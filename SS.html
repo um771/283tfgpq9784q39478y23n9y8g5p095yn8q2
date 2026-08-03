@@ -1336,20 +1336,19 @@ var NovelGen = (function () {
     }
 
     // ---- ファイル収集 ----
-    // 共通.txt（kyoutsu）はモード2以外の全モードで常に含める（モード2はAIオリジナル設定のため除外）
     var fileOrder = [];
     var charFiles = [];
     if (shuryoMode === 2) {
       fileOrder = ['shiryou'];
     } else if (shuryoMode === 3) {
-      fileOrder = ['shiryou', 'kyoutsu'];
+      fileOrder = ['shiryou'];
       if (chosen['ブーン']) charFiles.push('nijisousaku');
       if (chosen['モナー']) charFiles.push('choukasoku');
       if (chosen['他の人']) charFiles.push('tanohito');
       shuffle(charFiles);
       fileOrder = fileOrder.concat(charFiles);
     } else {
-      fileOrder = ['shiryou', 'ss', 'kyoutsu'];
+      fileOrder = ['shiryou', 'ss'];
       if (chosen['ブーン']) charFiles.push('nijisousaku');
       if (chosen['モナー']) charFiles.push('choukasoku');
       if (chosen['他の人']) charFiles.push('tanohito');
@@ -1381,6 +1380,35 @@ var NovelGen = (function () {
       if (kinshiText != null) {
         if (!addToContents(kinshiText)) return null;
       }
+    }
+
+    // ---- 共通.txt（モード2以外） ----
+    // SS.txt・キャラ資料の後ろ、各種マルコフの直前に配置する。
+    // （プロンプトの後ろ寄りの情報ほどAIが重視するため）
+    if (shuryoMode !== 2) {
+      var kyoutsuText = files.kyoutsu;
+      if (kyoutsuText != null) {
+        if (!addToContents(kyoutsuText)) return null;
+      }
+    }
+
+    // 主要AAキャラ限定制約
+    if (P.patternMode === 0 || randint(1, 1) === 1) {
+      if (!addToContents('主要AAのキャラのみを使用し、モブを用意する場合も主要AAから使用する')) return null;
+    }
+
+    // キャラクター間の関係ルール（モード2以外。モード2はAIオリジナル設定のため生成しない）
+    if (shuryoMode !== 2) {
+      var relationRule = generateRelationRule(chosen);
+      if (relationRule) {
+        if (!addToContents(relationRule)) return null;
+      }
+    }
+
+    // 汎用キャラクター一覧（キャラテンプレ.txt の動的出力）
+    var charaTemplate = buildCharTemplate(chosen, heroText, shuryoMode, files);
+    if (charaTemplate) {
+      if (!addToContents(charaTemplate)) return null;
     }
 
     // モード1はここで終了
@@ -1449,25 +1477,6 @@ var NovelGen = (function () {
           }
         }
       }
-    }
-
-    // 主要AAキャラ限定制約
-    if (P.patternMode === 0 || randint(1, 1) === 1) {
-      if (!addToContents('主要AAのキャラのみを使用し、モブを用意する場合も主要AAから使用する')) return null;
-    }
-
-    // キャラクター間の関係ルール（モード2以外。モード2はAIオリジナル設定のため生成しない）
-    if (shuryoMode !== 2) {
-      var relationRule = generateRelationRule(chosen);
-      if (relationRule) {
-        if (!addToContents(relationRule)) return null;
-      }
-    }
-
-    // 汎用キャラクター一覧（キャラテンプレ.txt の動的出力）
-    var charaTemplate = buildCharTemplate(chosen, heroText, shuryoMode, files);
-    if (charaTemplate) {
-      if (!addToContents(charaTemplate)) return null;
     }
 
     // 続き.txt（最後.txtの直前に挿入）

@@ -594,7 +594,7 @@ def build_contents(
         files = [always_files[0]]
 
     elif shuryo_mode == 3:
-        files = [always_files[0], kyoutsu_file]
+        files = [always_files[0]]
         char_files = []
 
         if chosen.get("ブーン"):
@@ -610,7 +610,7 @@ def build_contents(
         files.extend(char_files)
 
     else:
-        files = list(always_files) + [kyoutsu_file]
+        files = list(always_files)
         char_files = []
 
         if chosen.get("ブーン"):
@@ -669,6 +669,53 @@ def build_contents(
         if kinshi_text is not None:
             if not add_to_contents(kinshi_text):
                 return None
+
+    # ==========================================================
+    # 共通.txt（モード2以外）
+    #
+    # SS.txt・キャラ資料の後ろ、各種マルコフの直前に配置する。
+    # （プロンプトの後ろ寄りの情報ほどAIが重視するため）
+    # ==========================================================
+    if shuryo_mode != 2:
+        kyoutsu_text = safe_read(kyoutsu_file)
+
+        if kyoutsu_text is not None:
+            if not add_to_contents(kyoutsu_text):
+                return None
+
+    # ==========================================================
+    # 主要AAキャラ限定制約
+    # ==========================================================
+    if PATTERN_MODE == 0 or random.randint(1, 1) == 1:
+        if not add_to_contents(
+            "主要AAのキャラのみを使用し、"
+            "モブを用意する場合も主要AAから使用する"
+        ):
+            return None
+
+    # ==========================================================
+    # キャラクター間の関係ルール（モード2以外）
+    #
+    # モード2は「AIオリジナル設定」のため生成しない。
+    # ==========================================================
+    if shuryo_mode != 2:
+        relation_rule = generate_relation_rule(chosen)
+
+        if relation_rule:
+            if not add_to_contents(relation_rule):
+                return None
+
+    # ==========================================================
+    # 汎用キャラクター一覧（12-1テーブルの動的出力）
+    #
+    # モード2は全行、それ以外は資料キャラ除外＋ランダム間引き。
+    # 視点キャラは確定で含める。
+    # ==========================================================
+    chara_template = build_char_template(chosen, hero_text, shuryo_mode)
+
+    if chara_template:
+        if not add_to_contents(chara_template):
+            return None
 
     # ==========================================================
     # モード1はここで終了
@@ -817,43 +864,6 @@ def build_contents(
                         "↑\nこれは本編の資料です。軽度な改変はOK"
                     ):
                         return None
-
-    # ==========================================================
-    # 主要AAキャラ限定制約
-    #
-    # 最後.txt以降の指定順を崩さないように、
-    # 続き.txt・最後.txtより前に配置する
-    # ==========================================================
-    if PATTERN_MODE == 0 or random.randint(1, 1) == 1:
-        if not add_to_contents(
-            "主要AAのキャラのみを使用し、"
-            "モブを用意する場合も主要AAから使用する"
-        ):
-            return None
-
-    # ==========================================================
-    # キャラクター間の関係ルール（モード2以外）
-    #
-    # モード2は「AIオリジナル設定」のため生成しない。
-    # ==========================================================
-    if shuryo_mode != 2:
-        relation_rule = generate_relation_rule(chosen)
-
-        if relation_rule:
-            if not add_to_contents(relation_rule):
-                return None
-
-    # ==========================================================
-    # 汎用キャラクター一覧（12-1テーブルの動的出力）
-    #
-    # モード2は全行、それ以外は資料キャラ除外＋半分程度に間引き。
-    # 視点キャラは確定で含める。
-    # ==========================================================
-    chara_template = build_char_template(chosen, hero_text, shuryo_mode)
-
-    if chara_template:
-        if not add_to_contents(chara_template):
-            return None
 
     # ==========================================================
     # 続き.txt
