@@ -53,6 +53,13 @@ nijisousaku = r"C:\Users\saaaa\Downloads\新しいフォルダー (2)\二次創�
 choukasoku  = r"C:\Users\saaaa\Downloads\新しいフォルダー (2)\（ ´∀｀）　超加速.txt"
 tanohito    = r"C:\Users\saaaa\Downloads\新しいフォルダー (2)\他の人.txt"
 
+# 共通世界設定（モード2以外の全モードで常に含める。モード2はAIオリジナル設定のため除外）
+kyoutsu_file = r"C:\Users\saaaa\Downloads\新しいフォルダー (2)\共通.txt"
+
+# 汎用キャラクター一覧（SS.txt 12-1 のテーブルを切り出したファイル）
+# 実行時に「資料で引き当てたキャラの行を除外＋半分程度に間引き」してプロンプトに載せる
+chara_template_file = r"C:\Users\saaaa\Downloads\新しいフォルダー (2)\キャラテンプレ.txt"
+
 # 最後に必ず付けるファイル
 kinshi_file = r"C:\Users\saaaa\Downloads\新しいフォルダー (2)\禁止.txt"
 last_file   = r"C:\Users\saaaa\Downloads\新しいフォルダー (2)\最後.txt"
@@ -83,6 +90,180 @@ def safe_read(filepath: str) -> str | None:
     except Exception as e:
         print(f"⚠ ファイル読み込みエラー。スキップします: {filepath} ({e})")
         return None
+
+
+# ============================================================
+# キャラクター間の関係ルール（動的生成）
+#
+# 「無関係（他人）」「顔合わせ許容」「初対面義務」のルールを、
+# 選ばれたグループの組み合わせに応じてここで1回だけ生成する。
+# 資料ファイルに分散させないことで文字数を節約し、
+# プロンプトが1文書に結合される環境でも確実に機能する。
+# モード2（AIオリジナル設定）では生成しない。
+# ============================================================
+
+REL_GROUPS = {
+    "ブーン": ("VIP", ["兄者", "弟者", "ブーン", "ドクオ", "クー", "シュー", "モララー", "ギコ", "ショボン", "シャキン"]),
+    "モナー": ("モナーグループ", ["モナー", "ロマネスク", "しぃ", "つー", "ミセリ", "トソン"]),
+    "他の人": ("その他のグループ", ["ツン", "渡辺さん", "デレ", "キュート", "ペニサス伊藤", "花瓶", "ヒート", "フォックス", "ハイン", "でぃ", "またんき", "フサギコ", "ぃょぅ"]),
+}
+
+
+def generate_relation_rule(chosen: dict) -> str:
+    selected = [k for k in ("ブーン", "モナー", "他の人") if chosen.get(k)]
+    if not selected:
+        return ""
+
+    def member_str(label: str, members: list) -> str:
+        return f"{label}（{'、'.join(members)}）"
+
+    lines = []
+
+    # 選ばれたグループ同士の無関係の定義
+    for i in range(len(selected)):
+        for j in range(i + 1, len(selected)):
+            l1, m1 = REL_GROUPS[selected[i]]
+            l2, m2 = REL_GROUPS[selected[j]]
+            lines.append(
+                f"{member_str(l1, m1)}と{member_str(l2, m2)}は、"
+                "互いに一切の面識・接点を持たない完全な無関係（他人）である。"
+            )
+
+    # 単独パターン：他グループ全般へのガード
+    if len(selected) == 1:
+        l1, m1 = REL_GROUPS[selected[0]]
+        lines.append(
+            f"{member_str(l1, m1)}のキャラクターは、"
+            "このプロンプトに記述されていない他のグループのキャラクターと"
+            "互いに一切の面識・接点を持たない完全な無関係（他人）である。"
+        )
+
+    rule = "キャラクター間の関係：\n" + "\n".join(lines)
+    rule += (
+        "\nこの指定の趣旨は、互いに面識のないキャラクター同士を"
+        "「顔を知っている」「旧知の仲」のような顔見知り・旧知扱いで描写することを防ぐことにある。"
+        "顔合わせそのものを禁じる趣旨ではない。物語の展開やユーザーの指示に応じて、"
+        "異なるグループのキャラクターが同じ場に現れ、顔を合わせることは許容する。"
+        "その場合、両者は必ず初対面として描くこと："
+        "互いの名前・素性・性格・能力・過去を知らない前提で、"
+        "初対面特有の距離感（警戒・探り・よそよそしさ・自己紹介）を持たせる。"
+        "旧知同士のような馴染んだ口調、相手の内情を知っている前提の言動、"
+        "根拠のない親密さや信頼を付加してはならない。"
+        "顔合わせを避ける必要はないが、顔を合わせた以上、初対面以外の関係性を勝手に付与してはならない。"
+    )
+    return rule
+
+
+# ============================================================
+# 汎用キャラクター一覧（SS.txt 12-1 テーブル）の動的出力
+#
+# ・mode=2（AIオリジナル設定）: 全行を出力
+# ・mode=-1 / 1 / 3: 選択された資料にプロフィールが存在するキャラの行を除外し、
+#   残りをランダムに約半分まで間引いて出力する
+# ・視点（hero_text）で指定されたキャラクターは間引かれても確定で含める
+#   （hero_text は「今回の視点は[ AA　名前 ]です」形式。名前・AAのどちらかで照合）
+# ============================================================
+
+# 選択された資料にプロフィールが存在するキャラ（=テンプレから除外すべき行）
+TEMPLATE_EXCLUDE = {
+    "ブーン": {"兄者", "弟者", "ブーン", "ドクオ", "クー", "シュー", "モララー", "ギコ", "ショボン", "シャキン"},
+    "モナー": {"モナー", "ロマネスク", "しぃ", "つー", "ミセリ", "トソン", "またんき"},
+    "他の人": {"ツン", "渡辺さん", "デレ", "キュート", "ペニサス伊藤", "花瓶", "ヒート", "フォックス", "ハイン", "でぃ", "またんき", "フサギコ", "ぃょぅ"},
+}
+
+
+def _parse_template(text: str):
+    """テーブルを (ヘッダ行, 区切り行, データ行リスト) に分解。データ行はセル配列。"""
+    header = None
+    sep = None
+    rows = []
+    for line in text.splitlines():
+        s = line.strip()
+        if not s.startswith("|"):
+            continue
+        if "代表AA" in s:
+            header = s
+        elif re.fullmatch(r"\|[\s\-|]+\|", s):
+            sep = s
+        else:
+            cells = [c.strip() for c in s.strip("|").split("|")]
+            if len(cells) >= 2 and cells[0]:
+                rows.append(cells)
+    return header, sep, rows
+
+
+def _hero_name_from_text(hero_text: str) -> str:
+    """「今回の視点は[ X ]です」からキャラ名（X の末尾部分）を抽出。"""
+    m = re.search(r"今回の視点は\[\s*(.+?)\s*\]です", hero_text)
+    if not m:
+        return ""
+    x = m.group(1)
+    if "：" in x:
+        x = x.split("：", 1)[1]
+    parts = [p for p in x.split("　") if p.strip()]
+    return parts[-1] if parts else ""
+
+
+def build_char_template(chosen: dict, hero_text: str, shuryo_mode: int) -> str:
+    text = safe_read(chara_template_file)
+    if not text:
+        return ""
+    header, sep, rows = _parse_template(text)
+    if not rows:
+        return ""
+
+    # mode=2 は全行
+    if shuryo_mode == 2:
+        kept = rows
+    else:
+        # 選択された資料に存在するキャラの行を除外
+        exclude = set()
+        for k in ("ブーン", "モナー", "他の人"):
+            if chosen.get(k):
+                exclude |= TEMPLATE_EXCLUDE[k]
+
+        filtered = []
+        for r in rows:
+            core = r[0].split("（")[0].strip()
+            if core and core in exclude:
+                continue
+            filtered.append(r)
+
+        # 視点キャラは確定で含める（名前 or AA で照合）
+        hero_name = _hero_name_from_text(hero_text)
+        hero_rows = []
+        rest = []
+        for r in filtered:
+            core = r[0].split("（")[0].strip()
+            aa = r[1].strip() if len(r) >= 2 else ""
+            if (hero_name and core == hero_name) or (aa and aa in hero_text):
+                hero_rows.append(r)
+            else:
+                rest.append(r)
+
+        # 残りを約半分に間引き
+        thinned = [r for r in rest if random.random() < 0.5]
+        kept = hero_rows + thinned
+
+        # 全部間引かれてしまった場合は最低1行残す
+        if not kept and filtered:
+            kept = [random.choice(filtered)]
+
+    if not kept:
+        return ""
+
+    # 出力組み立て
+    out = [
+        "汎用キャラクター一覧（サブ・モブ用テンプレ）：",
+        "この一覧に記載されたキャラクターのみを使用できる。一覧に無いキャラクターは使用しない。",
+    ]
+    if header:
+        out.append(header)
+    if sep:
+        out.append(sep)
+    for r in kept:
+        out.append("| " + " | ".join(r) + " |")
+    return "\n".join(out)
 
 # ============================================================
 # マークダウン破壊（マルコフ素材専用）
@@ -412,7 +593,7 @@ def build_contents(
         files = [always_files[0]]
 
     elif shuryo_mode == 3:
-        files = [always_files[0]]
+        files = [always_files[0], kyoutsu_file]
         char_files = []
 
         if chosen.get("ブーン"):
@@ -428,7 +609,7 @@ def build_contents(
         files.extend(char_files)
 
     else:
-        files = list(always_files)
+        files = list(always_files) + [kyoutsu_file]
         char_files = []
 
         if chosen.get("ブーン"):
@@ -647,6 +828,30 @@ def build_contents(
             "主要AAのキャラのみを使用し、"
             "モブを用意する場合も主要AAから使用する"
         ):
+            return None
+
+    # ==========================================================
+    # キャラクター間の関係ルール（モード2以外）
+    #
+    # モード2は「AIオリジナル設定」のため生成しない。
+    # ==========================================================
+    if shuryo_mode != 2:
+        relation_rule = generate_relation_rule(chosen)
+
+        if relation_rule:
+            if not add_to_contents(relation_rule):
+                return None
+
+    # ==========================================================
+    # 汎用キャラクター一覧（12-1テーブルの動的出力）
+    #
+    # モード2は全行、それ以外は資料キャラ除外＋半分程度に間引き。
+    # 視点キャラは確定で含める。
+    # ==========================================================
+    chara_template = build_char_template(chosen, hero_text, shuryo_mode)
+
+    if chara_template:
+        if not add_to_contents(chara_template):
             return None
 
     # ==========================================================
