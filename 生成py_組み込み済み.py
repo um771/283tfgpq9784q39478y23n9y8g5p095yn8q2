@@ -171,6 +171,16 @@ TEMPLATE_EXCLUDE = {
     "他の人": {"ツン", "渡辺さん", "デレ", "キュート", "ペニサス伊藤", "花瓶", "ヒート", "フォックス", "ハイン", "でぃ", "またんき", "フサギコ", "ぃょぅ"},
 }
 
+# AAでの除外セット。
+# 資料内ではキャラの名前が省略・表記揺れしている例が複数あるため、
+# 同一人物かの判断は名前の一致よりもAA（ASCIIアート）の一致を優先する。
+# 例: テンプレの「素直キュート」は資料の「キュート」とAAが同一 → 同一人物として除外。
+TEMPLATE_EXCLUDE_AA = {
+    "ブーン": {"（　＾ω＾）", "('A`)", "川 ﾟ -ﾟ)", "lw´‐ _‐ﾉv", "（ ・∀・）", "(,,ﾟДﾟ)", "(´・ω・`)", "(｀･ω･´)", "（ ´_ゝ`）", "（´<_` ）"},
+    "モナー": {"（ ´∀｀）", "（ ФωФ）", "(*ﾟーﾟ)", "(*ﾟ∀ﾟ)", "ﾐｾ*ﾟーﾟ)ﾘ", "(ﾟ、ﾟﾄｿﾝ", "(・∀ ・)"},
+    "他の人": {"ξﾟ⊿ﾟ)ξ", "从'ー'从", "ζ(ﾟーﾟ*ζ", "o川*ﾟーﾟ)o", "('、`*川", "i!iiﾘﾟ ヮﾟﾉﾙ", "ﾉﾊﾟ⊿ﾟ)", "爪'ー`)y‐", "从 ﾟ∀从", "(#ﾟ;;-ﾟ)", "ミ,,ﾟДﾟ彡", "(=ﾟωﾟ)ﾉ"},
+}
+
 
 def _parse_template(text: str):
     """テーブルを (ヘッダ行, 区切り行, データ行リスト) に分解。データ行はセル配列。"""
@@ -218,14 +228,20 @@ def build_char_template(chosen: dict, hero_text: str, shuryo_mode: int) -> str:
     else:
         # 選択された資料に存在するキャラの行を除外
         exclude = set()
+        exclude_aa = set()
         for k in ("ブーン", "モナー", "他の人"):
             if chosen.get(k):
                 exclude |= TEMPLATE_EXCLUDE[k]
+                exclude_aa |= TEMPLATE_EXCLUDE_AA[k]
 
         filtered = []
         for r in rows:
             core = r[0].split("（")[0].strip()
+            aa = r[1].strip() if len(r) >= 2 else ""
+            # 同一人物判定は名前よりAAの一致を優先する（資料内で名前が省略されている例があるため）
             if core and core in exclude:
+                continue
+            if aa and aa in exclude_aa:
                 continue
             filtered.append(r)
 

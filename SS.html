@@ -1611,6 +1611,16 @@ var NovelGen = (function () {
     '他の人': ['ツン', '渡辺さん', 'デレ', 'キュート', 'ペニサス伊藤', '花瓶', 'ヒート', 'フォックス', 'ハイン', 'でぃ', 'またんき', 'フサギコ', 'ぃょぅ']
   };
 
+  // AAでの除外セット。
+  // 資料内ではキャラの名前が省略・表記揺れしている例が複数あるため、
+  // 同一人物かの判断は名前の一致よりもAA（ASCIIアート）の一致を優先する。
+  // 例: テンプレの「素直キュート」は資料の「キュート」とAAが同一 → 同一人物として除外。
+  var TEMPLATE_EXCLUDE_AA = {
+    'ブーン': ['（　＾ω＾）', "('A`)", '川 ﾟ -ﾟ)', "lw´‐ _‐ﾉv", '（ ・∀・）', '(,,ﾟДﾟ)', "(´・ω・`)", '(｀･ω･´)', '（ ´_ゝ`）', '（´<_` ）'],
+    'モナー': ['（ ´∀｀）', '（ ФωФ）', '(*ﾟーﾟ)', '(*ﾟ∀ﾟ)', 'ﾐｾ*ﾟーﾟ)ﾘ', '(ﾟ、ﾟﾄｿﾝ', '(・∀ ・)'],
+    '他の人': ['ξﾟ⊿ﾟ)ξ', "从'ー'从", 'ζ(ﾟーﾟ*ζ', 'o川*ﾟーﾟ)o', "('、`*川", 'i!iiﾘﾟ ヮﾟﾉﾙ', 'ﾉﾊﾟ⊿ﾟ)', "爪'ー`)y‐", '从 ﾟ∀从', '(#ﾟ;;-ﾟ)', 'ミ,,ﾟДﾟ彡', '(=ﾟωﾟ)ﾉ']
+  };
+
   function heroNameFromText(heroText) {
     var m = /今回の視点は\[\s*(.+?)\s*\]です/.exec(heroText || '');
     if (!m) return '';
@@ -1639,13 +1649,20 @@ var NovelGen = (function () {
       kept = rows;
     } else {
       var exclude = {};
+      var excludeAA = {};
       ['ブーン', 'モナー', '他の人'].forEach(function (k) {
-        if (chosen[k]) (TEMPLATE_EXCLUDE[k] || []).forEach(function (nm) { exclude[nm] = true; });
+        if (chosen[k]) {
+          (TEMPLATE_EXCLUDE[k] || []).forEach(function (nm) { exclude[nm] = true; });
+          (TEMPLATE_EXCLUDE_AA[k] || []).forEach(function (aa) { excludeAA[aa] = true; });
+        }
       });
       var filtered = [];
       rows.forEach(function (r) {
         var core = r[0].split('（')[0].trim();
+        var aa = (r[1] || '').trim();
+        // 同一人物判定は名前よりAAの一致を優先する（資料内で名前が省略されている例があるため）
         if (core && exclude[core]) return;
+        if (aa && excludeAA[aa]) return;
         filtered.push(r);
       });
       var heroName = heroNameFromText(heroText);
