@@ -241,8 +241,9 @@ def build_char_template(chosen: dict, hero_text: str, shuryo_mode: int) -> str:
             else:
                 rest.append(r)
 
-        # 残りを約半分に間引き
-        thinned = [r for r in rest if random.random() < 0.5]
+        # 残りをランダムな割合で間引き（間引かれるキャラ数も実行ごとにランダム）
+        keep_rate = random.random()
+        thinned = [r for r in rest if random.random() < keep_rate]
         kept = hero_rows + thinned
 
         # 全部間引かれてしまった場合は最低1行残す

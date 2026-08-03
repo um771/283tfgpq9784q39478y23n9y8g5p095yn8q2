@@ -1336,19 +1336,20 @@ var NovelGen = (function () {
     }
 
     // ---- ファイル収集 ----
+    // 共通.txt（kyoutsu）はモード2以外の全モードで常に含める（モード2はAIオリジナル設定のため除外）
     var fileOrder = [];
     var charFiles = [];
     if (shuryoMode === 2) {
       fileOrder = ['shiryou'];
     } else if (shuryoMode === 3) {
-      fileOrder = ['shiryou'];
+      fileOrder = ['shiryou', 'kyoutsu'];
       if (chosen['ブーン']) charFiles.push('nijisousaku');
       if (chosen['モナー']) charFiles.push('choukasoku');
       if (chosen['他の人']) charFiles.push('tanohito');
       shuffle(charFiles);
       fileOrder = fileOrder.concat(charFiles);
     } else {
-      fileOrder = ['shiryou', 'ss'];
+      fileOrder = ['shiryou', 'ss', 'kyoutsu'];
       if (chosen['ブーン']) charFiles.push('nijisousaku');
       if (chosen['モナー']) charFiles.push('choukasoku');
       if (chosen['他の人']) charFiles.push('tanohito');
@@ -1455,6 +1456,20 @@ var NovelGen = (function () {
       if (!addToContents('主要AAのキャラのみを使用し、モブを用意する場合も主要AAから使用する')) return null;
     }
 
+    // キャラクター間の関係ルール（モード2以外。モード2はAIオリジナル設定のため生成しない）
+    if (shuryoMode !== 2) {
+      var relationRule = generateRelationRule(chosen);
+      if (relationRule) {
+        if (!addToContents(relationRule)) return null;
+      }
+    }
+
+    // 汎用キャラクター一覧（キャラテンプレ.txt の動的出力）
+    var charaTemplate = buildCharTemplate(chosen, heroText, shuryoMode, files);
+    if (charaTemplate) {
+      if (!addToContents(charaTemplate)) return null;
+    }
+
     // 続き.txt（最後.txtの直前に挿入）
     var tsuzukiText = files.tsuzuki;
     if (tsuzukiText != null) {
@@ -1540,6 +1555,114 @@ var NovelGen = (function () {
     }
 
     return contents;
+  }
+
+  // ============================================================
+  // キャラクター間の関係ルール（動的生成） — py と同ロジック
+  // ============================================================
+  var REL_GROUPS = {
+    'ブーン': ['VIP', ['兄者', '弟者', 'ブーン', 'ドクオ', 'クー', 'シュー', 'モララー', 'ギコ', 'ショボン', 'シャキン']],
+    'モナー': ['モナーグループ', ['モナー', 'ロマネスク', 'しぃ', 'つー', 'ミセリ', 'トソン']],
+    '他の人': ['その他のグループ', ['ツン', '渡辺さん', 'デレ', 'キュート', 'ペニサス伊藤', '花瓶', 'ヒート', 'フォックス', 'ハイン', 'でぃ', 'またんき', 'フサギコ', 'ぃょぅ']]
+  };
+
+  function generateRelationRule(chosen) {
+    var selected = ['ブーン', 'モナー', '他の人'].filter(function (k) { return chosen[k]; });
+    if (!selected.length) return '';
+    function memberStr(label, members) {
+      return label + '（' + members.join('、') + '）';
+    }
+    var lines = [];
+    for (var i = 0; i < selected.length; i++) {
+      for (var j = i + 1; j < selected.length; j++) {
+        var l1 = REL_GROUPS[selected[i]][0], m1 = REL_GROUPS[selected[i]][1];
+        var l2 = REL_GROUPS[selected[j]][0], m2 = REL_GROUPS[selected[j]][1];
+        lines.push(memberStr(l1, m1) + 'と' + memberStr(l2, m2) + 'は、互いに一切の面識・接点を持たない完全な無関係（他人）である。');
+      }
+    }
+    if (selected.length === 1) {
+      var l0 = REL_GROUPS[selected[0]][0], m0 = REL_GROUPS[selected[0]][1];
+      lines.push(memberStr(l0, m0) + 'のキャラクターは、このプロンプトに記述されていない他のグループのキャラクターと互いに一切の面識・接点を持たない完全な無関係（他人）である。');
+    }
+    var rule = 'キャラクター間の関係：\n' + lines.join('\n');
+    rule += '\nこの指定の趣旨は、互いに面識のないキャラクター同士を「顔を知っている」「旧知の仲」のような顔見知り・旧知扱いで描写することを防ぐことにある。顔合わせそのものを禁じる趣旨ではない。物語の展開やユーザーの指示に応じて、異なるグループのキャラクターが同じ場に現れ、顔を合わせることは許容する。その場合、両者は必ず初対面として描くこと：互いの名前・素性・性格・能力・過去を知らない前提で、初対面特有の距離感（警戒・探り・よそよそしさ・自己紹介）を持たせる。旧知同士のような馴染んだ口調、相手の内情を知っている前提の言動、根拠のない親密さや信頼を付加してはならない。顔合わせを避ける必要はないが、顔を合わせた以上、初対面以外の関係性を勝手に付与してはならない。';
+    return rule;
+  }
+
+  // ============================================================
+  // 汎用キャラクター一覧（キャラテンプレ.txt）の動的出力 — py と同ロジック
+  // ・mode=2（AIオリジナル設定）: 全行を出力
+  // ・mode=-1 / 1 / 3: 選択された資料にプロフィールが存在するキャラの行を除外し、
+  //   残りをランダムな割合で間引いて出力（間引かれるキャラ数も実行ごとにランダム）
+  // ・視点（heroText）で指定されたキャラクターは間引かれても確定で含める
+  // ============================================================
+  var TEMPLATE_EXCLUDE = {
+    'ブーン': ['兄者', '弟者', 'ブーン', 'ドクオ', 'クー', 'シュー', 'モララー', 'ギコ', 'ショボン', 'シャキン'],
+    'モナー': ['モナー', 'ロマネスク', 'しぃ', 'つー', 'ミセリ', 'トソン', 'またんき'],
+    '他の人': ['ツン', '渡辺さん', 'デレ', 'キュート', 'ペニサス伊藤', '花瓶', 'ヒート', 'フォックス', 'ハイン', 'でぃ', 'またんき', 'フサギコ', 'ぃょぅ']
+  };
+
+  function heroNameFromText(heroText) {
+    var m = /今回の視点は\[\s*(.+?)\s*\]です/.exec(heroText || '');
+    if (!m) return '';
+    var x = m[1];
+    if (x.indexOf('：') >= 0) x = x.split('：')[1];
+    var parts = x.split('　').filter(function (p) { return p.trim(); });
+    return parts.length ? parts[parts.length - 1] : '';
+  }
+
+  function buildCharTemplate(chosen, heroText, shuryoMode, files) {
+    var text = files.charaTemplate;
+    if (!text) return '';
+    var header = null, sep = null, rows = [];
+    text.split(/\r?\n/).forEach(function (line) {
+      var s = line.trim();
+      if (!s || s.charAt(0) !== '|') return;
+      if (s.indexOf('代表AA') >= 0) { header = s; return; }
+      if (/^\|[\s\-|]+\|$/.test(s)) { sep = s; return; }
+      var cells = s.replace(/^\|/, '').replace(/\|$/, '').split('|').map(function (c) { return c.trim(); });
+      if (cells.length >= 2 && cells[0]) rows.push(cells);
+    });
+    if (!rows.length) return '';
+
+    var kept;
+    if (shuryoMode === 2) {
+      kept = rows;
+    } else {
+      var exclude = {};
+      ['ブーン', 'モナー', '他の人'].forEach(function (k) {
+        if (chosen[k]) (TEMPLATE_EXCLUDE[k] || []).forEach(function (nm) { exclude[nm] = true; });
+      });
+      var filtered = [];
+      rows.forEach(function (r) {
+        var core = r[0].split('（')[0].trim();
+        if (core && exclude[core]) return;
+        filtered.push(r);
+      });
+      var heroName = heroNameFromText(heroText);
+      var heroRows = [], rest = [];
+      filtered.forEach(function (r) {
+        var core = r[0].split('（')[0].trim();
+        var aa = (r[1] || '').trim();
+        if ((heroName && core === heroName) || (aa && heroText && heroText.indexOf(aa) >= 0)) heroRows.push(r);
+        else rest.push(r);
+      });
+      // ランダムな割合で間引き（間引かれるキャラ数も実行ごとにランダム）
+      var keepRate = Math.random();
+      var thinned = rest.filter(function () { return Math.random() < keepRate; });
+      kept = heroRows.concat(thinned);
+      if (!kept.length && filtered.length) kept = [filtered[Math.floor(Math.random() * filtered.length)]];
+    }
+    if (!kept.length) return '';
+
+    var out = [
+      '汎用キャラクター一覧（サブ・モブ用テンプレ）：',
+      'この一覧に記載されたキャラクターのみを使用できる。一覧に無いキャラクターは使用しない。'
+    ];
+    if (header) out.push(header);
+    if (sep) out.push(sep);
+    kept.forEach(function (r) { out.push('| ' + r.join(' | ') + ' |'); });
+    return out.join('\n');
   }
 
   // ============================================================
@@ -1914,6 +2037,9 @@ var NovelGen = (function () {
     splitCharacters: splitCharacters,
     splitSource: splitSource,
     dedupeBlocks: dedupeBlocks,
+    generateRelationRule: generateRelationRule,
+    buildCharTemplate: buildCharTemplate,
+    _buildContents: buildContents,
     // テスト用
     _randint: randint
   };
@@ -1945,6 +2071,8 @@ NovelGen.setNovelData(NOVEL_DATA);
   var SLOTS = [
     { id: 'shiryou',     label: '資料.txt',   repoFile: '資料.txt',   defMode: 'none',   note: 'リポジトリに無い場合はスキップ' },
     { id: 'ss',          label: 'SS.txt',    repoFile: 'SS.txt',    defMode: 'github' },
+    { id: 'kyoutsu',      label: '共通.txt',   repoFile: '共通.txt',   defMode: 'github' },
+    { id: 'charaTemplate', label: 'キャラテンプレ.txt', repoFile: 'キャラテンプレ.txt', defMode: 'github' },
     { id: 'nijisousaku', label: '二次創作.txt', repoFile: '二次創作.txt', defMode: 'github' },
     { id: 'choukasoku',  label: '超加速.txt', repoFile: '超加速.txt', defMode: 'github' },
     { id: 'tanohito',    label: '他の人.txt', repoFile: '他の人.txt', defMode: 'github' },
