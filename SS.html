@@ -1,0 +1,2572 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>小説生成プロンプト ワンクリックジェネレーター</title>
+<style>
+:root {
+  --bg: #0f1117;
+  --bg2: #171a23;
+  --bg3: #1e2230;
+  --border: #2c3246;
+  --text: #e6e9f2;
+  --text-dim: #9aa3b8;
+  --accent: #ff9f43;
+  --accent2: #f76b1c;
+  --ok: #3ddc84;
+  --warn: #ffce54;
+  --err: #ff6b6b;
+  --mono: "SFMono-Regular", Consolas, "BIZ UDGothic", "MS Gothic", monospace;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; background: var(--bg); color: var(--text); }
+body {
+  font-family: "Hiragino Kaku Gothic ProN", "Noto Sans JP", "Yu Gothic", sans-serif;
+  line-height: 1.6;
+  font-size: 15px;
+}
+header {
+  padding: 26px 20px 18px;
+  text-align: center;
+  border-bottom: 1px solid var(--border);
+  background: linear-gradient(180deg, #1a1e2b, #10131b);
+}
+header h1 { margin: 0 0 6px; font-size: 24px; letter-spacing: 0.5px; }
+header p { margin: 0; color: var(--text-dim); font-size: 13px; }
+main { max-width: 980px; margin: 0 auto; padding: 22px 16px 80px; }
+
+/* ---- 生成ボタン ---- */
+.controls { text-align: center; margin: 18px 0 10px; }
+.big-btn {
+  display: inline-block;
+  font-size: 20px;
+  font-weight: 700;
+  padding: 16px 44px;
+  border: none;
+  border-radius: 14px;
+  cursor: pointer;
+  color: #1a1206;
+  background: linear-gradient(135deg, var(--accent), var(--accent2));
+  box-shadow: 0 6px 24px rgba(247, 107, 28, 0.35);
+  transition: transform 0.12s ease, box-shadow 0.12s ease;
+}
+.big-btn:hover { transform: translateY(-2px); box-shadow: 0 10px 30px rgba(247, 107, 28, 0.45); }
+.big-btn:active { transform: translateY(0); }
+.big-btn:disabled { opacity: 0.55; cursor: wait; transform: none; }
+#status { display: block; margin-top: 10px; color: var(--text-dim); font-size: 13px; min-height: 20px; }
+
+/* ---- 結果 ---- */
+.result {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 16px;
+  margin-top: 18px;
+}
+.meta {
+  font-family: var(--mono);
+  font-size: 13px;
+  color: var(--ok);
+  margin-bottom: 10px;
+  word-break: break-all;
+}
+.meta .sub { color: var(--text-dim); }
+#result {
+  width: 100%;
+  height: 320px;
+  background: #0c0e14;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text);
+  font-family: var(--mono);
+  font-size: 12.5px;
+  line-height: 1.5;
+  padding: 10px;
+  resize: vertical;
+  white-space: pre;
+}
+.actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+.actions button {
+  background: var(--bg3);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 14px;
+  font-size: 13px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.actions button:hover:not(:disabled) { background: #29304a; }
+.actions button:disabled { opacity: 0.4; cursor: default; }
+
+/* ---- ログ ---- */
+.log {
+  margin-top: 14px;
+  background: #0c0e14;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 12px;
+  font-family: var(--mono);
+  font-size: 12px;
+  max-height: 200px;
+  overflow-y: auto;
+  white-space: pre-wrap;
+  color: var(--text-dim);
+}
+.log .warn { color: var(--warn); }
+.log .err { color: var(--err); }
+.log .ok { color: var(--ok); }
+
+/* ---- 設定 ---- */
+details.settings, details.help {
+  margin-top: 16px;
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 4px 18px 18px;
+}
+summary {
+  cursor: pointer;
+  font-weight: 700;
+  font-size: 16px;
+  padding: 14px 0;
+  user-select: none;
+}
+summary:hover { color: var(--accent); }
+section.block { margin-top: 14px; }
+section.block h3 {
+  font-size: 14px;
+  color: var(--accent);
+  margin: 18px 0 8px;
+  border-bottom: 1px dashed var(--border);
+  padding-bottom: 4px;
+}
+.repo-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 8px; }
+.repo-row input, .repo-row select, .params input, .params select, .slot-row input, .slot-row select {
+  background: #0c0e14;
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  padding: 7px 10px;
+  font-size: 13px;
+  font-family: inherit;
+}
+.repo-row input[type=text] { width: 260px; }
+.repo-row input[type=text].short { width: 120px; }
+
+table.slots { width: 100%; border-collapse: collapse; }
+table.slots th, table.slots td { padding: 6px 8px; border-bottom: 1px solid #222838; text-align: left; vertical-align: middle; }
+table.slots th { font-size: 12px; color: var(--text-dim); font-weight: normal; }
+table.slots td.label { font-weight: 700; white-space: nowrap; width: 150px; }
+table.slots td .note { font-size: 11px; color: var(--text-dim); font-weight: normal; }
+table.slots select { min-width: 150px; }
+table.slots input[type=text] { width: 100%; min-width: 220px; font-family: var(--mono); font-size: 12px; }
+table.slots .filebtn { font-size: 12px; padding: 5px 10px; }
+table.slots .fname { font-size: 11px; color: var(--text-dim); margin-left: 6px; }
+table.slots .state { font-size: 11px; white-space: nowrap; }
+table.slots textarea { width: 100%; min-width: 220px; background: #0c0e14; color: var(--text); border: 1px solid var(--border); border-radius: 7px; padding: 6px; font-size: 12px; font-family: var(--mono); resize: vertical; }
+
+.params { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 10px; }
+.params .field { display: flex; align-items: center; gap: 8px; }
+.params .field label { font-size: 12.5px; color: var(--text-dim); flex: 1; }
+.params .field input, .params .field select { width: 130px; }
+.btn-row { margin-top: 14px; display: flex; gap: 10px; flex-wrap: wrap; }
+.btn-row button {
+  background: var(--bg3);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 16px;
+  cursor: pointer;
+  font-size: 13px;
+}
+.btn-row button:hover { background: #29304a; }
+.saved-flag { color: var(--ok); font-size: 12px; }
+
+/* ---- ヘルプ ---- */
+.help-content { font-size: 13.5px; color: var(--text-dim); }
+.help-content h4 { color: var(--text); margin: 14px 0 4px; font-size: 14px; }
+.help-content ul { margin: 4px 0 10px; padding-left: 20px; }
+.help-content li { margin: 3px 0; }
+.help-content code {
+  background: #0c0e14;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  padding: 1px 6px;
+  font-size: 12px;
+  font-family: var(--mono);
+}
+.help-content table { border-collapse: collapse; margin: 6px 0; }
+.help-content td, .help-content th { border: 1px solid var(--border); padding: 4px 10px; font-size: 12.5px; }
+
+footer { text-align: center; color: #5b6378; font-size: 11px; padding: 24px 0 40px; }
+
+</style>
+</head>
+<body>
+
+<header>
+  <h1>📖 小説生成プロンプト ジェネレーター</h1>
+  <p>ワンクリックで「AIに渡す小説生成プロンプト」を作成してクリップボードへコピー。毎回ランダムな組み合わせで出力します。</p>
+</header>
+
+<main>
+  <div class="controls">
+    <button id="genBtn" class="big-btn">🚀 ワンクリック生成＆コピー</button>
+    <span id="status"></span>
+  </div>
+
+  <section class="result" id="resultSection" hidden>
+    <div class="meta" id="meta"></div>
+    <textarea id="result" readonly spellcheck="false"></textarea>
+    <div class="actions">
+      <button id="copyBtn">📋 コピー</button>
+      <button id="dlGenprompt" disabled>💾 genprompt.txt を保存</button>
+      <button id="dlWorld" disabled>💾 00_world.md を保存</button>
+      <button id="dlChars" disabled>💾 01_characters.md を保存</button>
+    </div>
+  </section>
+
+  <div class="log" id="log"></div>
+
+  <details class="settings" id="settings">
+    <summary>⚙ 設定（データ参照元・パラメータ）</summary>
+
+    <section class="block">
+      <h3>📦 リポジトリ（GitHub参照の基準）</h3>
+      <div class="repo-row">
+        <input type="text" id="repoOwner" placeholder="owner" class="short" title="ユーザー名">
+        <span>/</span>
+        <input type="text" id="repoName" placeholder="repo" title="リポジトリ名">
+        <span>ブランチ</span>
+        <input type="text" id="repoBranch" placeholder="refs/heads/main" class="short" title="ブランチ">
+        <button id="resetUrls">🔄 全ファイルをこのリポジトリ参照に戻す</button>
+      </div>
+      <p style="font-size:12px;color:#9aa3b8;margin:4px 0 0;">
+        マルコフ.txt / 最後.txt などを GitHub 上で編集・保存すれば、次回の生成で自動的に最新版が使われます。
+      </p>
+    </section>
+
+    <section class="block">
+      <h3>📄 データファイル（参照元）</h3>
+      <table class="slots">
+        <thead>
+          <tr><th>ファイル</th><th>参照元</th><th>URL / ファイル / 内容</th><th>状態</th></tr>
+        </thead>
+        <tbody id="slotBody"></tbody>
+      </table>
+    </section>
+
+    <section class="block">
+      <h3>🎛 パラメータ（基本）</h3>
+      <div class="params" id="paramsBasic"></div>
+    </section>
+
+    <section class="block">
+      <h3>🔧 パラメータ（上級）</h3>
+      <div class="params" id="paramsAdv"></div>
+    </section>
+
+    <div class="btn-row">
+      <button id="resetAll">🗑 すべて初期状態に戻す</button>
+    </div>
+  </details>
+
+  <details class="help">
+    <summary>❓ 使い方・仕組み</summary>
+    <div class="help-content">
+
+      <h4>◆ 使い方</h4>
+      <ul>
+        <li>このページをブラウザで開いて、<b>「🚀 ワンクリック生成＆コピー」</b>を押すだけ。</li>
+        <li>生成されたプロンプトは自動でクリップボードにコピーされ、下の欄にも表示されます。そのままAI（ChatGPT等）に貼り付けて小説を生成してください。</li>
+        <li>実行のたびに「選出パターン（ブーン／モナー／他の人／マルコフ）・視点・テーマ・トーン・文字数」がランダムに変わります。</li>
+      </ul>
+
+      <h4>◆ データはどこから来るの？（GitHub参照）</h4>
+      <ul>
+        <li>デフォルトでは GitHub リポジトリ
+          <code>um771/283tfgpq9784q39478y23n9y8g5p095yn8q2</code> の <code>main</code> ブランチにある
+          <code>SS.txt / 二次創作.txt / 超加速.txt / 他の人.txt / マルコフ.txt / トーン.txt / 最後.txt</code> を
+          <code>raw.githubusercontent.com</code> から取得します。</li>
+        <li><b>マルコフ.txt や 最後.txt をリポジトリ上で編集して保存 → このページで生成</b> すれば、最新版が反映されます（毎回最新を取得）。</li>
+        <li>取得に失敗した場合は「前回取得した内容」を自動で使い、警告を表示します。</li>
+        <li>リポジトリを変えたい場合は「⚙ 設定」のリポジトリ欄を書き換えるか、各ファイルのURLを直接編集してください。</li>
+      </ul>
+
+      <h4>◆ ローカルファイルを使う場合</h4>
+      <ul>
+        <li>設定の各ファイル行で「参照元」を<b>ローカルファイル</b>に切り替え、📁 ボタンで選択します。</li>
+        <li>Chrome / Edge なら選択したファイルを記憶し、<b>毎回最新の内容を読み込み直します</b>（ファイルを編集→生成、が反映される）。</li>
+        <li>他のブラウザでは選択内容をキャッシュします（ファイル変更時は再選択）。</li>
+        <li>「テキスト直接入力」にすると、画面内の欄に内容を貼り付けて使えます。</li>
+      </ul>
+
+      <h4>◆ パラメータと元のPythonスクリプトの対応</h4>
+      <table>
+        <tr><th>この画面</th><th>生成py_組み込み済み.py</th></tr>
+        <tr><td>資料オンリーモード</td><td>SHURYO_ONLY_MODE</td></tr>
+        <tr><td>パターンモード</td><td>PATTERN_MODE</td></tr>
+        <tr><td>マルコフ連鎖</td><td>USE_MARKOV_MODE</td></tr>
+        <tr><td>視点モード</td><td>HERO_MODE</td></tr>
+        <tr><td>テーマ提示（最後の1行）</td><td>USE_LAST_MARKOV_LINE_MODE</td></tr>
+        <tr><td>特殊視点レート</td><td>SPECIAL_HERO_RATE</td></tr>
+        <tr><td>文字数下限／上限</td><td>CHAR_COUNT_MIN / CHAR_COUNT_MAX</td></tr>
+        <tr><td>マルコフ最大行数</td><td>MARKOV_LINES_MAX（他は MARKOV_LINES_MAX_SHURYO_MODE）</td></tr>
+        <tr><td>トーン最大選出数</td><td>MAX_TONE_COUNT</td></tr>
+        <tr><td>マルコフ次数</td><td>MARKOV_ORDER</td></tr>
+        <tr><td>マルコフ精度の揺らぎ</td><td>MARKOV_FLUCTUATION</td></tr>
+        <tr><td>全体上限文字数</td><td>MAX_CHAR</td></tr>
+        <tr><td>マルコフ1文の文字数</td><td>MARKOV_SENTENCE_MIN/MAX_CHARS</td></tr>
+        <tr><td>リトライ回数</td><td>MAX_RETRY / MAX_OUTER_RETRY</td></tr>
+      </table>
+
+      <h4>◆ 保存機能（改稿システム用）</h4>
+      <ul>
+        <li><b>genprompt.txt</b> … AIへ渡したプロンプト全文（元pyの write_genprompt 相当）。</li>
+        <li><b>00_world.md / 01_characters.md</b> … 採用された資料を機械分割したもの（元pyの write_split_files 相当）。</li>
+        <li>生成後に各ボタンで保存できます。</li>
+      </ul>
+
+      <h4>◆ エラーが出るとき</h4>
+      <ul>
+        <li>GitHub取得に失敗する場合：①ネットワーク確認 ②リポジトリ名・ブランチ名の確認 ③参照元を「ローカルファイル」に変更。</li>
+        <li>ブラウザの制限で取得できない環境（まれ）では、このHTMLをGitHubリポジトリに <code>index.html</code> として置き、
+          <b>GitHub Pages</b>（Settings → Pages → Deploy from branch）で公開すれば確実に動きます。</li>
+        <li>クリップボードコピーが効かない環境では、下の欄から手動コピーしてください。</li>
+        <li>設定はこのブラウザに自動保存されます。「すべて初期状態に戻す」でリセットできます。</li>
+      </ul>
+
+      <h4>◆ 移植メモ</h4>
+      <ul>
+        <li>「生成py_組み込み済み.py」のロジック（マルコフ連鎖・パターン抽選・トーン配合・視点・テール処理・資料分割）をJavaScriptへ忠実に移植しています。</li>
+        <li>Python側と出力が一致すること（strip_markdown・マルコフ統計・分割ファイル）をテストで確認済みです。</li>
+        <li>元pyの絶対パス（C:\Users\...）の代わりに、ファイルごとの「参照元」で切り替えます。</li>
+      </ul>
+    </div>
+  </details>
+
+  <footer>小説生成プロンプト ワンクリックジェネレーター — ブラウザ内で完結（Python不要）</footer>
+</main>
+
+<script>
+// ★ 生成py_組み込み済み.py から抽出したキャラ・ラベルリスト（自動生成）
+var NOVEL_DATA = {
+  boon: [
+    "（　＾ω＾）　ブーン",
+    "('A`)　ドクオ",
+    "川 ﾟ -ﾟ)　クー",
+    "lw´‐ _‐ﾉv　シュー",
+    "（ ・∀・）　モララー",
+    "(,,ﾟДﾟ)　ギコ",
+    "(´・ω・`)　ショボン",
+    "(｀･ω･´)　シャキン",
+    "（ ´_ゝ`）　兄者",
+    "（´<_` ）　弟者",
+  ],
+  mona: [
+    "（ ´∀｀）　モナー",
+    "（ ФωФ）　ロマネスク",
+    "(*ﾟーﾟ)　しぃ",
+    "(*ﾟ∀ﾟ)　つー",
+    "ﾐｾ*ﾟーﾟ)ﾘ　ミセリ",
+    "(ﾟ、ﾟﾄｿﾝ　トソン",
+    "(・∀ ・)　またんき",
+  ],
+  tano: [
+    "ξﾟ⊿ﾟ)ξ　ツン",
+    "从'ー'从　渡辺さん",
+    "ζ(ﾟーﾟ*ζ　デレ",
+    "o川*ﾟーﾟ)o　キュート",
+    "('、`*川　ペニサス",
+    "i!iiﾘﾟ ヮﾟﾉﾙ　花瓶",
+    "ﾉﾊﾟ⊿ﾟ)　ヒート",
+    "爪'ー`)y‐　フォックス",
+    "从 ﾟ∀从　ハイン",
+    "(#ﾟ;;-ﾟ)　でぃ",
+    "ミ,,ﾟДﾟ彡　フサギコ",
+    "(=ﾟωﾟ)ﾉ　ぃょぅ",
+  ],
+  specialLabels: [
+    "部外者",
+    "外部者",
+    "門外漢",
+    "傍観者",
+    "敵",
+    "敵対者",
+    "対立者",
+    "仇敵",
+    "よそ者",
+    "余所者",
+    "他所者",
+    "流れ者",
+    "外様",
+    "外来者",
+    "外部の人間",
+    "第三者",
+    "局外者",
+    "中立者",
+    "来訪者",
+    "訪問者",
+    "来客",
+    "招かれざる客",
+    "刺客",
+    "暗殺者",
+    "追手",
+    "追跡者",
+    "一般人",
+    "一般市民",
+    "素人",
+    "不審者",
+    "謎の人物",
+    "正体不明の人間",
+    "侵入者",
+    "乱入者",
+    "闖入者",
+    "通りすがり",
+    "通行人",
+    "迷い込んだ人間",
+    "新参者",
+    "新入り",
+    "異邦人",
+    "スパイ",
+    "工作員",
+    "密偵",
+    "逃亡者",
+    "脱走者",
+    "目撃者",
+    "余計者",
+    "邪魔者",
+    "挑戦者",
+    "放浪者",
+    "流浪者",
+    "漂流者",
+    "漂泊者",
+    "さすらい者",
+    "彷徨い者",
+    "風来坊",
+    "はぐれ者",
+    "根無し草",
+    "宿無し",
+    "渡り者",
+    "旅人",
+    "旅路の者",
+    "亡命者",
+    "追放者",
+    "流刑者",
+    "放逐者",
+    "難民",
+    "避難者",
+    "越境者",
+    "密航者",
+    "漂着者",
+    "渡来者",
+    "移住者",
+    "裏切り者",
+    "背信者",
+    "内通者",
+    "密通者",
+    "変節者",
+    "転向者",
+    "離反者",
+    "寝返り者",
+    "二重スパイ",
+    "反逆者",
+    "謀反者",
+    "叛逆者",
+    "反乱者",
+    "反抗者",
+    "異端者",
+    "異分子",
+    "造反者",
+    "革命者",
+    "抵抗者",
+    "叛徒",
+    "仲介者",
+    "調停者",
+    "仲裁者",
+    "取次者",
+    "橋渡し役",
+    "斡旋者",
+    "和解者",
+    "監視者",
+    "観察者",
+    "見張り番",
+    "番人",
+    "門番",
+    "哨兵",
+    "歩哨",
+    "衛兵",
+    "見届け人",
+    "検問者",
+    "斥候",
+    "偵察者",
+    "先遣者",
+    "先行者",
+    "探索者",
+    "索敵者",
+    "物見",
+    "使者",
+    "使節",
+    "特使",
+    "密使",
+    "伝令",
+    "伝達者",
+    "急使",
+    "御使い",
+    "間者",
+    "諜報員",
+    "回し者",
+    "忍び",
+    "隠密",
+    "草",
+    "細作",
+    "守護者",
+    "護衛者",
+    "用心棒",
+    "護り手",
+    "守り手",
+    "盾役",
+    "守衛",
+    "防人",
+    "討手",
+    "狙撃者",
+    "追っ手",
+    "狩人",
+    "賞金稼ぎ",
+    "討伐者",
+    "処刑者",
+    "執行者",
+    "始末屋",
+    "仕置人",
+    "復讐者",
+    "報復者",
+    "仇討ち人",
+    "返り討ち者",
+    "黒幕",
+    "首謀者",
+    "主謀者",
+    "糸引き者",
+    "扇動者",
+    "煽動者",
+    "教唆者",
+    "仕掛け人",
+    "陰謀者",
+    "策謀者",
+    "謀略者",
+    "傭兵",
+    "雇われ者",
+    "請負人",
+    "仕事人",
+    "代理人",
+    "代行者",
+    "依頼者",
+    "委託者",
+    "雇い主",
+    "差し向けた者",
+    "囮",
+    "身代わり",
+    "影武者",
+    "替え玉",
+    "捨て駒",
+    "当て馬",
+    "犠牲役",
+    "盾",
+    "囚人",
+    "捕虜",
+    "虜",
+    "人質",
+    "拘束者",
+    "抑留者",
+    "幽閉者",
+    "犠牲者",
+    "被害者",
+    "生贄",
+    "殉死者",
+    "巻き添え",
+    "被災者",
+    "遭難者",
+    "帰還者",
+    "生還者",
+    "帰国者",
+    "帰郷者",
+    "復帰者",
+    "出戻り",
+    "居候",
+    "食客",
+    "寄生者",
+    "厄介者",
+    "ただ乗り者",
+    "便乗者",
+    "隠者",
+    "隠遁者",
+    "世捨て人",
+    "遁世者",
+    "引きこもり",
+    "孤立者",
+    "孤高の者",
+    "脱落者",
+    "落伍者",
+    "はみ出し者",
+    "のけ者",
+    "爪弾き者",
+    "鼻つまみ者",
+    "嫌われ者",
+    "除け者",
+    "村八分",
+    "征服者",
+    "占領者",
+    "略奪者",
+    "簒奪者",
+    "支配者",
+    "統治者",
+    "独裁者",
+    "暴君",
+    "覇者",
+    "圧制者",
+    "弾圧者",
+    "密告者",
+    "告発者",
+    "内報者",
+    "垂れ込み者",
+    "通報者",
+    "証言者",
+    "告げ口者",
+    "潜入者",
+    "潜伏者",
+    "紛れ込んだ者",
+    "成りすまし",
+    "偽装者",
+    "変装者",
+    "先駆者",
+    "先導者",
+    "開拓者",
+    "先鋒",
+    "先兵",
+    "尖兵",
+    "切り込み隊長",
+    "露払い",
+    "後継者",
+    "後任者",
+    "後釜",
+    "跡継ぎ",
+    "後見人",
+    "代役",
+    "補欠",
+    "従者",
+    "随行者",
+    "手下",
+    "配下",
+    "腹心",
+    "側近",
+    "右腕",
+    "片腕",
+    "子分",
+    "家来",
+    "付き人",
+    "共闘者",
+    "同盟者",
+    "協力者",
+    "加担者",
+    "共犯者",
+    "援軍",
+    "助太刀",
+    "味方",
+    "後ろ盾",
+    "庇護者",
+    "後援者",
+    "野次馬",
+    "見物人",
+    "高みの見物",
+    "対岸の者",
+    "物見高い者",
+    "群衆",
+    "裁定者",
+    "審判者",
+    "裁き手",
+    "断罪者",
+    "粛清者",
+    "制裁者",
+    "案内者",
+    "導き手",
+    "水先案内人",
+    "先達",
+    "道先案内",
+    "手引き者",
+    "預言者",
+    "予見者",
+    "託宣者",
+    "占い師",
+    "立会人",
+    "証人",
+    "保証人",
+    "後見役",
+    "異端",
+    "規格外",
+    "想定外の者",
+    "番外",
+    "例外者",
+    "埒外の者",
+    "追われる者",
+    "お尋ね者",
+    "指名手配者",
+    "懸賞首",
+    "逃走者",
+    "潜伏犯",
+    "漂着者",
+    "迷い人",
+    "遭難者",
+    "座礁者",
+    "行き倒れ",
+    "さまよえる者",
+    "遊撃者",
+    "一匹狼",
+    "単独者",
+    "独行者",
+    "独立者",
+    "フリーランス",
+    "無所属",
+    "無頼者",
+    "無頼漢",
+    "渡世人",
+    "アウトロー",
+    "横取り者",
+    "掠め取り者",
+    "火事場泥棒",
+    "漁夫の利を得る者",
+    "奪取者",
+    "生存者",
+    "勝ち残り",
+    "最後の1人",
+    "競争者",
+    "対抗者",
+    "好敵手",
+    "宿敵",
+    "捜索者",
+    "調査者",
+    "探偵",
+    "捜査者",
+    "聞き込み者",
+    "嗅ぎ回る者",
+    "脅威",
+    "厄災の種",
+    "禍の元",
+    "疫病神",
+    "死神",
+    "貧乏神",
+    "執着する救済者",
+    "依存してくる奴",
+    "恩を着せる奴",
+    "庇護欲を刺激する奴",
+    "勝手に弟子を名乗る奴",
+    "真似をする奴",
+    "再現しようとする奴",
+    "過去の被害者",
+    "復讐の機会を待つ奴",
+    "恨みを忘れない奴",
+    "救いを求めすぎる奴",
+    "寄りかかる奴",
+    "見捨てられ恐怖症",
+    "共依存を望む奴",
+    "束縛する保護者",
+    "善意の監視者",
+    "理解者を自称する奴",
+    "代弁者気取り",
+    "勝手な同情者",
+    "英雄視する奴",
+    "神格化する奴",
+    "偶像として扱う奴",
+    "競争心むき出しの同業者",
+    "格下扱いしてくる先達",
+    "追い越されを恐れる先輩",
+    "マウント取りたがる奴",
+    "優位を誇示する奴",
+    "見下す格上",
+    "噂を信じた奴",
+    "誤解したまま接近する奴",
+    "勘違いストーカー",
+    "好意を押し付ける奴",
+    "断れない関係を作る奴",
+    "無自覚な加害者",
+    "家族ごっこを求める奴",
+    "擬似的な絆を強要する奴",
+    "役割を押し付ける奴",
+    "能力者登録制度の執行者",
+    "違法付与の取締官",
+    "能力行使規制の監視員",
+    "原初能力者探索班",
+    "能力測定機関の職員",
+    "能力適性判定師",
+    "付与記録管理者",
+    "能力者データベース担当",
+    "生体情報収集班",
+    "政府の能力者管理部門",
+    "治安維持特殊部隊",
+    "能力犯罪対策課",
+    "勢力図作成者",
+    "派閥マッピング屋",
+    "関係図を売る奴",
+    "情報売買組織",
+    "裏データブローカー",
+    "機密流出屋",
+    "後始末専門業者",
+    "証拠隠滅請負人",
+    "始末を引き受ける奴",
+    "スカウト担当",
+    "引き抜き屋",
+    "ヘッドハンター",
+    "能力者オークション主催者",
+    "人身売買組織",
+    "付与権売買の仲介者",
+    "実験体調達業者",
+    "検体確保班",
+    "被験者リクルーター",
+    "勢力間調停者",
+    "停戦交渉人",
+    "不可侵条約の監視者",
+    "保険金目当ての依頼者",
+    "報酬未払いの雇い主",
+    "使い捨て前提の発注者",
+    "付与失敗者",
+    "後遺症を恨む奴",
+    "神経癒着の被害者",
+    "能力解除を求める奴",
+    "付与の取り消しを懇願する奴",
+    "能力を呪う奴",
+    "自己付与に失敗した原初能力者",
+    "付与能力のみの原初",
+    "付与を乱用する原初",
+    "能力コピーを目論む奴",
+    "模倣付与の研究者",
+    "再現実験の対象に選ぶ者",
+    "上位互換能力者",
+    "下位互換に追い詰められた奴",
+    "相性最悪の能力者",
+    "能力無効化持ち",
+    "制約を突く能力者",
+    "天敵能力の保持者",
+    "訓練限界を超えた奴",
+    "能力100%出力到達者",
+    "理論値を引き出した怪物",
+    "能力付与ブローカー",
+    "闇付与の斡旋者",
+    "違法付与請負人",
+    "付与痕跡鑑定士",
+    "能力由来特定の専門家",
+    "原初能力者判別屋",
+    "能力者狩りの専門班",
+    "賞金首専門",
+    "能力者専門の暗殺者",
+    "保護したがる奴",
+    "囲い込もうとする奴",
+    "隔離を提案する奴",
+    "連れ帰ろうとする奴",
+    "引き戻そうとする奴",
+    "元の場所に戻したがる奴",
+    "更生させたがる奴",
+    "矯正を望む奴",
+    "正しい道に導こうとする奴",
+    "治療を強いる奴",
+    "療養を勧めすぎる奴",
+    "休息を強制する奴",
+    "真実を暴こうとする奴",
+    "秘密を明かそうとする奴",
+    "公にしたがる奴",
+    "和解を仲介したがる奴",
+    "仲直りさせようとする奴",
+    "関係修復を押し付ける奴",
+    "才能を見出したがる奴",
+    "期待をかけすぎる奴",
+    "将来を決めつける奴",
+    "鍛え直そうとする奴",
+    "訓練を強要する奴",
+    "限界突破を求める奴",
+    "暴走する支援者",
+    "過剰な味方",
+    "行きすぎた協力者",
+    "利害が一致しただけの仲間",
+    "いつか裏切る前提の協力者",
+    "条件次第で敵になる奴",
+    "借りを作らせる奴",
+    "恩を売り込む奴",
+    "貸しを盾にする奴",
+    "秘密を握った奴",
+    "弱みを知る奴",
+    "暴露をちらつかせる奴",
+    "口止め屋",
+    "沈黙を売る奴",
+    "黙っている代償を求める奴",
+    "リーク癖のある奴",
+    "守秘が甘い協力者",
+    "口が軽い味方",
+    "界隈クラッシャー",
+    "コミュニティ破壊者",
+    "関係性を引っ掻き回す奴",
+    "派閥対立を煽る奴",
+    "内紛誘発屋",
+    "分断工作員",
+    "無自覚な密告者",
+    "善意の通報者",
+    "正義感で密告する奴",
+    "記録魔",
+    "証拠を残す奴",
+    "全てを記録する奴",
+    "目撃者として現れ続ける奴",
+    "偶然を装う観察者",
+    "遭遇率が異常な他人",
+    "模倣犯",
+    "手口を真似る奴",
+    "やり方をコピーする奴",
+    "噂を広める奴",
+    "風評を操作する奴",
+    "評判を作る奴",
+    "過去を掘り返す奴",
+    "昔話を持ち出す奴",
+    "忘れたことを蒸し返す奴",
+    "比較してくる奴",
+    "他人と並べたがる奴",
+    "順位を付けたがる奴",
+    "試す奴",
+    "本気を引き出そうとする奴",
+    "限界を見定める奴",
+    "代理戦争の駒",
+    "利用される戦力",
+    "誰かの鉄砲玉",
+    "捨て石要員",
+    "囮として送られた奴",
+    "犠牲前提の先鋒",
+    "見せしめ対象",
+    "吊し上げられる奴",
+    "晒される役",
+    "スケープゴート候補",
+    "責任転嫁先",
+    "罪を被せられる奴",
+    "実力行使を辞さない交渉者",
+    "脅迫込みの提案者",
+    "断れない依頼者",
+    "返済を迫る債権者",
+    "取り立て屋",
+    "貸しの回収者",
+    "契約違反を突く奴",
+    "約束の履行を求める奴",
+    "義務を追及する奴",
+    "前例を作りたがる奴",
+    "ルールを変えようとする奴",
+    "慣習破壊者",
+    "前例がないからやらない奴",
+    "手柄を横取りする奴",
+    "成果を掠める奴",
+    "功績泥棒",
+    "責任を押し付ける奴",
+    "失敗を転嫁する奴",
+    "尻拭いを求める奴",
+  ],
+  bugai: [
+    "（　＾ω＾）　ブーン",
+    "('A`)　ドクオ",
+    "川 ﾟ -ﾟ)　クー",
+    "lw´‐ _‐ﾉv　シュー",
+    "（ ・∀・）　モララー",
+    "(,,ﾟДﾟ)　ギコ",
+    "(´・ω・`)　ショボン",
+    "(｀･ω･´)　シャキン",
+    "（ ´_ゝ`）　兄者",
+    "（´<_` ）　弟者",
+    "（ ´∀｀）　モナー",
+    "（ ФωФ）　ロマネスク",
+    "(*ﾟーﾟ)　しぃ",
+    "(*ﾟ∀ﾟ)　つー",
+    "ﾐｾ*ﾟーﾟ)ﾘ　ミセリ",
+    "(ﾟ、ﾟﾄｿﾝ　トソン",
+    "(・∀ ・)　またんき",
+    "ξﾟ⊿ﾟ)ξ　ツン",
+    "从'ー'从　渡辺さん",
+    "ζ(ﾟーﾟ*ζ　デレ",
+    "o川*ﾟーﾟ)o　キュート",
+    "('、`*川　ペニサス",
+    "i!iiﾘﾟ ヮﾟﾉﾙ　花瓶",
+    "ﾉﾊﾟ⊿ﾟ)　ヒート",
+    "爪'ー`)y‐　フォックス",
+    "从 ﾟ∀从　ハイン",
+    "(#ﾟ;;-ﾟ)　でぃ",
+    "ミ,,ﾟДﾟ彡　フサギコ",
+    "(=ﾟωﾟ)ﾉ　ぃょぅ",
+    "( ﾟ∀ﾟ)o彡゜　ジョルジュ長岡",
+    "(-＿-)　ヒッキー",
+    "/ ,' 3　荒巻スカルチノフ",
+    "<ヽ｀∀´>　ニダー",
+    "川д川　貞子",
+    "＼(^o^)／　人生オワタ",
+    "(,,＾Д＾)　タカラ",
+    "m9（＾Д＾)　プギャー",
+    "＊(＊'')＊　ヘリカル沢近",
+    "(＊'ω' ＊)　ちんぽっぽ",
+    "（ ＞＜）　わかんないんです（ビロード）",
+    "( <●><●>)　わかってます",
+    "J( 'ｰ`)し　カーチャン",
+    "( ﾟдﾟ )　こっちみんな（ミルナ）",
+    "｜(●),　 ､(●)､｜　ダディクール",
+    "（ ｀ﾊ´）　シナー",
+    "( ∵)　ビコーズ",
+    "( ﾟ∋ﾟ)　クックル",
+    "( ,_ﾉ` )y━・~　渋澤さん",
+    "∬´_ゝ`)　姉者",
+    "l从・∀・ﾉ!ﾘ　妹者",
+    "｜ﾟﾉ ^∀^）　レモナ",
+    "/ ﾟ、。 ／　鈴木ダイオード",
+    "( ,'3 )　中嶋バルケン",
+    "( ・ω・)＝つ≡つ　ボッコス松本",
+    "｜ ＾o＾ ｜　ブームくん",
+    "（ ＾＾ω）　マルタスニム瀬川",
+    "｜/ﾟUﾟ｜　激しく忍者",
+    "（ ＾＾）　山崎渉",
+    "('(ﾟ∀ﾟ∩　なおるよ",
+    "（ ＾ν＾）　ニュッ",
+    "(´・_ゝ・｀)　盛岡デミタス",
+    "／^o^＼　フッジサーン",
+    "(・(ｴ)・)　クマー",
+    "川 ﾟ 々ﾟ)　素直くるう",
+    "('_Ｌ')　フィレンクト",
+    "▼･ェ･▼　ビーグル",
+    "（-@∀@）　アサピー",
+    "Ｎ\\\\| \\\"ﾟ'`{\\\"ﾟ\\\\`lﾘ　阿部さん",
+    "（ ﾟ∀ﾟ ）　アヒャ",
+    "〈::ﾟ－ﾟ〉　ぃし",
+    "（ '∀'）　ガナー",
+    "ｲ从ﾟ ｰﾟﾉi､　狐娘",
+    "从´ヮ｀从ﾄ　狸娘",
+    "ﾘi､ﾟｰ ﾟｲ`!　狼娘",
+    "（ \\\"ゞ)　デルタ関ヶ原",
+    "ﾘハ´∀｀ﾉゝ　モナ子",
+    "从ﾘ ﾟдﾟﾉﾘ　ギコ子",
+    "li ｲ ﾟ -ﾟﾉl|　雪苺",
+    "(ノﾘ_ﾟ_-ﾟﾉﾘゝ　ギコアイス",
+    "ヽｉﾘ,,ﾟヮﾟﾉi　スパム",
+    "|::━◎┥　歯車王",
+    "爪ﾟーﾟ)　じぃ",
+    "瓜ﾟ∀ﾟ)　づー",
+    "爪ﾟAﾟ)　ぬー",
+    "( ´W｀)　シラヒーゲ",
+    "（ ・∀・ ∀・）　奇形モララー",
+    "ﾘ´－´ﾙ　リル子さん",
+    "<(' _'<人ﾉ　高崎美和さん",
+    "<ﾟДﾟ=>　ギコタイガー",
+    "(=ﾟдﾟ)　トラギコ",
+    "< ﾟ _･ﾟ>　ギコイヌ",
+    "ﾊｿ ﾟ－ﾟﾘ　なちっ娘",
+    "（ ﾟ￥ﾟ）　偽モナー",
+    "（ ノＡヽ）　ノーネ",
+    "ミ*ﾟ∀ﾟ彡　ふー",
+    "￥・∀・￥　マニー",
+    "彡(ﾟ)(ﾟ)　なんJ民",
+  ],
+};
+if (typeof module !== 'undefined' && module.exports) module.exports = NOVEL_DATA;
+
+</script>
+<script>
+/*
+ * 小説生成プロンプト エンジン
+ * 「生成py_組み込み済み.py」のロジックをJavaScriptへ移植したもの。
+ * 動作は元のPythonと同等（ランダム性は毎回変化）。
+ * ファイルパスの代わりに「slotId → テキスト」の辞書（files）を受け取る。
+ */
+var NovelGen = (function () {
+  'use strict';
+
+  // キャラ・ラベルリスト（data.js から注入）
+  var DATA = null;
+  function setNovelData(d) { DATA = d; }
+
+  // ============================================================
+  // 乱数ユーティリティ（Python random 互換）
+  // ============================================================
+  function randint(a, b) {
+    // Python の random.randint(a, b) は両端を含む
+    return a + Math.floor(Math.random() * (b - a + 1));
+  }
+  function choice(arr) {
+    return arr[Math.floor(Math.random() * arr.length)];
+  }
+  function shuffle(arr) {
+    // Fisher–Yates（Python random.shuffle と同等の一様性）
+    for (var i = arr.length - 1; i > 0; i--) {
+      var j = Math.floor(Math.random() * (i + 1));
+      var t = arr[i]; arr[i] = arr[j]; arr[j] = t;
+    }
+    return arr;
+  }
+
+  // ============================================================
+  // マークダウン破壊（マルコフ素材専用） — py の strip_markdown と同ロジック
+  // ============================================================
+  var TABLE_SEP_RE = /^[ \t]*\|?[ \t]*:?-{2,}:?[ \t]*(\|[ \t]*:?-{2,}:?[ \t]*)+\|?[ \t]*/gm;
+  // Python の re.$（MULTILINE）は「\n の直前 or 文字列末尾」でのみマッチする。
+  // JS の $ は \r の前でもマッチするため、境界チェックはコールバックで行う。
+  function pyLineEnd() {
+    // 引数: (match, p1, ..., offset, string) の形
+    var whole = arguments[0];
+    var str = arguments[arguments.length - 1];
+    var offset = arguments[arguments.length - 2];
+    var rest = str.slice(offset + whole.length);
+    if (rest === '' || rest.charAt(0) === '\n') return '';
+    return whole;
+  }
+
+  function stripMarkdown(text) {
+    if (!text) return text;
+    // --- コード系 ---
+    text = text.replace(/```[\s\S]*?```/g, '');
+    text = text.replace(/~~~[\s\S]*?~~~/g, '');
+    text = text.replace(/`+([^`\n]*?)`+/g, '$1');
+    // --- 画像・リンク ---
+    text = text.replace(/!\[([^\]]*)\]\([^)]*\)/g, '$1');
+    text = text.replace(/\[([^\]]*)\]\([^)]*\)/g, '$1');
+    text = text.replace(/\[([^\]]*)\]\[[^\]]*\]/g, '$1');
+    text = text.replace(/<https?:\/\/[^>]+>/g, '');
+    // --- 行頭装飾 ---
+    text = text.replace(/^[ \t]*#{1,6}[ \t]*/gm, '');
+    text = text.replace(/^[ \t]*>+[ \t]?/gm, '');
+    text = text.replace(/^[ \t]*[-*+][ \t]+/gm, '');
+    text = text.replace(/^[ \t]*\d+\.[ \t]+/gm, '');
+    // 水平線（py の [\1 \t] は文字クラス内の \1 = 0x01 を踏襲。
+    // 行末判定は Python の $ と同様「\n の直前 or 末尾」のみ）
+    text = text.replace(/^[ \t]*([-*_])[ \t]*\1[ \t]*\1[\x01 \t]*/gm, pyLineEnd);
+    // --- 強調系 ---
+    text = text.replace(/\*\*\*([^\*\n]+?)\*\*\*/g, '$1');
+    text = text.replace(/___([^_\n]+?)___/g, '$1');
+    text = text.replace(/\*\*([^\*\n]+?)\*\*/g, '$1');
+    text = text.replace(/__([^_\n]+?)__/g, '$1');
+    text = text.replace(/~~([^~\n]+?)~~/g, '$1');
+    text = text.replace(/(?<!\*)\*([^\*\n]+?)\*(?!\*)/g, '$1');
+    text = text.replace(/(?<!_)_([^_\n]+?)_(?!_)/g, '$1');
+    // --- テーブル ---
+    text = text.replace(TABLE_SEP_RE, pyLineEnd);
+    text = text.replace(/\|/g, ' ');
+    // --- HTMLタグ ---
+    text = text.replace(/<[^<>\n]{1,200}>/g, '');
+    // --- 残骸掃除 ---
+    text = text.replace(/[ \t]+\n/g, '\n');
+    text = text.replace(/\n{3,}/g, '\n\n');
+    return text;
+  }
+
+  // ============================================================
+  // マルコフ連鎖エンジン
+  // ============================================================
+  function isEnglishText(text, threshold) {
+    threshold = threshold || 0.5;
+    if (!text) return false;
+    var chars = Array.from(text);
+    var asciiCount = 0;
+    for (var i = 0; i < chars.length; i++) {
+      if (chars[i].charCodeAt(0) < 128) asciiCount++;
+    }
+    return (asciiCount / chars.length) >= threshold;
+  }
+
+  // chain: グラム(string) → 次文字(string|null) の配列
+  function buildMarkovChain(text, order) {
+    order = Math.max(1, Math.floor(order));
+    var chain = {};
+    var starts = [];
+
+    var textSplit = text.replace(/。/g, '。\n');
+    var lines = textSplit
+      .split(/[\r\n\x0b\x0c\x1c\x1d\x1e\x85\u2028\u2029]/)
+      .map(function (l) { return l.trim(); })
+      .filter(function (l) { return l.length > order; });
+
+    if (!lines.length) return null;
+
+    for (var li = 0; li < lines.length; li++) {
+      var chars = Array.from(lines[li]); // コードポイント単位（AA対応）
+      var startGram = chars.slice(0, order).join('');
+      starts.push(startGram);
+      for (var i = 0; i <= chars.length - order; i++) {
+        var gram = chars.slice(i, i + order).join('');
+        var nc = (i + order < chars.length) ? chars[i + order] : null;
+        if (!chain[gram]) chain[gram] = [];
+        chain[gram].push(nc);
+      }
+    }
+    return { chain: chain, starts: starts };
+  }
+
+  function generateSentence(chainData, order, isEnglish, minLength, maxLength) {
+    if (!chainData) return '';
+    order = Math.max(1, Math.floor(order));
+    var chain = chainData.chain;
+    var starts = chainData.starts;
+    if (!starts.length) return '';
+
+    for (var t = 0; t < 100; t++) {
+      var cur = Array.from(choice(starts));
+      var res = cur.slice();
+      while (res.length < maxLength) {
+        var arr = chain[cur.join('')];
+        if (!arr || !arr.length) break;
+        var nc = choice(arr);
+        if (nc === null) break;
+        res.push(nc);
+        cur = cur.concat([nc]).slice(-order);
+      }
+      if (res.length >= minLength) return res.join('');
+    }
+    return '';
+  }
+
+  // マルコフチェーンのキャッシュ（同一生成内で使い回す。純関数なので安全）
+  var markovCache = new Map();
+  function getChain(text, order, cacheKey) {
+    var key = cacheKey + '@' + order;
+    if (markovCache.has(key)) return markovCache.get(key);
+    var c = buildMarkovChain(text, order);
+    markovCache.set(key, c);
+    return c;
+  }
+
+  function generateMarkovOneLiner(text, order, charLimit, P) {
+    // py では「1行マルコフは常に精度4・揺らぎなしで固定」
+    if (!text) return '';
+    var cleaned = stripMarkdown(text);
+    if (!cleaned.trim()) return '';
+    var isEnglish = isEnglishText(cleaned);
+    var baseOrder = 4;
+    var chain = getChain(cleaned, baseOrder, '__one');
+    if (!chain) return '';
+    var s = generateSentence(chain, baseOrder, isEnglish, P.markovSentenceMinChars, P.markovSentenceMaxChars);
+    if (!s) return '';
+    s = s.replace(/\r/g, '').replace(/\n/g, ' ').trim();
+    if (s.length > charLimit) {
+      var cut = s.slice(0, charLimit);
+      var puncts = ['。', '、', '.', '!', '？', '?', '！'];
+      for (var pi = 0; pi < puncts.length; pi++) {
+        var idx = cut.lastIndexOf(puncts[pi]);
+        if (idx >= 10) { cut = cut.slice(0, idx + 1); break; }
+      }
+      s = cut.trim();
+    }
+    if (s.length < P.markovSentenceMinChars) return '';
+    return s;
+  }
+
+  function generateMarkovText(text, order, lineCount, charLimit, P, cacheKey) {
+    if (!text) return '';
+    var cleaned = stripMarkdown(text);
+    if (!cleaned.trim()) return '';
+    var isEnglish = isEnglishText(cleaned);
+
+    var baseOrder = Math.max(1, Math.floor(order));
+    var candidateOrders;
+    if (P.markovFluctuation === 1) {
+      candidateOrders = [Math.max(1, baseOrder - 1), baseOrder];
+    } else {
+      candidateOrders = [baseOrder];
+    }
+    candidateOrders = Array.from(new Set(candidateOrders));
+
+    var pool = [];
+    for (var ci = 0; ci < candidateOrders.length; ci++) {
+      var o = candidateOrders[ci];
+      var chain = getChain(cleaned, o, cacheKey);
+      if (chain) pool.push({ order: o, chain: chain });
+    }
+    if (!pool.length) return '';
+
+    var sentences = [];
+    var currentLen = 0;
+    var generatedLines = 0;
+    var consecutiveFailures = 0;
+
+    while (generatedLines < lineCount && currentLen < charLimit) {
+      var sel = choice(pool);
+      var s = generateSentence(sel.chain, sel.order, isEnglish, P.markovSentenceMinChars, P.markovSentenceMaxChars);
+      if (!s) {
+        consecutiveFailures++;
+        if (consecutiveFailures >= 100) break;
+        continue;
+      }
+      if (s.length < P.markovSentenceMinChars) {
+        consecutiveFailures++;
+        if (consecutiveFailures >= 100) break;
+        continue;
+      }
+      sentences.push(s);
+      currentLen += s.length + 1;
+      generatedLines++;
+      consecutiveFailures = 0;
+      if (currentLen > charLimit) break;
+    }
+    return sentences.join('\n');
+  }
+
+  // ============================================================
+  // build_contents（プロンプト本体の組み立て） — py と同ロジック
+  // ============================================================
+  function buildContents(P, files, A) {
+    var chosen = A.chosen;
+    var useMarkov = A.useMarkov;
+    var currentHeroMode = A.currentHeroMode;
+    var heroText = A.heroText;
+    var markovLinesMax = A.markovLinesMax;
+    var maxChar = A.maxChar;
+    var shuryoMode = A.shuryoMode;
+    var suppressHero = A.suppressHero;
+    var MARKOV_ORDER = A.MARKOV_ORDER;
+
+    var currentLen = 0;
+    var contents = [];
+
+    function addToContents(text) {
+      if (!text) return true;
+      contents.push(text);
+      currentLen += text.length + 2;
+      if (currentLen > maxChar) return false;
+      return true;
+    }
+
+    // モード2のとき、冒頭にSS.txtをそのまま挿入
+    if (shuryoMode === 2 && randint(1, 10000000000) > 2) {
+      var ssText = files.ss;
+      if (ssText != null) {
+        if (!addToContents(ssText)) return null;
+      }
+    }
+
+    // ---- ファイル収集 ----
+    var fileOrder = [];
+    var charFiles = [];
+    if (shuryoMode === 2) {
+      fileOrder = ['shiryou'];
+    } else if (shuryoMode === 3) {
+      fileOrder = ['shiryou'];
+      if (chosen['ブーン']) charFiles.push('nijisousaku');
+      if (chosen['モナー']) charFiles.push('choukasoku');
+      if (chosen['他の人']) charFiles.push('tanohito');
+      shuffle(charFiles);
+      fileOrder = fileOrder.concat(charFiles);
+    } else {
+      fileOrder = ['shiryou', 'ss'];
+      if (chosen['ブーン']) charFiles.push('nijisousaku');
+      if (chosen['モナー']) charFiles.push('choukasoku');
+      if (chosen['他の人']) charFiles.push('tanohito');
+      shuffle(charFiles);
+      fileOrder = fileOrder.concat(charFiles);
+    }
+
+    // 資料.txt を1%でマルコフ化
+    var preprocessMap = {};
+    if (files.shiryou && Math.random() < 0.01) {
+      var raw = files.shiryou;
+      var mText = generateMarkovText(raw, 3, 10000000, raw.length, P, 'shiryou');
+      if (mText) preprocessMap.shiryou = mText;
+    }
+
+    shuffle(fileOrder);
+
+    for (var fi = 0; fi < fileOrder.length; fi++) {
+      var id = fileOrder[fi];
+      var text = (id in preprocessMap) ? preprocessMap[id] : files[id];
+      if (text != null) {
+        if (!addToContents(text)) return null;
+      }
+    }
+
+    // 禁止.txt（モード2・3では除外）
+    if (shuryoMode !== 2 && shuryoMode !== 3) {
+      var kinshiText = files.kinshi;
+      if (kinshiText != null) {
+        if (!addToContents(kinshiText)) return null;
+      }
+    }
+
+    // モード1はここで終了
+    if (shuryoMode === 1) {
+      if (!suppressHero && currentHeroMode === 1) {
+        if (!addToContents(heroText)) return null;
+      }
+      if (!addToContents('これを全部覚えろ　覚えたとだけ言え')) return null;
+      return contents;
+    }
+
+    // ---- マルコフテキスト ----
+    if (useMarkov) {
+      var effectiveMin = (shuryoMode === 2 || shuryoMode === 3) ? 1 : P.markovLinesMin;
+      var actualMax = Math.max(effectiveMin, markovLinesMax);
+
+      if (shuryoMode === 2 || shuryoMode === 3) {
+        // 1つ目のマルコフ対象
+        var combineTargets1;
+        if (shuryoMode === 2) {
+          combineTargets1 = ['ss', 'nijisousaku', 'choukasoku', 'tanohito'];
+        } else {
+          combineTargets1 = ['ss'];
+          if (!chosen['ブーン']) combineTargets1.push('nijisousaku');
+          if (!chosen['モナー']) combineTargets1.push('choukasoku');
+          if (!chosen['他の人']) combineTargets1.push('tanohito');
+        }
+        var parts1 = [];
+        for (var ti = 0; ti < combineTargets1.length; ti++) {
+          var t = files[combineTargets1[ti]];
+          if (t) parts1.push(t);
+        }
+        var combinedText1 = parts1.join('\n');
+        if (combinedText1) {
+          var mLines = randint(effectiveMin, actualMax);
+          var remaining = maxChar - currentLen;
+          if (remaining > 0) {
+            var mText1 = generateMarkovText(combinedText1, MARKOV_ORDER, mLines, remaining, P, '__c1');
+            if (mText1) {
+              if (!addToContents(mText1)) return null;
+              if (!addToContents('---\nこれは資料です')) return null;
+            }
+          }
+        }
+        // 2つ目：マルコフ.txt のみでマルコフ
+        var markovText2 = files.markov;
+        if (markovText2) {
+          var mLines2 = randint(effectiveMin, actualMax);
+          var remaining2 = maxChar - currentLen;
+          if (remaining2 > 0) {
+            var mText2 = generateMarkovText(markovText2, MARKOV_ORDER, mLines2, remaining2, P, 'markov');
+            if (mText2) {
+              if (!addToContents(mText2)) return null;
+              if (!addToContents('---\nこれは資料です')) return null;
+            }
+          }
+        }
+      } else {
+        var mLines3 = randint(effectiveMin, actualMax);
+        var remaining3 = maxChar - currentLen;
+        if (remaining3 > 0) {
+          var mText3 = generateMarkovText(files.markov, MARKOV_ORDER, mLines3, remaining3, P, 'markov');
+          if (mText3) {
+            if (!addToContents(mText3)) return null;
+            if (!addToContents('↑\nこれは本編の資料です。軽度な改変はOK')) return null;
+          }
+        }
+      }
+    }
+
+    // 主要AAキャラ限定制約
+    if (P.patternMode === 0 || randint(1, 1) === 1) {
+      if (!addToContents('主要AAのキャラのみを使用し、モブを用意する場合も主要AAから使用する')) return null;
+    }
+
+    // 続き.txt（最後.txtの直前に挿入）
+    var tsuzukiText = files.tsuzuki;
+    if (tsuzukiText != null) {
+      if (!addToContents(tsuzukiText)) return null;
+    }
+
+    // 最後.txt
+    var lastText = files.last;
+    if (lastText != null) {
+      if (!addToContents(lastText)) return null;
+    }
+
+    // テーマ提示（最後.txtの後にマルコフ1行とテーマ指定）
+    if (P.useLastMarkovLineMode === 1) {
+      var remaining4 = maxChar - currentLen;
+      if (remaining4 > 0) {
+        var oneLine = generateMarkovOneLiner(files.markov, MARKOV_ORDER, Math.min(120, remaining4), P);
+        if (oneLine) {
+          if (!addToContents(oneLine)) return null;
+          if (!addToContents('↑\nこれがテーマの話を書け')) return null;
+        }
+      }
+    }
+
+    // ---- ジャンル・トーン提示 ----
+    var allToneNames = [];
+    if (files.tone) {
+      allToneNames = files.tone
+        .split(/\r?\n/)
+        .map(function (l) { return l.trim(); })
+        .filter(function (l) { return l; });
+    }
+    if (!allToneNames.length) {
+      allToneNames = ['コメディ', 'ダーク', 'ハード', 'ホラー', 'ミステリー'];
+    }
+
+    shuffle(allToneNames);
+    var toneCount = randint(0, Math.min(P.maxToneCount, allToneNames.length));
+    var selectedNames = allToneNames.slice(0, toneCount);
+    var values = [];
+    if (toneCount === 1) {
+      values = [100];
+    } else if (toneCount > 1) {
+      var loopGuard = 0;
+      while (true) {
+        loopGuard++;
+        var tempValues = [];
+        for (var vv = 0; vv < toneCount - 1; vv++) tempValues.push(randint(-100, 100));
+        var lastValue = 100 - tempValues.reduce(function (a, b) { return a + b; }, 0);
+        if (lastValue >= -100 && lastValue <= 200) {
+          values = tempValues.concat([lastValue]);
+          shuffle(values);
+          break;
+        }
+        if (loopGuard > 100000) { values = tempValues.concat([lastValue]); break; }
+      }
+    }
+    var toneLines = selectedNames.map(function (n, i) {
+      return '・' + n + ' ' + values[i] + '%';
+    }).join('\n');
+    var toneText = '話のトーン（本編内でこの語彙を使用することを控えろ）\n' + toneLines;
+    if (!addToContents(toneText)) return null;
+
+    // ---- 視点提示 → 文字数提示 ----
+    var charMin = randint(P.charCountMin, P.charCountMax);
+    var charMax = randint(charMin, P.charCountMax);
+    var charCountText = '文字数は' + charMin + '~' + charMax + '文字';
+
+    if (suppressHero) {
+      if (!addToContents(charCountText)) return null;
+    } else if (currentHeroMode === 1) {
+      if (!addToContents(heroText)) return null;
+      if (!addToContents(charCountText)) return null;
+    } else if (currentHeroMode === 0) {
+      if (!addToContents(charCountText)) return null;
+    } else {
+      if (randint(1, 5) !== 1) {
+        if (!addToContents(heroText)) return null;
+        if (!addToContents(charCountText)) return null;
+      } else {
+        if (!addToContents(charCountText)) return null;
+      }
+    }
+
+    return contents;
+  }
+
+  // ============================================================
+  // run_generation — py と同ロジック
+  // ============================================================
+  var PATTERNS_7 = [
+    { 'ブーン': true,  'モナー': false, '他の人': false },
+    { 'ブーン': false, 'モナー': true,  '他の人': false },
+    { 'ブーン': false, 'モナー': false, '他の人': true },
+    { 'ブーン': true,  'モナー': true,  '他の人': false },
+    { 'ブーン': true,  'モナー': false, '他の人': true },
+    { 'ブーン': false, 'モナー': true,  '他の人': true },
+    { 'ブーン': true,  'モナー': true,  '他の人': true }
+  ];
+  var PATTERNS_8 = [
+    { 'ブーン': false, 'モナー': false, '他の人': false },
+    { 'ブーン': true,  'モナー': false, '他の人': false },
+    { 'ブーン': false, 'モナー': true,  '他の人': false },
+    { 'ブーン': true,  'モナー': true,  '他の人': false },
+    { 'ブーン': false, 'モナー': false, '他の人': true },
+    { 'ブーン': true,  'モナー': false, '他の人': true },
+    { 'ブーン': false, 'モナー': true,  '他の人': true },
+    { 'ブーン': true,  'モナー': true,  '他の人': true }
+  ];
+
+  function runGeneration(P, files, MARKOV_ORDER, suppressHero) {
+    var shuryoMode;
+    if (P.shuryoOnlyMode === 0) {
+      shuryoMode = choice([-1, 1, 2, 3]);
+    } else {
+      shuryoMode = P.shuryoOnlyMode;
+    }
+
+    var bestCount = -1;
+    var bestArgs = null;
+    var iterations = (shuryoMode === -1) ? 1 : 2;
+
+    for (var it = 0; it < iterations; it++) {
+      var currentHeroMode = P.heroMode;
+      var chosen;
+      if (shuryoMode === 1) {
+        chosen = { 'ブーン': true, 'モナー': true, '他の人': true };
+      } else if (shuryoMode === 2) {
+        chosen = { 'ブーン': false, 'モナー': false, '他の人': false };
+      } else if (P.patternMode === 0) {
+        chosen = { 'ブーン': false, 'モナー': false, '他の人': false };
+        currentHeroMode = 0;
+      } else if (P.patternMode === 1) {
+        chosen = { 'ブーン': true, 'モナー': !!randint(0, 1), '他の人': !!randint(0, 1) };
+      } else if (P.patternMode === 2) {
+        chosen = { 'ブーン': !!randint(0, 1), 'モナー': true, '他の人': !!randint(0, 1) };
+      } else if (P.patternMode === 3) {
+        chosen = { 'ブーン': !!randint(0, 1), 'モナー': !!randint(0, 1), '他の人': true };
+      } else {
+        var patterns = (shuryoMode === -1) ? PATTERNS_7 : PATTERNS_8;
+        chosen = choice(patterns);
+      }
+
+      var trueCount = (chosen['ブーン'] ? 1 : 0) + (chosen['モナー'] ? 1 : 0) + (chosen['他の人'] ? 1 : 0);
+
+      var useMarkov;
+      if (shuryoMode === 1) useMarkov = false;
+      else if (shuryoMode === 2 || shuryoMode === 3) useMarkov = true;
+      else useMarkov = (P.useMarkovMode === 1);
+
+      // ---- 視点キャラ選択 ----
+      var candidates = [];
+      if (P.patternMode === 1 && (shuryoMode !== 1 && shuryoMode !== 2 && shuryoMode !== 3)) {
+        candidates = DATA.boon.slice();
+      } else if (P.patternMode === 2 && (shuryoMode !== 1 && shuryoMode !== 2 && shuryoMode !== 3)) {
+        candidates = DATA.mona.slice();
+      } else if (P.patternMode === 3 && (shuryoMode !== 1 && shuryoMode !== 2 && shuryoMode !== 3)) {
+        candidates = DATA.tano.slice();
+      } else {
+        if (chosen['ブーン']) candidates = candidates.concat(DATA.boon);
+        if (chosen['モナー']) candidates = candidates.concat(DATA.mona);
+        if (chosen['他の人']) candidates = candidates.concat(DATA.tano);
+        if (!candidates.length) {
+          candidates = DATA.boon.concat(DATA.mona, DATA.tano);
+        }
+      }
+
+      var hero1 = choice(candidates);
+      var isDoubleHero = (randint(1, 10) === 1);
+      var heroText;
+      if (isDoubleHero && candidates.length >= 2) {
+        var hero2 = choice(candidates.filter(function (c) { return c !== hero1; }));
+        heroText = '今回の視点は[ ' + hero1 + '、' + hero2 + ' ]です';
+      } else {
+        heroText = '今回の視点は[ ' + hero1 + ' ]です';
+      }
+
+      // 特殊視点（5分の1で特殊視点）
+      if ((shuryoMode === -1 || shuryoMode === 2 || shuryoMode === 3) &&
+          randint(1, P.specialHeroRate) === 2) {
+        var specialLabel = choice(DATA.specialLabels);
+        var bugai = choice(DATA.bugai);
+        heroText = '今回の視点は[ ' + specialLabel + '：' + bugai + ' ]です';
+        currentHeroMode = 1;
+      }
+
+      if (trueCount > bestCount) {
+        bestCount = trueCount;
+        bestArgs = { chosen: chosen, useMarkov: useMarkov, currentHeroMode: currentHeroMode, heroText: heroText };
+      }
+    }
+
+    chosen = bestArgs.chosen;
+    useMarkov = bestArgs.useMarkov;
+    currentHeroMode = bestArgs.currentHeroMode;
+    heroText = bestArgs.heroText;
+
+    var currentMarkovLinesMax = (shuryoMode === 2 || shuryoMode === 3)
+      ? P.markovLinesMaxShuryo : P.markovLinesMax;
+
+    for (var attempt = 1; attempt <= P.maxRetry; attempt++) {
+      var contents = buildContents(P, files, {
+        chosen: chosen,
+        useMarkov: useMarkov,
+        currentHeroMode: currentHeroMode,
+        heroText: heroText,
+        markovLinesMax: currentMarkovLinesMax,
+        maxChar: P.maxChar,
+        shuryoMode: shuryoMode,
+        suppressHero: suppressHero,
+        MARKOV_ORDER: MARKOV_ORDER
+      });
+
+      if (contents === null) {
+        if (currentMarkovLinesMax > P.markovLinesMin) {
+          currentMarkovLinesMax = Math.max(P.markovLinesMin, currentMarkovLinesMax - randint(1, 500));
+        }
+        continue;
+      }
+      if (!contents.length) {
+        return { result: null, attempt: -1, pattern: '', chosen: chosen, shuryoMode: shuryoMode };
+      }
+
+      var result = contents.join('\n\n');
+      if (result.length < P.maxChar) {
+        var label = function (v) { return v ? 'あり' : 'なし'; };
+        var patternText = '選出パターン： ブーン ' + label(chosen['ブーン']) +
+          '　／　モナー ' + label(chosen['モナー']) +
+          '　／　他の人 ' + label(chosen['他の人']) +
+          '　／　マルコフ ' + label(useMarkov);
+        if (shuryoMode === 1) patternText += '　／　資料オンリー モード1';
+        else if (shuryoMode === 2) patternText += '　／　資料オンリー モード2';
+        else if (shuryoMode === 3) patternText += '　／　資料オンリー モード3';
+        return { result: result, attempt: attempt, pattern: patternText, chosen: chosen, shuryoMode: shuryoMode };
+      }
+    }
+
+    return { result: null, attempt: -1, pattern: '', chosen: chosen, shuryoMode: shuryoMode };
+  }
+
+  // ============================================================
+  // 資料の機械分割（00_world.md / 01_characters.md）
+  // ============================================================
+  var WORLD_HEAD_RE = /^#{1,3}\s*(世界設定|グループ概要|組織概要|【AI用設計資料】|地理|日本政府|勢力)/;
+  var JA_CHAR_RE = /[ぁ-んァ-ヶ一-龠]/;
+  // py の [^\w\s]（Unicode対応\w）に合わせる：日本語・ギリシャ・キリル・全角英数・半角カナを「記号」から除外
+  var SYM_RE = /[^\s\w\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FFF\uF900-\uFAFF\u0370-\u03FF\u0400-\u04FF\uFF10-\uFF19\uFF21-\uFF3A\uFF41-\uFF5A\uFF66-\uFF9F]/;
+
+  function isAALine(s) {
+    var t = s.trim();
+    if (t.length < 2 || t.length > 40) return false;
+    var ja = 0;
+    for (var i = 0; i < t.length; i++) if (JA_CHAR_RE.test(t[i])) ja++;
+    if (ja > 1) return false;
+    var sym = 0;
+    for (var j = 0; j < t.length; j++) if (SYM_RE.test(t[j])) sym++;
+    return sym >= 2;
+  }
+
+  function splitSource(text) {
+    var lines = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n').split('\n');
+    var idx = null;
+    for (var i = 0; i < lines.length; i++) {
+      if (WORLD_HEAD_RE.test(lines[i].trim())) { idx = i; break; }
+    }
+    if (idx === null) return ['', lines.join('\n')];
+    return [lines.slice(idx).join('\n'), lines.slice(0, idx).join('\n')];
+  }
+
+  var MARK_RE = /★\s*(.+?)\s*の欲/;
+  var SEP_RE = /^[-=＝]{4,}$/;
+
+  function splitCharacters(chunk) {
+    var lines = chunk.split('\n');
+    var marks = [];
+    for (var i = 0; i < lines.length; i++) {
+      var m = lines[i].match(MARK_RE);
+      if (m) marks.push([i, m[1].trim()]);
+    }
+    if (!marks.length) return [];
+    var seps = [];
+    for (var k = 0; k < lines.length; k++) {
+      if (SEP_RE.test(lines[k].trim())) seps.push(k);
+    }
+    var starts = [];
+    var prevMark = -1;
+    for (var mi = 0; mi < marks.length; mi++) {
+      var markIdx = marks[mi][0], name = marks[mi][1];
+      var lo = prevMark + 1;
+      var cand = seps.filter(function (x) { return x >= lo && x < markIdx; });
+      if (cand.length) lo = cand[cand.length - 1] + 1;
+      var s = lo;
+      for (var j = markIdx - 1; j >= lo; j--) {
+        if (isAALine(lines[j])) { s = j; break; }
+      }
+      starts.push([s, name]);
+      prevMark = markIdx;
+    }
+    var out = [];
+    for (var n = 0; n < starts.length; n++) {
+      var st = starts[n][0], nm = starts[n][1];
+      var e = (n + 1 < starts.length) ? starts[n + 1][0] : lines.length;
+      var body = lines.slice(st, e).join('\n').replace(/^\n+|\n+$/g, '');
+      body = body.replace(/\n[-=＝]{4,}\s*$/, '');
+      if (body) out.push([nm, body]);
+    }
+    return out;
+  }
+
+  function dedupeBlocks(text) {
+    var blocks = text.split(/^(?=#{1,3}\s)/gm);
+    var seen = {};
+    var out = [];
+    for (var i = 0; i < blocks.length; i++) {
+      var b = blocks[i];
+      var key = b.replace(/\s/g, '');
+      if (!key || seen[key]) continue;
+      seen[key] = true;
+      out.push(b.replace(/\n+$/, ''));
+    }
+    return out.join('\n\n');
+  }
+
+  function writeSplitFiles(chosen, shuryoMode, files) {
+    var targets = [];
+    if (shuryoMode === 2) {
+      targets = [];
+    } else if (shuryoMode === 1) {
+      targets = ['nijisousaku', 'choukasoku', 'tanohito'];
+    } else {
+      if (chosen['ブーン']) targets.push('nijisousaku');
+      if (chosen['モナー']) targets.push('choukasoku');
+      if (chosen['他の人']) targets.push('tanohito');
+    }
+
+    var worldParts = [];
+    var charEntries = [];
+    for (var t = 0; t < targets.length; t++) {
+      var raw = files[targets[t]];
+      if (!raw) continue;
+      var split = splitSource(raw);
+      var w = split[0], c = split[1];
+      if (w.trim()) worldParts.push(w.trim());
+      charEntries = charEntries.concat(splitCharacters(c));
+    }
+
+    var worldMd = null;
+    if (worldParts.length) {
+      var worldBody = dedupeBlocks(worldParts.join('\n\n'));
+      worldMd = '# 世界設定分割（00：世界・共通仕様・地理・勢力・禁止事項）\n\n' +
+        '本ファイルは提示資料から機械的に分割したものである。内容の追加、要約、言い換えを行ってはならない。\n\n' +
+        worldBody.replace(/\n+$/, '') + '\n';
+    }
+
+    var charactersMd = null;
+    if (charEntries.length) {
+      var names = charEntries.map(function (e) { return e[0]; }).join('、');
+      var parts = [
+        '# 人物分割（01：登場人物）\n',
+        '本ファイルは提示資料から機械的に分割したものである。内容の追加、要約、言い換えを行ってはならない。\n',
+        '人物の区切りは `### 人物: 名前` の行である。本文中の見出しは資料に元からあるものであり、区切りではない。\n',
+        '収録人物 ' + charEntries.length + '名：' + names + '\n'
+      ];
+      for (var pe = 0; pe < charEntries.length; pe++) {
+        parts.push('### 人物: ' + charEntries[pe][0] + '\n\n' + charEntries[pe][1].trim() + '\n');
+      }
+      // py は "\n".join(parts)（各パーツ末尾に \n があるため空行で区切られる）
+      charactersMd = parts.join('\n').replace(/\n+$/, '') + '\n';
+    }
+    return { worldMd: worldMd, charactersMd: charactersMd };
+  }
+
+  // ============================================================
+  // メイン実行（外側リトライ込み）— py のメイン部と同ロジック
+  // ============================================================
+  var TAIL_OPTIONS = [
+    '続きを書きなさい　謎を残しなさい',
+    '続きを書きなさい　大きいピンチが来る',
+    '続きを書きなさい　未回収の謎や放置してる部分を回収しなさい',
+    '続きを書きなさい　未回収の謎や放置してる部分を回収しなさい'
+  ];
+  var TAIL_BIG = '続きを書け　最も大きいピンチを用意しろ　未解決や放置されてる部分を全部回収しろ';
+
+  function generate(P, files) {
+    markovCache.clear();
+
+    // マルコフ次数のランダム化（py は起動時に1回）
+    var MARKOV_ORDER = P.markovOrder;
+    if (MARKOV_ORDER === 0) MARKOV_ORDER = randint(1, 5);
+
+    // 続き.txt の文字数チェック → tail / suppress_hero
+    var tsuzukiText = files.tsuzuki;
+    var tsuzukiLen = tsuzukiText ? tsuzukiText.length : 0;
+    var tail = '';
+    if (tsuzukiLen <= 1000) {
+      tail = '';
+    } else if (tsuzukiLen < 30000) {
+      tail = choice(TAIL_OPTIONS);
+    } else {
+      tail = TAIL_BIG;
+    }
+    var suppressHero = (tail === TAIL_BIG);
+
+    var finalResult = null;
+    var finalPattern = null;
+    var finalChosen = {};
+    var finalShuryoMode = -1;
+    var finalAttempt = -1;
+
+    for (var outer = 1; outer <= P.maxOuterRetry; outer++) {
+      var r1 = runGeneration(P, files, MARKOV_ORDER, suppressHero);
+      if (r1.result === null) continue;
+      var r2 = runGeneration(P, files, MARKOV_ORDER, suppressHero);
+      if (r2.result !== null && r2.result.length > r1.result.length) {
+        finalResult = r2.result; finalPattern = r2.pattern;
+        finalChosen = r2.chosen; finalShuryoMode = r2.shuryoMode;
+        finalAttempt = r2.attempt;
+      } else {
+        finalResult = r1.result; finalPattern = r1.pattern;
+        finalChosen = r1.chosen; finalShuryoMode = r1.shuryoMode;
+        finalAttempt = r1.attempt;
+      }
+      break;
+    }
+
+    if (finalResult === null) {
+      return { error: '外側 ' + P.maxOuterRetry + ' 回×内側 ' + P.maxRetry + ' 回、すべて失敗しました。' };
+    }
+
+    if (tail) finalResult = finalResult + '\n\n' + tail;
+
+    var split = writeSplitFiles(finalChosen, finalShuryoMode, files);
+
+    return {
+      result: finalResult,
+      pattern: finalPattern,
+      attempt: finalAttempt,
+      chosen: finalChosen,
+      shuryoMode: finalShuryoMode,
+      worldMd: split.worldMd,
+      charactersMd: split.charactersMd
+    };
+  }
+
+  // ============================================================
+  // 公開API
+  // ============================================================
+  return {
+    setNovelData: setNovelData,
+    generate: generate,
+    stripMarkdown: stripMarkdown,
+    buildMarkovChain: buildMarkovChain,
+    generateSentence: generateSentence,
+    generateMarkovText: generateMarkovText,
+    writeSplitFiles: writeSplitFiles,
+    isAALine: isAALine,
+    splitCharacters: splitCharacters,
+    splitSource: splitSource,
+    dedupeBlocks: dedupeBlocks,
+    // テスト用
+    _randint: randint
+  };
+})();
+
+if (typeof module !== 'undefined' && module.exports) {
+  module.exports = NovelGen;
+}
+
+</script>
+<script>
+NovelGen.setNovelData(NOVEL_DATA);
+</script>
+<script>
+/*
+ * 小説生成プロンプト ジェネレーター UI ロジック
+ * - 設定（データ参照元・パラメータ）を localStorage に自動保存
+ * - GitHub（raw.githubusercontent.com）参照 / ローカルファイル / テキスト直接入力 に対応
+ * - 生成 → クリップボードコピー → genprompt.txt / 00_world.md / 01_characters.md 保存
+ */
+(function () {
+  'use strict';
+
+  // ============================================================
+  // 設定のデフォルト
+  // ============================================================
+  var DEFAULT_REPO = { owner: 'um771', repo: '283tfgpq9784q39478y23n9y8g5p095yn8q2', branch: 'main' };
+
+  var SLOTS = [
+    { id: 'shiryou',     label: '資料.txt',   repoFile: '資料.txt',   defMode: 'none',   note: 'リポジトリに無い場合はスキップ' },
+    { id: 'ss',          label: 'SS.txt',    repoFile: 'SS.txt',    defMode: 'github' },
+    { id: 'nijisousaku', label: '二次創作.txt', repoFile: '二次創作.txt', defMode: 'github' },
+    { id: 'choukasoku',  label: '超加速.txt', repoFile: '超加速.txt', defMode: 'github' },
+    { id: 'tanohito',    label: '他の人.txt', repoFile: '他の人.txt', defMode: 'github' },
+    { id: 'markov',      label: 'マルコフ.txt', repoFile: 'マルコフ.txt', defMode: 'github' },
+    { id: 'tone',        label: 'トーン.txt', repoFile: 'トーン.txt', defMode: 'github' },
+    { id: 'last',        label: '最後.txt',   repoFile: '最後.txt',   defMode: 'github' },
+    { id: 'kinshi',      label: '禁止.txt',   repoFile: '禁止.txt',   defMode: 'none',   note: 'リポジトリに無い場合はスキップ' },
+    { id: 'tsuzuki',     label: '続き.txt',   repoFile: '続き.txt',   defMode: 'none',   note: '長さで末尾指示が変わる（無ければ無し）' },
+  ];
+
+  var DEFAULT_PARAMS = {
+    // 基本
+    shuryoOnlyMode: 0,        // 0=ランダム / -1=OFF / 1=モード1 / 2=モード2 / 3=モード3
+    patternMode: -1,          // -1=ランダム / 0=全部なし / 1=ブーン固定 / 2=モナー固定 / 3=他の人固定
+    useMarkovMode: 1,         // 1=ON / 0=OFF
+    heroMode: -1,             // -1=ランダム / 0=視点なし / 1=必ず視点
+    useLastMarkovLineMode: 1, // テーマ（最後の1行マルコフ） 1=ON / 0=OFF
+    specialHeroRate: 5,       // 特殊視点レート（N分の1）
+    charCountMin: 9000,
+    charCountMax: 20000,
+    markovLinesMax: 2000,
+    maxToneCount: 10,
+    // 上級
+    markovOrder: 0,           // 0=ランダム(1〜5) / 1〜5=固定
+    markovFluctuation: 1,     // 1=ON / -1=OFF
+    markovLinesMin: 1,
+    markovLinesMaxShuryo: 2000,
+    maxChar: 119000,
+    markovSentenceMinChars: 10,
+    markovSentenceMaxChars: 500,
+    maxRetry: 50,
+    maxOuterRetry: 10,
+  };
+
+  var PARAM_FIELDS = [
+    { key: 'shuryoOnlyMode', label: '資料オンリーモード', type: 'select',
+      options: [[0, '0: ランダム（本家仕様）'], [-1, '-1: OFF'], [1, '1: モード1'], [2, '2: モード2'], [3, '3: モード3']] },
+    { key: 'patternMode', label: 'パターンモード', type: 'select',
+      options: [[-1, '-1: ランダム'], [0, '0: 全部なし固定'], [1, '1: ブーン固定'], [2, '2: モナー固定'], [3, '3: 他の人固定']] },
+    { key: 'useMarkovMode', label: 'マルコフ連鎖', type: 'select', options: [[1, '1: ON'], [0, '0: OFF']] },
+    { key: 'heroMode', label: '視点モード', type: 'select',
+      options: [[-1, '-1: ランダム（4/5で視点あり）'], [0, '0: 視点なし'], [1, '1: 必ず視点']] },
+    { key: 'useLastMarkovLineMode', label: 'テーマ提示（最後の1行）', type: 'select', options: [[1, '1: ON'], [0, '0: OFF']] },
+    { key: 'specialHeroRate', label: '特殊視点レート（N分の1）', type: 'number', min: 1, max: 100 },
+    { key: 'charCountMin', label: '文字数下限', type: 'number', min: 0 },
+    { key: 'charCountMax', label: '文字数上限', type: 'number', min: 1 },
+    { key: 'markovLinesMax', label: 'マルコフ最大行数', type: 'number', min: 1 },
+    { key: 'maxToneCount', label: 'トーン最大選出数', type: 'number', min: 0 },
+    { key: 'markovOrder', label: 'マルコフ次数（0=ランダム1〜5）', type: 'number', min: 0, max: 5, adv: true },
+    { key: 'markovFluctuation', label: 'マルコフ精度の揺らぎ', type: 'select', options: [[1, '1: ON'], [-1, '-1: OFF']], adv: true },
+    { key: 'markovLinesMin', label: 'マルコフ最小行数', type: 'number', min: 1, adv: true },
+    { key: 'markovLinesMaxShuryo', label: '資料オンリー時のマルコフ最大行数', type: 'number', min: 1, adv: true },
+    { key: 'maxChar', label: '全体上限文字数（MAX_CHAR）', type: 'number', min: 1000, adv: true },
+    { key: 'markovSentenceMinChars', label: 'マルコフ1文の最小文字数', type: 'number', min: 1, adv: true },
+    { key: 'markovSentenceMaxChars', label: 'マルコフ1文の最大文字数', type: 'number', min: 1, adv: true },
+    { key: 'maxRetry', label: '内側リトライ回数', type: 'number', min: 1, adv: true },
+    { key: 'maxOuterRetry', label: '外側リトライ回数', type: 'number', min: 1, adv: true },
+  ];
+
+  // ============================================================
+  // ストレージ（localStorage / IndexedDB）
+  // ============================================================
+  var LS_KEY = 'novelgen_settings_v1';
+  var FB_KEY = 'novelgen_fallback_'; // GitHub取得失敗時の前回分
+  var store = {
+    get: function (k) { try { return localStorage.getItem(k); } catch (e) { return null; } },
+    set: function (k, v) { try { localStorage.setItem(k, v); } catch (e) { /* 容量超過などは無視 */ } },
+    del: function (k) { try { localStorage.removeItem(k); } catch (e) {} },
+  };
+
+  var idb = {
+    _db: null,
+    open: function () {
+      if (this._db) return Promise.resolve(this._db);
+      return new Promise(function (resolve, reject) {
+        if (!window.indexedDB) return resolve(null);
+        var req = indexedDB.open('novelgen', 1);
+        req.onupgradeneeded = function () { req.result.createObjectStore('kv'); };
+        req.onsuccess = function () { idb._db = req.result; resolve(req.result); };
+        req.onerror = function () { reject(req.error); };
+      });
+    },
+    set: function (k, v) {
+      return idb.open().then(function (db) {
+        if (!db) return;
+        return new Promise(function (resolve, reject) {
+          var tx = db.transaction('kv', 'readwrite');
+          tx.objectStore('kv').put(v, k);
+          tx.oncomplete = resolve;
+          tx.onerror = function () { reject(tx.error); };
+        });
+      }).catch(function () {});
+    },
+    get: function (k) {
+      return idb.open().then(function (db) {
+        if (!db) return undefined;
+        return new Promise(function (resolve) {
+          var tx = db.transaction('kv', 'readonly');
+          var rq = tx.objectStore('kv').get(k);
+          rq.onsuccess = function () { resolve(rq.result); };
+          rq.onerror = function () { resolve(undefined); };
+        });
+      });
+    },
+  };
+
+  // ============================================================
+  // 状態
+  // ============================================================
+  var state = {
+    repo: Object.assign({}, DEFAULT_REPO),
+    slots: {},   // id -> { mode:'github'|'local'|'text'|'none', url, text, fileName }
+    params: Object.assign({}, DEFAULT_PARAMS),
+  };
+
+  SLOTS.forEach(function (s) {
+    state.slots[s.id] = { mode: s.defMode, url: '', text: '', fileName: '' };
+  });
+
+  function slotUrl(slot) {
+    var r = state.repo;
+    return 'https://raw.githubusercontent.com/' +
+      encodeURIComponent(r.owner) + '/' + encodeURIComponent(r.repo) + '/' +
+      encodeURIComponent(r.branch) + '/' + encodeURIComponent(slot.repoFile);
+  }
+
+  function resetUrls() {
+    SLOTS.forEach(function (s) {
+      state.slots[s.id].url = slotUrl(s);
+    });
+    renderSlotTable();
+    saveState();
+  }
+
+  // ---- 保存・読込 ----
+  function saveState() {
+    var data = {
+      repo: state.repo,
+      slots: state.slots,
+      params: state.params,
+    };
+    store.set(LS_KEY, JSON.stringify(data));
+  }
+
+  function loadState() {
+    var raw = store.get(LS_KEY);
+    if (!raw) { resetUrls(); return; }
+    try {
+      var data = JSON.parse(raw);
+      if (data.repo) state.repo = Object.assign({}, DEFAULT_REPO, data.repo);
+      SLOTS.forEach(function (s) {
+        var d = (data.slots || {})[s.id];
+        if (d) state.slots[s.id] = Object.assign({ mode: s.defMode, url: '', text: '', fileName: '' }, d);
+        else state.slots[s.id] = { mode: s.defMode, url: '', text: '', fileName: '' };
+        if (state.slots[s.id].mode === 'github' && !state.slots[s.id].url) state.slots[s.id].url = slotUrl(s);
+      });
+      state.params = Object.assign({}, DEFAULT_PARAMS, data.params || {});
+    } catch (e) {
+      resetUrls();
+    }
+  }
+
+  function fallbackKey(id) { return FB_KEY + id; }
+
+  // ============================================================
+  // DOM参照
+  // ============================================================
+  var $ = function (id) { return document.getElementById(id); };
+  var logBox, statusEl;
+
+  function log(msg, cls) {
+    var div = document.createElement('div');
+    div.className = cls || '';
+    div.textContent = msg;
+    logBox.appendChild(div);
+    logBox.scrollTop = logBox.scrollHeight;
+  }
+  function clearLog() { logBox.innerHTML = ''; }
+
+  // ============================================================
+  // スロットテーブル描画
+  // ============================================================
+  var hiddenFileInputs = {};
+
+  function renderSlotTable() {
+    var tbody = $('slotBody');
+    tbody.innerHTML = '';
+    SLOTS.forEach(function (s) {
+      var st = state.slots[s.id];
+      var tr = document.createElement('tr');
+
+      var tdLabel = document.createElement('td');
+      tdLabel.className = 'label';
+      tdLabel.innerHTML = s.label + (s.note ? '<div class="note">' + s.note + '</div>' : '');
+      tr.appendChild(tdLabel);
+
+      var tdMode = document.createElement('td');
+      var sel = document.createElement('select');
+      [['github', 'GitHub（リポジトリ参照）'], ['local', 'ローカルファイル'], ['text', 'テキスト直接入力'], ['none', 'なし']].forEach(function (m) {
+        var op = document.createElement('option');
+        op.value = m[0]; op.textContent = m[1];
+        if (m[0] === st.mode) op.selected = true;
+        sel.appendChild(op);
+      });
+      sel.addEventListener('change', function () {
+        st.mode = sel.value;
+        renderSlotTable();
+        saveState();
+      });
+      tdMode.appendChild(sel);
+      tr.appendChild(tdMode);
+
+      var tdInput = document.createElement('td');
+      if (st.mode === 'github') {
+        var inp = document.createElement('input');
+        inp.type = 'text';
+        inp.value = st.url;
+        inp.placeholder = 'https://raw.githubusercontent.com/...';
+        inp.addEventListener('input', function () { st.url = inp.value; saveState(); });
+        tdInput.appendChild(inp);
+      } else if (st.mode === 'local') {
+        var btn = document.createElement('button');
+        btn.className = 'filebtn';
+        btn.textContent = '📁 ファイルを選択';
+        btn.addEventListener('click', function () { pickLocalFile(s.id); });
+        tdInput.appendChild(btn);
+        var span = document.createElement('span');
+        span.className = 'fname';
+        span.id = 'fname_' + s.id;
+        span.textContent = st.fileName ? '選択中: ' + st.fileName : '';
+        tdInput.appendChild(span);
+      } else if (st.mode === 'text') {
+        var ta = document.createElement('textarea');
+        ta.rows = 2;
+        ta.value = st.text || '';
+        ta.placeholder = 'この資料の内容を直接貼り付け';
+        ta.addEventListener('input', function () { st.text = ta.value; saveState(); });
+        tdInput.appendChild(ta);
+      } else {
+        tdInput.textContent = '—';
+      }
+      tr.appendChild(tdInput);
+
+      var tdState = document.createElement('td');
+      tdState.className = 'state';
+      tdState.id = 'state_' + s.id;
+      tdState.textContent = '未取得';
+      tr.appendChild(tdState);
+
+      tbody.appendChild(tr);
+    });
+  }
+
+  function setSlotState(id, msg, cls) {
+    var el = $('state_' + id);
+    if (el) { el.textContent = msg; el.style.color = cls || ''; }
+  }
+
+  // ============================================================
+  // パラメータフォーム
+  // ============================================================
+  function renderParams() {
+    var basic = $('paramsBasic');
+    var adv = $('paramsAdv');
+    basic.innerHTML = '';
+    adv.innerHTML = '';
+    PARAM_FIELDS.forEach(function (f) {
+      var wrap = document.createElement('div');
+      wrap.className = 'field';
+      var lab = document.createElement('label');
+      lab.textContent = f.label;
+      wrap.appendChild(lab);
+
+      var input;
+      if (f.type === 'select') {
+        input = document.createElement('select');
+        f.options.forEach(function (o) {
+          var op = document.createElement('option');
+          op.value = String(o[0]);
+          op.textContent = String(o[1]);
+          if (String(o[0]) === String(state.params[f.key])) op.selected = true;
+          input.appendChild(op);
+        });
+        input.addEventListener('change', function () {
+          state.params[f.key] = parseInt(input.value, 10);
+          saveState();
+        });
+      } else {
+        input = document.createElement('input');
+        input.type = 'number';
+        input.value = state.params[f.key];
+        if (f.min != null) input.min = f.min;
+        if (f.max != null) input.max = f.max;
+        input.addEventListener('change', function () {
+          var v = parseInt(input.value, 10);
+          if (isNaN(v)) v = DEFAULT_PARAMS[f.key];
+          state.params[f.key] = v;
+          input.value = v;
+          saveState();
+        });
+      }
+      wrap.appendChild(input);
+      (f.adv ? adv : basic).appendChild(wrap);
+    });
+  }
+
+  function renderRepo() {
+    $('repoOwner').value = state.repo.owner;
+    $('repoName').value = state.repo.repo;
+    $('repoBranch').value = state.repo.branch;
+  }
+
+  // ============================================================
+  // ローカルファイル選択
+  // ============================================================
+  async function pickLocalFile(slotId) {
+    var st = state.slots[slotId];
+    try {
+      if (window.showOpenFilePicker) {
+        var handles = await window.showOpenFilePicker();
+        var handle = handles[0];
+        st.handle = handle;
+        await idb.set('handle_' + slotId, handle);
+        var file = await handle.getFile();
+        st.text = await file.text();
+        st.fileName = file.name;
+        cacheLocalText(slotId, st.text);
+        saveState();
+        setSlotState(slotId, '✓ 選択済み', '#3ddc84');
+        log('📁 ' + slotId + ': ' + file.name + ' を選択（' + file.size.toLocaleString() + ' bytes）', 'ok');
+        return;
+      }
+    } catch (e) {
+      if (e && e.name === 'AbortError') return;
+      log('⚠ ファイル選択に失敗: ' + e.message, 'warn');
+    }
+    // フォールバック: <input type=file>
+    if (!hiddenFileInputs[slotId]) {
+      var inp = document.createElement('input');
+      inp.type = 'file';
+      inp.accept = '.txt,.md,.text,text/plain';
+      inp.style.display = 'none';
+      document.body.appendChild(inp);
+      hiddenFileInputs[slotId] = inp;
+      inp.addEventListener('change', async function () {
+        var f = inp.files && inp.files[0];
+        if (!f) return;
+        var t = await f.text();
+        state.slots[slotId].text = t;
+        state.slots[slotId].fileName = f.name;
+        cacheLocalText(slotId, t);
+        saveState();
+        var span = $('fname_' + slotId);
+        if (span) span.textContent = '選択中: ' + f.name;
+        setSlotState(slotId, '✓ 選択済み', '#3ddc84');
+        log('📁 ' + slotId + ': ' + f.name + ' を選択（' + f.size.toLocaleString() + ' bytes）', 'ok');
+      });
+    }
+    hiddenFileInputs[slotId].click();
+  }
+
+  function cacheLocalText(slotId, text) {
+    if (text && text.length < 3 * 1024 * 1024) {
+      store.set('novelgen_local_' + slotId, text);
+    } else {
+      store.del('novelgen_local_' + slotId);
+    }
+  }
+
+  // 保存されたハンドル・キャッシュを復元
+  async function restoreLocalSlots() {
+    for (var i = 0; i < SLOTS.length; i++) {
+      var s = SLOTS[i];
+      var st = state.slots[s.id];
+      if (st.mode !== 'local') continue;
+      var handle = await idb.get('handle_' + s.id);
+      if (handle) {
+        st.handle = handle;
+        try {
+          var f = await handle.getFile();
+          st.text = await f.text();
+          st.fileName = f.name;
+          setSlotState(s.id, '✓ 読込済み: ' + f.name, '#3ddc84');
+        } catch (e) {
+          // 権限切れなど → キャッシュへフォールバック
+          var cached = store.get('novelgen_local_' + s.id);
+          if (cached != null) { st.text = cached; setSlotState(s.id, '⚠ キャッシュ使用', '#ffce54'); }
+          else setSlotState(s.id, '再選択が必要', '#ffce54');
+        }
+      } else {
+        var cached2 = store.get('novelgen_local_' + s.id);
+        if (cached2 != null) { st.text = cached2; setSlotState(s.id, '⚠ キャッシュ使用', '#ffce54'); }
+        else setSlotState(s.id, '未選択', '#ffce54');
+      }
+    }
+  }
+
+  // ============================================================
+  // データ取得（各スロットをテキストに解決）
+  // ============================================================
+  async function resolveSlot(s) {
+    var st = state.slots[s.id];
+    if (st.mode === 'github') {
+      var url = st.url;
+      if (!url) { setSlotState(s.id, 'URL未設定', '#ff6b6b'); return null; }
+      var bust = url + (url.indexOf('?') >= 0 ? '&' : '?') + 't=' + Date.now();
+      try {
+        var res = await fetch(bust, { cache: 'no-store' });
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        var text = await res.text();
+        store.set(fallbackKey(s.id), text); // 次回以降のフォールバック用
+        setSlotState(s.id, '✓ ' + text.length.toLocaleString() + '文字', '#3ddc84');
+        return text;
+      } catch (e) {
+        var fb = store.get(fallbackKey(s.id));
+        if (fb != null) {
+          log('⚠ ' + s.label + ': GitHub取得失敗（' + e.message + '）→ 前回取得分を使用', 'warn');
+          setSlotState(s.id, '⚠ 前回分', '#ffce54');
+          return fb;
+        }
+        log('⚠ ' + s.label + ': GitHubから取得できません（' + e.message + '）→ スキップ', 'warn');
+        setSlotState(s.id, '⚠ 取得不可', '#ff6b6b');
+        return null;
+      }
+    }
+    if (st.mode === 'local') {
+      if (st.handle) {
+        try {
+          var f = await st.handle.getFile();
+          var t = await f.text();
+          st.text = t;
+          setSlotState(s.id, '✓ ' + t.length.toLocaleString() + '文字', '#3ddc84');
+          return t;
+        } catch (e) {
+          log('⚠ ' + s.label + ': ローカルファイル読込失敗（' + e.message + '）→ キャッシュ', 'warn');
+        }
+      }
+      if (st.text != null && st.text !== '') {
+        setSlotState(s.id, '✓ メモリ内', '#3ddc84');
+        return st.text;
+      }
+      setSlotState(s.id, '未選択', '#ffce54');
+      log('⚠ ' + s.label + ': ローカルファイルが選択されていません → スキップ', 'warn');
+      return null;
+    }
+    if (st.mode === 'text') {
+      if (st.text != null && st.text.trim() !== '') {
+        setSlotState(s.id, '✓ 入力分', '#3ddc84');
+        return st.text;
+      }
+      setSlotState(s.id, '空', '#ffce54');
+      return null;
+    }
+    setSlotState(s.id, '使用しない', '#5b6378');
+    return null;
+  }
+
+  // ============================================================
+  // 生成・コピー・保存
+  // ============================================================
+  var lastResult = null; // {result, pattern, worldMd, charactersMd}
+
+  function setStatus(msg) { if (statusEl) statusEl.textContent = msg; }
+
+  async function onGenerate() {
+    var btn = $('genBtn');
+    btn.disabled = true;
+    setStatus('⏳ データ取得中…');
+    clearLog();
+
+    // 1) 全スロットを解決
+    var files = {};
+    for (var i = 0; i < SLOTS.length; i++) {
+      var s = SLOTS[i];
+      var text = await resolveSlot(s);
+      files[s.id] = text;
+    }
+
+    // 2) 生成
+    setStatus('⏳ プロンプト生成中…');
+    var t0 = performance.now();
+    var result;
+    try {
+      result = NovelGen.generate(state.params, files);
+    } catch (e) {
+      log('エラー: ' + (e && e.stack || e), 'err');
+      setStatus('❌ 生成中にエラーが発生');
+      btn.disabled = false;
+      return;
+    }
+    var ms = Math.round(performance.now() - t0);
+
+    if (result.error) {
+      log('エラー: ' + result.error, 'err');
+      setStatus('❌ 生成失敗（データが大きすぎる等）。設定を見直してください');
+      btn.disabled = false;
+      return;
+    }
+
+    lastResult = result;
+
+    // 3) 表示
+    $('resultSection').hidden = false;
+    $('result').value = result.result;
+    $('meta').innerHTML =
+      '<span>' + result.pattern + '</span><br>' +
+      '<span class="sub">' + result.result.length.toLocaleString() + ' 文字 ／ 生成 ' + ms + 'ms ／ 資料オンリーモード: ' + result.shuryoMode + '</span>';
+
+    // 4) クリップボードへ
+    var copied = await copyText(result.result);
+    log(copied ? '✅ クリップボードへコピーしました' : '⚠ コピーに失敗（手動コピーしてください）', copied ? 'ok' : 'warn');
+
+    // 5) ダウンロードボタン
+    $('dlGenprompt').disabled = false;
+    $('dlWorld').disabled = !result.worldMd;
+    $('dlChars').disabled = !result.charactersMd;
+
+    setStatus('✅ 生成完了（' + result.pattern + '）');
+    btn.disabled = false;
+  }
+
+  async function copyText(text) {
+    try {
+      if (navigator.clipboard && window.isSecureContext) {
+        await navigator.clipboard.writeText(text);
+        return true;
+      }
+    } catch (e) { /* フォールバックへ */ }
+    // file:// 等のフォールバック
+    try {
+      var ta = document.createElement('textarea');
+      ta.value = text;
+      ta.style.position = 'fixed';
+      ta.style.opacity = '0';
+      document.body.appendChild(ta);
+      ta.select();
+      var ok = document.execCommand('copy');
+      document.body.removeChild(ta);
+      return ok;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  function download(filename, text) {
+    var blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(function () { URL.revokeObjectURL(url); }, 3000);
+  }
+
+  // ============================================================
+  // 初期化
+  // ============================================================
+  function init() {
+    logBox = $('log');
+    statusEl = $('status');
+
+    loadState();
+    renderSlotTable();
+    renderParams();
+    renderRepo();
+    restoreLocalSlots();
+
+    $('genBtn').addEventListener('click', onGenerate);
+
+    $('copyBtn').addEventListener('click', async function () {
+      var ok = await copyText($('result').value);
+      log(ok ? '✅ コピーしました' : '⚠ コピー失敗', ok ? 'ok' : 'warn');
+    });
+    $('dlGenprompt').addEventListener('click', function () {
+      if (lastResult) download('genprompt.txt', lastResult.result);
+    });
+    $('dlWorld').addEventListener('click', function () {
+      if (lastResult && lastResult.worldMd) download('00_world.md', lastResult.worldMd);
+    });
+    $('dlChars').addEventListener('click', function () {
+      if (lastResult && lastResult.charactersMd) download('01_characters.md', lastResult.charactersMd);
+    });
+
+    // リポジトリ設定
+    var repoKeyMap = { repoOwner: 'owner', repoName: 'repo', repoBranch: 'branch' };
+    Object.keys(repoKeyMap).forEach(function (id) {
+      $(id).addEventListener('change', function () {
+        state.repo[repoKeyMap[id]] = $(id).value.trim() || DEFAULT_REPO[repoKeyMap[id]];
+        saveState();
+      });
+    });
+    $('resetUrls').addEventListener('click', function () {
+      resetUrls();
+      log('全ファイルの参照先をリポジトリ（' + state.repo.owner + '/' + state.repo.repo + ' ' + state.repo.branch + '）に戻しました', 'ok');
+    });
+    $('resetAll').addEventListener('click', function () {
+      if (!confirm('すべての設定を初期状態に戻しますか？')) return;
+      store.del(LS_KEY);
+      state.repo = Object.assign({}, DEFAULT_REPO);
+      state.params = Object.assign({}, DEFAULT_PARAMS);
+      SLOTS.forEach(function (s) {
+        state.slots[s.id] = { mode: s.defMode, url: '', text: '', fileName: '' };
+      });
+      resetUrls();
+      renderParams();
+      renderRepo();
+      log('設定を初期状態に戻しました', 'ok');
+    });
+
+    // 既存のハンドル復元後は未選択状態の表示を更新
+    log('準備完了。リポジトリ ' + state.repo.owner + '/' + state.repo.repo + ' のデータを参照します', 'ok');
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init);
+  } else {
+    init();
+  }
+})();
+
+</script>
+</body>
+</html>
