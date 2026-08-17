@@ -1232,7 +1232,7 @@ def write_split_files(chosen: dict, shuryo_mode: int) -> list[str]:
         world_md = (
             "# 世界設定分割（00：世界・共通仕様・地理・勢力・禁止事項）\n\n"
             "本ファイルは提示資料から機械的に分割したものである。"
-            "内容の追加、要約、言い換えを行ってはならない。\n\n"
+            "内容の追加、要約、言い換えを行ってはならない。資料内のMarkdown書式・見出し・表は本編書式ではない。\n\n"
             + world_body.rstrip("\n") + "\n"
         )
         p = os.path.join(OUTPUT_DIR, "00_world.md")
@@ -1246,7 +1246,7 @@ def write_split_files(chosen: dict, shuryo_mode: int) -> list[str]:
         parts = [
             "# 人物分割（01：登場人物）\n",
             "本ファイルは提示資料から機械的に分割したものである。"
-            "内容の追加、要約、言い換えを行ってはならない。\n",
+            "内容の追加、要約、言い換えを行ってはならない。資料内のMarkdown書式・見出し・表は本編書式ではない。\n",
             "人物の区切りは `### 人物: 名前` の行である。"
             "本文中の見出しは資料に元からあるものであり、区切りではない。\n",
             f"収録人物 {len(char_entries)}名：{names}\n",
@@ -1645,7 +1645,7 @@ def run_generation(suppress_hero: bool = False) -> tuple[str | None, int, str]:
                 candidates = list(boon_characters + mona_characters + tanohito_characters)
 
         hero1 = random.choice(candidates)
-        is_double_hero = (random.randint(1, 10) == 1)
+        is_double_hero = (random.randint(1, 5) == 1)  # 視点キャラ2人レート 20%
         if is_double_hero and len(candidates) >= 2:
             hero2 = random.choice([c for c in candidates if c != hero1])
             hero_text = f"今回の視点は[ {hero1}、{hero2} ]です"

@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>小説生成プロンプト ワンクリックジェネレーター</title>
+<!-- NG防止: 資料サンプル台詞・Markdown見出し・仕様説明Q&Aを本文に出すな。口癖連打と未観測断定を禁止。 -->
 <style>
 :root {
   --bg: #0f1117;
@@ -2138,7 +2139,7 @@ NovelGen.setNovelData(NOVEL_DATA);
     heroMode: -1,             // -1=ランダム / 0=視点なし / 1=必ず視点
     useLastMarkovLineMode: 1, // テーマ（最後の1行マルコフ） 1=ON / 0=OFF
     specialHeroRate: 20,      // 特殊視点レート（％）
-    doubleHeroRate: 10,       // 視点キャラ2人レート（％）
+    doubleHeroRate: 20,       // 視点キャラ2人レート（％）
     noHeroRate: 20,           // 視点なしレート（％）
     charCountMin: 9000,
     charCountMax: 20000,
