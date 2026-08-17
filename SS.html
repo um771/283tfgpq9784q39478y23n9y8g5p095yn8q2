@@ -330,7 +330,9 @@ footer { text-align: center; color: #5b6378; font-size: 11px; padding: 24px 0 40
         <tr><td>マルコフ連鎖</td><td>USE_MARKOV_MODE</td></tr>
         <tr><td>視点モード</td><td>HERO_MODE</td></tr>
         <tr><td>テーマ提示（最後の1行）</td><td>USE_LAST_MARKOV_LINE_MODE</td></tr>
-        <tr><td>特殊視点レート</td><td>SPECIAL_HERO_RATE</td></tr>
+        <tr><td>特殊視点レート（％）</td><td>SPECIAL_HERO_RATE</td></tr>
+        <tr><td>視点キャラ2人レート（％）</td><td>DOUBLE_HERO_RATE</td></tr>
+        <tr><td>視点なしレート（％）</td><td>NO_HERO_RATE</td></tr>
         <tr><td>文字数下限／上限</td><td>CHAR_COUNT_MIN / CHAR_COUNT_MAX</td></tr>
         <tr><td>マルコフ最大行数</td><td>MARKOV_LINES_MAX（他は MARKOV_LINES_MAX_SHURYO_MODE）</td></tr>
         <tr><td>トーン最大選出数</td><td>MAX_TONE_COUNT</td></tr>
@@ -1574,10 +1576,10 @@ var NovelGen = (function () {
     } else if (currentHeroMode === 0) {
       if (!addToContents(charCountText)) return null;
     } else {
-      if (randint(1, 5) !== 1) {
-        if (!addToContents(heroText)) return null;
+      if (Math.random() * 100 < P.noHeroRate) {
         if (!addToContents(charCountText)) return null;
       } else {
+        if (!addToContents(heroText)) return null;
         if (!addToContents(charCountText)) return null;
       }
     }
@@ -1791,7 +1793,7 @@ var NovelGen = (function () {
       }
 
       var hero1 = choice(candidates);
-      var isDoubleHero = (randint(1, 10) === 1);
+      var isDoubleHero = (Math.random() * 100 < P.doubleHeroRate);
       var heroText;
       if (isDoubleHero && candidates.length >= 2) {
         var hero2 = choice(candidates.filter(function (c) { return c !== hero1; }));
@@ -1802,7 +1804,7 @@ var NovelGen = (function () {
 
       // 特殊視点（5分の1で特殊視点）
       if ((shuryoMode === -1 || shuryoMode === 2 || shuryoMode === 3) &&
-          randint(1, P.specialHeroRate) === 2) {
+          Math.random() * 100 < P.specialHeroRate) {
         var specialLabel = choice(DATA.specialLabels);
         var bugai = choice(DATA.bugai);
         heroText = '今回の視点は[ ' + specialLabel + '：' + bugai + ' ]です';
@@ -2135,7 +2137,9 @@ NovelGen.setNovelData(NOVEL_DATA);
     useMarkovMode: 1,         // 1=ON / 0=OFF
     heroMode: -1,             // -1=ランダム / 0=視点なし / 1=必ず視点
     useLastMarkovLineMode: 1, // テーマ（最後の1行マルコフ） 1=ON / 0=OFF
-    specialHeroRate: 5,       // 特殊視点レート（N分の1）
+    specialHeroRate: 20,      // 特殊視点レート（％）
+    doubleHeroRate: 10,       // 視点キャラ2人レート（％）
+    noHeroRate: 20,           // 視点なしレート（％）
     charCountMin: 9000,
     charCountMax: 20000,
     markovLinesMax: 2000,
@@ -2161,7 +2165,9 @@ NovelGen.setNovelData(NOVEL_DATA);
     { key: 'heroMode', label: '視点モード', type: 'select',
       options: [[-1, '-1: ランダム（4/5で視点あり）'], [0, '0: 視点なし'], [1, '1: 必ず視点']] },
     { key: 'useLastMarkovLineMode', label: 'テーマ提示（最後の1行）', type: 'select', options: [[1, '1: ON'], [0, '0: OFF']] },
-    { key: 'specialHeroRate', label: '特殊視点レート（N分の1）', type: 'number', min: 1, max: 100 },
+    { key: 'specialHeroRate', label: '特殊視点レート（％）', type: 'number', min: 0, max: 100 },
+    { key: 'doubleHeroRate', label: '視点キャラ2人レート（％）', type: 'number', min: 0, max: 100 },
+    { key: 'noHeroRate', label: '視点なしレート（％）', type: 'number', min: 0, max: 100 },
     { key: 'charCountMin', label: '文字数下限', type: 'number', min: 0 },
     { key: 'charCountMax', label: '文字数上限', type: 'number', min: 1 },
     { key: 'markovLinesMax', label: 'マルコフ最大行数', type: 'number', min: 1 },
@@ -2741,5 +2747,5 @@ NovelGen.setNovelData(NOVEL_DATA);
 })();
 
 </script>
-</body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a2c6d9a3f861fca3',t:'MTc4Njk1MDUzMw=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
