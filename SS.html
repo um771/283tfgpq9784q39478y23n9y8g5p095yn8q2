@@ -1433,15 +1433,6 @@ var NovelGen = (function () {
       if (!addToContents(charaTemplate)) return null;
     }
 
-    // モード1はここで終了
-    if (shuryoMode === 1) {
-      if (!suppressHero && currentHeroMode === 1) {
-        if (!addToContents(heroText)) return null;
-      }
-      if (!addToContents('これを全部覚えろ　覚えたとだけ言え')) return null;
-      return contents;
-    }
-
     // ---- マルコフテキスト ----
     if (useMarkov) {
       var effectiveMin = (shuryoMode === 2 || shuryoMode === 3) ? 1 : P.markovLinesMin;
@@ -1739,10 +1730,12 @@ var NovelGen = (function () {
   function runGeneration(P, files, MARKOV_ORDER, suppressHero) {
     var shuryoMode;
     if (P.shuryoOnlyMode === 0) {
-      shuryoMode = choice([-1, 1, 2, 3]);
+      shuryoMode = choice([-1, 2, 3]);
     } else {
       shuryoMode = P.shuryoOnlyMode;
     }
+    // モード1は欠番。指定されても通常モード(-1)へ倒す。
+    if (shuryoMode === 1) shuryoMode = -1;
 
     var bestCount = -1;
     var bestArgs = null;
@@ -1751,9 +1744,7 @@ var NovelGen = (function () {
     for (var it = 0; it < iterations; it++) {
       var currentHeroMode = P.heroMode;
       var chosen;
-      if (shuryoMode === 1) {
-        chosen = { 'ブーン': true, 'モナー': true, '他の人': true };
-      } else if (shuryoMode === 2) {
+      if (shuryoMode === 2) {
         chosen = { 'ブーン': false, 'モナー': false, '他の人': false };
       } else if (P.patternMode === 0) {
         chosen = { 'ブーン': false, 'モナー': false, '他の人': false };
@@ -1772,17 +1763,16 @@ var NovelGen = (function () {
       var trueCount = (chosen['ブーン'] ? 1 : 0) + (chosen['モナー'] ? 1 : 0) + (chosen['他の人'] ? 1 : 0);
 
       var useMarkov;
-      if (shuryoMode === 1) useMarkov = false;
-      else if (shuryoMode === 2 || shuryoMode === 3) useMarkov = true;
+      if (shuryoMode === 2 || shuryoMode === 3) useMarkov = true;
       else useMarkov = (P.useMarkovMode === 1);
 
       // ---- 視点キャラ選択 ----
       var candidates = [];
-      if (P.patternMode === 1 && (shuryoMode !== 1 && shuryoMode !== 2 && shuryoMode !== 3)) {
+      if (P.patternMode === 1 && (shuryoMode !== 2 && shuryoMode !== 3)) {
         candidates = DATA.boon.slice();
-      } else if (P.patternMode === 2 && (shuryoMode !== 1 && shuryoMode !== 2 && shuryoMode !== 3)) {
+      } else if (P.patternMode === 2 && (shuryoMode !== 2 && shuryoMode !== 3)) {
         candidates = DATA.mona.slice();
-      } else if (P.patternMode === 3 && (shuryoMode !== 1 && shuryoMode !== 2 && shuryoMode !== 3)) {
+      } else if (P.patternMode === 3 && (shuryoMode !== 2 && shuryoMode !== 3)) {
         candidates = DATA.tano.slice();
       } else {
         if (chosen['ブーン']) candidates = candidates.concat(DATA.boon);
@@ -1856,8 +1846,7 @@ var NovelGen = (function () {
           '　／　モナー ' + label(chosen['モナー']) +
           '　／　他の人 ' + label(chosen['他の人']) +
           '　／　マルコフ ' + label(useMarkov);
-        if (shuryoMode === 1) patternText += '　／　資料オンリー モード1';
-        else if (shuryoMode === 2) patternText += '　／　資料オンリー モード2';
+        if (shuryoMode === 2) patternText += '　／　資料オンリー モード2';
         else if (shuryoMode === 3) patternText += '　／　資料オンリー モード3';
         return { result: result, attempt: attempt, pattern: patternText, chosen: chosen, shuryoMode: shuryoMode };
       }
@@ -1953,8 +1942,6 @@ var NovelGen = (function () {
     var targets = [];
     if (shuryoMode === 2) {
       targets = [];
-    } else if (shuryoMode === 1) {
-      targets = ['nijisousaku', 'choukasoku', 'tanohito'];
     } else {
       if (chosen['ブーン']) targets.push('nijisousaku');
       if (chosen['モナー']) targets.push('choukasoku');
@@ -2133,7 +2120,7 @@ NovelGen.setNovelData(NOVEL_DATA);
 
   var DEFAULT_PARAMS = {
     // 基本
-    shuryoOnlyMode: 0,        // 0=ランダム / -1=OFF / 1=モード1 / 2=モード2 / 3=モード3
+    shuryoOnlyMode: 0,        // 0=ランダム / -1=OFF / 2=モード2 / 3=モード3（モード1は欠番）
     patternMode: -1,          // -1=ランダム / 0=全部なし / 1=ブーン固定 / 2=モナー固定 / 3=他の人固定
     useMarkovMode: 1,         // 1=ON / 0=OFF
     heroMode: -1,             // -1=ランダム / 0=視点なし / 1=必ず視点
@@ -2159,7 +2146,7 @@ NovelGen.setNovelData(NOVEL_DATA);
 
   var PARAM_FIELDS = [
     { key: 'shuryoOnlyMode', label: '資料オンリーモード', type: 'select',
-      options: [[0, '0: ランダム（本家仕様）'], [-1, '-1: OFF'], [1, '1: モード1'], [2, '2: モード2'], [3, '3: モード3']] },
+      options: [[0, '0: ランダム（本家仕様）'], [-1, '-1: OFF'], [2, '2: モード2'], [3, '3: モード3']] },
     { key: 'patternMode', label: 'パターンモード', type: 'select',
       options: [[-1, '-1: ランダム'], [0, '0: 全部なし固定'], [1, '1: ブーン固定'], [2, '2: モナー固定'], [3, '3: 他の人固定']] },
     { key: 'useMarkovMode', label: 'マルコフ連鎖', type: 'select', options: [[1, '1: ON'], [0, '0: OFF']] },
@@ -2282,6 +2269,8 @@ NovelGen.setNovelData(NOVEL_DATA);
         if (state.slots[s.id].mode === 'github' && !state.slots[s.id].url) state.slots[s.id].url = slotUrl(s);
       });
       state.params = Object.assign({}, DEFAULT_PARAMS, data.params || {});
+      // モード1は欠番。保存済み設定に残っていたらランダムへ戻す。
+      if (state.params.shuryoOnlyMode === 1) state.params.shuryoOnlyMode = 0;
     } catch (e) {
       resetUrls();
     }
