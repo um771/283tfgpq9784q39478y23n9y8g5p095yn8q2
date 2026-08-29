@@ -1331,6 +1331,8 @@ var NovelGen = (function () {
   // ============================================================
   // -1 / 3 では、旧「ブーン・モナー・他の人」の三択を使わない。
   // ここに並ぶ8資料を毎回シャッフルし、上から順にプロンプト先頭へ加える。
+  var MIN_CHAR_MATERIAL_CHARS = 10000;
+  var MARKOV_LINES_HARD_MAX = 1000;
   var CHAR_MATERIALS = [
     { id: 'nijisousaku', label: '二次創作', names: ['兄者', '弟者', 'ブーン', 'ドクオ', 'クー', 'シュー', 'モララー', 'ギコ', 'ショボン', 'シャキン'] },
     { id: 'choukasoku',  label: '超加速', names: ['モナー', 'ロマネスク', 'しぃ', 'つー', 'ミセリ', 'トソン'] },
@@ -1451,8 +1453,8 @@ var NovelGen = (function () {
     if (!addBase('主要AAのキャラのみを使用し、モブを用意する場合も主要AAから使用する')) return null;
 
     if (useMarkov) {
-      var effectiveMin = shuryoMode === 3 ? 1 : P.markovLinesMin;
-      var actualMax = Math.max(effectiveMin, A.markovLinesMax);
+      var effectiveMin = Math.min(MARKOV_LINES_HARD_MAX, shuryoMode === 3 ? 1 : P.markovLinesMin);
+      var actualMax = Math.min(MARKOV_LINES_HARD_MAX, Math.max(effectiveMin, A.markovLinesMax));
       if (shuryoMode === 3) {
         // モード3のマルコフ素材も、キャラ資料の優先度決定より先に作る。
         // 生資料はこの段階では全8資料を対象にし、後段の採用資料とは独立させる。
@@ -1535,6 +1537,7 @@ var NovelGen = (function () {
     // ベース部分が完成した後に、キャラ資料の優先度を適用する。
     var priority = (A.charPriority || cloneCharPriority()).slice();
     var selectedCharFiles = [];
+    var selectedCharMaterialLength = 0;
     var charBlocks = [];
     var projectedLen = baseLen;
     var priorityStopped = false;
@@ -1548,6 +1551,7 @@ var NovelGen = (function () {
       }
       charBlocks.push(raw);
       selectedCharFiles.push(id);
+      selectedCharMaterialLength += raw.length;
       projectedLen += raw.length + 2;
     }
 
@@ -1573,8 +1577,9 @@ var NovelGen = (function () {
     function extraLen(blocks) { return blocks.reduce(function (n, x) { return n + (x ? x.length + 2 : 0); }, 0); }
     while (selectedCharFiles.length && projectedLen + extraLen(finalTailBlocks) > maxChar) {
       priorityStopped = true;
-      selectedCharFiles.pop();
-      charBlocks.pop();
+      var removedCharFile = selectedCharFiles.pop();
+      var removedCharBlock = charBlocks.pop();
+      selectedCharMaterialLength -= removedCharBlock ? removedCharBlock.length : 0;
       projectedLen = baseLen + charBlocks.reduce(function (n, x) { return n + x.length + 2; }, 0);
       heroInfo = chooseHeroForCharFiles(P, selectedCharFiles, A.currentHeroMode, A.suppressHero);
       tail = charTailText(P, selectedCharFiles, heroInfo.heroText, shuryoMode, files);
@@ -1606,6 +1611,7 @@ var NovelGen = (function () {
     return {
       contents: finalContents,
       selectedCharFiles: selectedCharFiles,
+      selectedCharMaterialLength: selectedCharMaterialLength,
       charPriority: priority,
       heroText: heroInfo.heroText,
       currentHeroMode: heroInfo.currentHeroMode,
@@ -1710,8 +1716,8 @@ var NovelGen = (function () {
 
     // ---- マルコフテキスト ----
     if (useMarkov) {
-      var effectiveMin = (shuryoMode === 2 || shuryoMode === 3) ? 1 : P.markovLinesMin;
-      var actualMax = Math.max(effectiveMin, markovLinesMax);
+      var effectiveMin = Math.min(MARKOV_LINES_HARD_MAX, (shuryoMode === 2 || shuryoMode === 3) ? 1 : P.markovLinesMin);
+      var actualMax = Math.min(MARKOV_LINES_HARD_MAX, Math.max(effectiveMin, markovLinesMax));
 
       if (shuryoMode === 2 || shuryoMode === 3) {
         // 1つ目のマルコフ対象
@@ -1993,13 +1999,9 @@ var NovelGen = (function () {
   // ============================================================
   // run_generation — py と同ロジック（資料優先度対応）
   // ============================================================
-  function priorityPatternText(priority, selected, useMarkov, shuryoMode, stopped) {
-    var p = (priority || []).map(charMaterialLabel).join(' ＞ ');
+  function priorityPatternText(selected, shuryoMode) {
     var s = (selected || []).map(charMaterialLabel).join('、') || 'なし';
-    var text = '選出パターン： キャラ資料優先度 ' + p + '　／　採用 ' + s + '　／　マルコフ ' + (useMarkov ? 'あり' : 'なし');
-    if (stopped) text += '　／　文字数上限で停止';
-    if (shuryoMode === 3) text += '　／　資料オンリー モード3';
-    return text;
+    return '採用 ' + s + '　／ モード' + shuryoMode;
   }
 
   function runGeneration(P, files, MARKOV_ORDER, suppressHero, tailText) {
@@ -2011,10 +2013,10 @@ var NovelGen = (function () {
     // -1 / 3 は、8資料の優先度を1回だけ決める。マルコフ生成の
     // リトライで優先度を入れ替えないため、同一試行内の順序は固定される。
     if (shuryoMode === -1 || shuryoMode === 3) {
-      var priority = cloneCharPriority();
       var usePriorityMarkov = (shuryoMode === 3) || (P.useMarkovMode === 1);
-      var priorityMarkovMax = shuryoMode === 3 ? P.markovLinesMaxShuryo : P.markovLinesMax;
+      var priorityMarkovMax = Math.min(MARKOV_LINES_HARD_MAX, shuryoMode === 3 ? P.markovLinesMaxShuryo : P.markovLinesMax);
       for (var pa = 1; pa <= P.maxRetry; pa++) {
+        var priority = cloneCharPriority();
         var made = buildContents(P, files, {
           chosen: {},
           selectedCharFiles: [],
@@ -2035,12 +2037,14 @@ var NovelGen = (function () {
           }
           continue;
         }
+        // 誰も選ばれていない／資料が薄すぎる結果は本編生成に回さない。
+        if (made.selectedCharMaterialLength < MIN_CHAR_MATERIAL_CHARS) continue;
         var priorityResult = made.contents.join('\n\n');
         if (priorityResult.length <= P.maxChar) {
           return {
             result: priorityResult,
             attempt: pa,
-            pattern: priorityPatternText(priority, made.selectedCharFiles, usePriorityMarkov, shuryoMode, made.priorityStopped),
+            pattern: priorityPatternText(made.selectedCharFiles, shuryoMode),
             chosen: {},
             selectedCharFiles: made.selectedCharFiles,
             charPriority: priority,
@@ -2092,7 +2096,7 @@ var NovelGen = (function () {
         return {
           result: result,
           attempt: attempt,
-          pattern: '選出パターン： キャラ資料なし　／　マルコフ あり　／　資料オンリー モード2',
+          pattern: '採用 なし　／ モード2',
           chosen: chosen,
           selectedCharFiles: [],
           charPriority: [],
@@ -2383,13 +2387,13 @@ NovelGen.setNovelData(NOVEL_DATA);
     noHeroRate: 20,           // 視点なしレート（％）
     charCountMin: 9000,
     charCountMax: 20000,
-    markovLinesMax: 2000,
+    markovLinesMax: 1000,
     maxToneCount: 10,
     // 上級
     markovOrder: 0,           // 0=ランダム(1〜5) / 1〜5=固定
     markovFluctuation: 1,     // 1=ON / -1=OFF
     markovLinesMin: 1,
-    markovLinesMaxShuryo: 2000,
+    markovLinesMaxShuryo: 1000,
     maxChar: 119000,
     markovSentenceMinChars: 10,
     markovSentenceMaxChars: 500,
@@ -2409,12 +2413,12 @@ NovelGen.setNovelData(NOVEL_DATA);
     { key: 'noHeroRate', label: '視点なしレート（％）', type: 'number', min: 0, max: 100 },
     { key: 'charCountMin', label: '文字数下限', type: 'number', min: 0 },
     { key: 'charCountMax', label: '文字数上限', type: 'number', min: 1 },
-    { key: 'markovLinesMax', label: 'マルコフ最大行数', type: 'number', min: 1 },
+    { key: 'markovLinesMax', label: 'マルコフ最大行数（上限1000）', type: 'number', min: 1, max: 1000 },
     { key: 'maxToneCount', label: 'トーン最大選出数', type: 'number', min: 0 },
     { key: 'markovOrder', label: 'マルコフ次数（0=ランダム1〜5）', type: 'number', min: 0, max: 5, adv: true },
     { key: 'markovFluctuation', label: 'マルコフ精度の揺らぎ', type: 'select', options: [[1, '1: ON'], [-1, '-1: OFF']], adv: true },
     { key: 'markovLinesMin', label: 'マルコフ最小行数', type: 'number', min: 1, adv: true },
-    { key: 'markovLinesMaxShuryo', label: '資料オンリー時のマルコフ最大行数', type: 'number', min: 1, adv: true },
+    { key: 'markovLinesMaxShuryo', label: '資料オンリー時のマルコフ最大行数（上限1000）', type: 'number', min: 1, max: 1000, adv: true },
     { key: 'maxChar', label: '全体上限文字数（MAX_CHAR）', type: 'number', min: 1000, adv: true },
     { key: 'markovSentenceMinChars', label: 'マルコフ1文の最小文字数', type: 'number', min: 1, adv: true },
     { key: 'markovSentenceMaxChars', label: 'マルコフ1文の最大文字数', type: 'number', min: 1, adv: true },
@@ -2520,6 +2524,9 @@ NovelGen.setNovelData(NOVEL_DATA);
         if (state.slots[s.id].mode === 'github' && !state.slots[s.id].url) state.slots[s.id].url = slotUrl(s);
       });
       state.params = Object.assign({}, DEFAULT_PARAMS, data.params || {});
+      // 保存済みの旧設定が1000を超えていても、新仕様の上限へ正規化する。
+      state.params.markovLinesMax = Math.min(1000, Math.max(1, parseInt(state.params.markovLinesMax, 10) || 1000));
+      state.params.markovLinesMaxShuryo = Math.min(1000, Math.max(1, parseInt(state.params.markovLinesMaxShuryo, 10) || 1000));
       // モード1は欠番。保存済み設定に残っていたらランダムへ戻す。
       if (state.params.shuryoOnlyMode === 1) state.params.shuryoOnlyMode = 0;
     } catch (e) {
@@ -2988,5 +2995,5 @@ NovelGen.setNovelData(NOVEL_DATA);
 })();
 
 </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a2c6d9a3f861fca3',t:'MTc4Njk1MDUzMw=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a2c6d9a3f861fca3',t:'MTc4Njk1MDUzMw=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script><script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a32b5bbdea32d5f9',t:'MTc4ODAwNDQzOA=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
