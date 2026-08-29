@@ -301,16 +301,18 @@ footer { text-align: center; color: #5b6378; font-size: 11px; padding: 24px 0 40
       <ul>
         <li>このページをブラウザで開いて、<b>「🚀 ワンクリック生成＆コピー」</b>を押すだけ。</li>
         <li>生成されたプロンプトは自動でクリップボードにコピーされ、下の欄にも表示されます。そのままAI（ChatGPT等）に貼り付けて小説を生成してください。</li>
-        <li>実行のたびに「選出パターン（ブーン／モナー／他の人／マルコフ）・視点・テーマ・トーン・文字数」がランダムに変わります。</li>
+        <li>実行のたびにキャラ資料の優先度（および採用範囲）・視点・テーマ・トーン・文字数がランダムに変わります。</li>
       </ul>
 
       <h4>◆ データはどこから来るの？（GitHub参照）</h4>
       <ul>
         <li>デフォルトでは GitHub リポジトリ
           <code>um771/283tfgpq9784q39478y23n9y8g5p095yn8q2</code> の <code>main</code> ブランチにある
-          <code>SS.txt / 二次創作.txt / 超加速.txt / 他の人.txt / マルコフ.txt / トーン.txt / 最後.txt</code> を
+          <code>SS.txt / 二次創作.txt / 超加速.txt / ラボ組.txt / 学校組.txt / ホスト組.txt / ツン.txt / 渡辺さん.txt / ハイン.txt / マルコフ.txt / トーン.txt / 最後.txt</code> を
           <code>raw.githubusercontent.com</code> から取得します。</li>
-        <li><b>マルコフ.txt や 最後.txt をリポジトリ上で編集して保存 → このページで生成</b> すれば、最新版が反映されます（毎回最新を取得）。</li>
+        <li><b>マルコフ.txt や 最後.txt、各キャラ資料をリポジトリ上で編集して保存 → このページで生成</b> すれば、最新版が反映されます（毎回最新を取得）。</li>
+        <li>資料オンリーモード（-1／3）では、二次創作・超加速・ラボ組・学校組・ホスト組・ツン・渡辺さん・ハインを候補に優先度をランダム設定し、文字数上限に収まる順番までをプロンプト先頭へ追加します。</li>
+        <li>旧来の統合資料 <code>他の人.txt</code> は旧Python版との互換用に残っていますが、SS.htmlでは参照しません。</li>
         <li>取得に失敗した場合は「前回取得した内容」を自動で使い、警告を表示します。</li>
         <li>リポジトリを変えたい場合は「⚙ 設定」のリポジトリ欄を書き換えるか、各ファイルのURLを直接編集してください。</li>
       </ul>
@@ -327,7 +329,7 @@ footer { text-align: center; color: #5b6378; font-size: 11px; padding: 24px 0 40
       <table>
         <tr><th>この画面</th><th>生成py_組み込み済み.py</th></tr>
         <tr><td>資料オンリーモード</td><td>SHURYO_ONLY_MODE</td></tr>
-        <tr><td>パターンモード</td><td>PATTERN_MODE</td></tr>
+        <tr><td>キャラ資料優先度</td><td>8資料を毎回シャッフルし、上限で停止</td></tr>
         <tr><td>マルコフ連鎖</td><td>USE_MARKOV_MODE</td></tr>
         <tr><td>視点モード</td><td>HERO_MODE</td></tr>
         <tr><td>テーマ提示（最後の1行）</td><td>USE_LAST_MARKOV_LINE_MODE</td></tr>
@@ -362,8 +364,8 @@ footer { text-align: center; color: #5b6378; font-size: 11px; padding: 24px 0 40
 
       <h4>◆ 移植メモ</h4>
       <ul>
-        <li>「生成py_組み込み済み.py」のロジック（マルコフ連鎖・パターン抽選・トーン配合・視点・テール処理・資料分割）をJavaScriptへ忠実に移植しています。</li>
-        <li>Python側と出力が一致すること（strip_markdown・マルコフ統計・分割ファイル）をテストで確認済みです。</li>
+        <li>「生成py_組み込み済み.py」を土台に、マルコフ連鎖・トーン配合・視点・テール処理・資料分割をJavaScriptで実行しています。キャラ資料の優先度選出は本ページの新仕様です。</li>
+        <li>strip_markdown・マルコフ統計・分割ファイルの基本動作をテストで確認済みです。</li>
         <li>元pyの絶対パス（C:\Users\...）の代わりに、ファイルごとの「参照元」で切り替えます。</li>
       </ul>
     </div>
@@ -1325,9 +1327,300 @@ var NovelGen = (function () {
   }
 
   // ============================================================
+  // キャラ資料の細分化と優先度選出
+  // ============================================================
+  // -1 / 3 では、旧「ブーン・モナー・他の人」の三択を使わない。
+  // ここに並ぶ8資料を毎回シャッフルし、上から順にプロンプト先頭へ加える。
+  var CHAR_MATERIALS = [
+    { id: 'nijisousaku', label: '二次創作', names: ['兄者', '弟者', 'ブーン', 'ドクオ', 'クー', 'シュー', 'モララー', 'ギコ', 'ショボン', 'シャキン'] },
+    { id: 'choukasoku',  label: '超加速', names: ['モナー', 'ロマネスク', 'しぃ', 'つー', 'ミセリ', 'トソン'] },
+    { id: 'lab',         label: 'ラボ組', names: ['フォックス', '花瓶', 'ヒート'] },
+    { id: 'school',      label: '学校組', names: ['デレ', 'キュート', 'ペニサス'] },
+    { id: 'host',        label: 'ホスト組', names: ['またんき', 'フサギコ', 'ぃょぅ'] },
+    { id: 'tsun',        label: 'ツン', names: ['ツン'] },
+    { id: 'watanabe',    label: '渡辺さん', names: ['渡辺さん'] },
+    { id: 'hain',        label: 'ハイン', names: ['ハイン'] }
+  ];
+
+  function charMaterialById(id) {
+    for (var i = 0; i < CHAR_MATERIALS.length; i++) {
+      if (CHAR_MATERIALS[i].id === id) return CHAR_MATERIALS[i];
+    }
+    return null;
+  }
+
+  function charMaterialLabel(id) {
+    var m = charMaterialById(id);
+    return m ? m.label : id;
+  }
+
+  function cloneCharPriority() {
+    var ids = CHAR_MATERIALS.map(function (m) { return m.id; });
+    shuffle(ids);
+    return ids;
+  }
+
+  function entryHasName(entry, name) {
+    return entry === name || entry.indexOf('　' + name) >= 0 || entry.indexOf(' ' + name) >= 0 || entry.indexOf(name) >= 0;
+  }
+
+  function candidatesForCharFiles(fileIds) {
+    var out = [];
+    var seen = {};
+    (fileIds || []).forEach(function (id) {
+      var m = charMaterialById(id);
+      if (!m) return;
+      var pool = [];
+      if (id === 'nijisousaku') pool = DATA.boon || [];
+      else if (id === 'choukasoku') pool = (DATA.mona || []).filter(function (x) { return !entryHasName(x, 'またんき'); });
+      else if (id === 'host') pool = (DATA.mona || []).concat(DATA.tano || []);
+      else pool = DATA.tano || [];
+      pool.forEach(function (entry) {
+        if (!m.names.some(function (name) { return entryHasName(entry, name); })) return;
+        if (!seen[entry]) { seen[entry] = true; out.push(entry); }
+      });
+    });
+    return out;
+  }
+
+  function chooseHeroForCharFiles(P, fileIds, currentHeroMode, suppressHero) {
+    var candidates = candidatesForCharFiles(fileIds);
+    if (!candidates.length) candidates = (DATA.boon || []).concat(DATA.mona || [], DATA.tano || []);
+    var heroText = '';
+    if (candidates.length) {
+      var hero1 = choice(candidates);
+      var isDoubleHero = Math.random() * 100 < P.doubleHeroRate;
+      if (isDoubleHero && candidates.length >= 2) {
+        var rest = candidates.filter(function (x) { return x !== hero1; });
+        heroText = '今回の視点は[ ' + hero1 + '、' + choice(rest) + ' ]です';
+      } else {
+        heroText = '今回の視点は[ ' + hero1 + ' ]です';
+      }
+    }
+
+    var mode = currentHeroMode;
+    if (!suppressHero && Math.random() * 100 < P.specialHeroRate) {
+      heroText = '今回の視点は[ ' + choice(DATA.specialLabels) + '：' + choice(DATA.bugai) + ' ]です';
+      mode = 1;
+    }
+    if (!heroText) mode = 0;
+    return { heroText: heroText, currentHeroMode: mode };
+  }
+
+  function charTailText(P, selectedCharFiles, heroText, shuryoMode, files) {
+    var relation = shuryoMode === 2 ? '' : generateRelationRule(selectedCharFiles);
+    var template = buildCharTemplate(selectedCharFiles, heroText, shuryoMode, files);
+    return { relation: relation, template: template };
+  }
+
+  function buildContentsWithPriority(P, files, A) {
+    var shuryoMode = A.shuryoMode;
+    var useMarkov = A.useMarkov;
+    var maxChar = A.maxChar;
+    var MARKOV_ORDER = A.MARKOV_ORDER;
+    var baseContents = [];
+    var baseLen = 0;
+
+    function addBase(text) {
+      if (!text) return true;
+      baseContents.push(text);
+      baseLen += text.length + 2;
+      return baseLen <= maxChar;
+    }
+
+    // ここではまだキャラ資料を追加しない。先にSS・共通資料・マルコフ・
+    // 最後.txt・テーマ・トーンまでを確定させる。
+    var preprocessMap = {};
+    if (files.shiryou && Math.random() < 0.01) {
+      var mShiryou = generateMarkovText(files.shiryou, 3, 10000000, files.shiryou.length, P, 'shiryou');
+      if (mShiryou) preprocessMap.shiryou = mShiryou;
+    }
+    if (shuryoMode === 3) {
+      if (!addBase(preprocessMap.shiryou || files.shiryou)) return null;
+    } else {
+      if (!addBase(preprocessMap.shiryou || files.shiryou)) return null;
+      if (!addBase(files.ss)) return null;
+    }
+
+    if (shuryoMode !== 2 && files.kinshi) {
+      if (!addBase(files.kinshi)) return null;
+    }
+    if (files.kyoutsu) {
+      if (!addBase(files.kyoutsu)) return null;
+    }
+    if (!addBase('主要AAのキャラのみを使用し、モブを用意する場合も主要AAから使用する')) return null;
+
+    if (useMarkov) {
+      var effectiveMin = shuryoMode === 3 ? 1 : P.markovLinesMin;
+      var actualMax = Math.max(effectiveMin, A.markovLinesMax);
+      if (shuryoMode === 3) {
+        // モード3のマルコフ素材も、キャラ資料の優先度決定より先に作る。
+        // 生資料はこの段階では全8資料を対象にし、後段の採用資料とは独立させる。
+        var allParts = [];
+        if (files.ss) allParts.push(files.ss);
+        CHAR_MATERIALS.forEach(function (m) { if (files[m.id]) allParts.push(files[m.id]); });
+        var combined = allParts.join('\n');
+        if (combined) {
+          var left = maxChar - baseLen;
+          if (left > 0) {
+            var generated1 = generateMarkovText(combined, MARKOV_ORDER, randint(effectiveMin, actualMax), left, P, '__priority_c1');
+            if (generated1) {
+              if (!addBase(generated1)) return null;
+              if (!addBase('---\nこれは資料です')) return null;
+            }
+          }
+        }
+        if (files.markov) {
+          var left2 = maxChar - baseLen;
+          if (left2 > 0) {
+            var generated2 = generateMarkovText(files.markov, MARKOV_ORDER, randint(effectiveMin, actualMax), left2, P, 'markov');
+            if (generated2) {
+              if (!addBase(generated2)) return null;
+              if (!addBase('---\nこれは資料です')) return null;
+            }
+          }
+        }
+      } else {
+        var left3 = maxChar - baseLen;
+        if (left3 > 0) {
+          var generated3 = generateMarkovText(files.markov, MARKOV_ORDER, randint(effectiveMin, actualMax), left3, P, 'markov');
+          if (generated3) {
+            if (!addBase(generated3)) return null;
+            if (!addBase('↑\nこれは本編の資料です。軽度な改変はOK')) return null;
+          }
+        }
+      }
+    }
+
+    if (files.tsuzuki && !addBase(files.tsuzuki)) return null;
+    if (files.last && !addBase(files.last)) return null;
+
+    if (P.useLastMarkovLineMode === 1) {
+      var left4 = maxChar - baseLen;
+      if (left4 > 0) {
+        var oneLine = generateMarkovOneLiner(files.markov, MARKOV_ORDER, Math.min(120, left4), P);
+        if (oneLine) {
+          if (!addBase(oneLine)) return null;
+          if (!addBase('↑\nこれがテーマの話を書け')) return null;
+        }
+      }
+    }
+
+    var allToneNames = files.tone ? files.tone.split(/\r?\n/).map(function (l) { return l.trim(); }).filter(function (l) { return l; }) : [];
+    if (!allToneNames.length) allToneNames = ['コメディ', 'ダーク', 'ハード', 'ホラー', 'ミステリー'];
+    shuffle(allToneNames);
+    var toneCount = randint(0, Math.min(P.maxToneCount, allToneNames.length));
+    var selectedNames = allToneNames.slice(0, toneCount);
+    var values = [];
+    if (toneCount === 1) values = [100];
+    else if (toneCount > 1) {
+      var guard = 0;
+      while (true) {
+        guard++;
+        var temp = [];
+        for (var vi = 0; vi < toneCount - 1; vi++) temp.push(randint(-100, 100));
+        var last = 100 - temp.reduce(function (a, b) { return a + b; }, 0);
+        if (last >= -100 && last <= 200) { values = temp.concat([last]); shuffle(values); break; }
+        if (guard > 100000) { values = temp.concat([last]); break; }
+      }
+    }
+    var toneLines = selectedNames.map(function (n, i) { return '・' + n + ' ' + values[i] + '%'; }).join('\n');
+    if (!addBase('話のトーン（本編内でこの語彙を使用することを控えろ）\n' + toneLines)) return null;
+    if (A.tailText && !addBase(A.tailText)) return null;
+
+    var charMin = randint(P.charCountMin, P.charCountMax);
+    var charMax = randint(charMin, P.charCountMax);
+    var charCountText = '文字数は' + charMin + '~' + charMax + '文字';
+
+    // ベース部分が完成した後に、キャラ資料の優先度を適用する。
+    var priority = (A.charPriority || cloneCharPriority()).slice();
+    var selectedCharFiles = [];
+    var charBlocks = [];
+    var projectedLen = baseLen;
+    var priorityStopped = false;
+    for (var pi = 0; pi < priority.length; pi++) {
+      var id = priority[pi];
+      var raw = files[id];
+      if (!raw || !raw.trim()) continue;
+      if (projectedLen + raw.length + 2 + charCountText.length + 2 > maxChar) {
+        priorityStopped = true;
+        break;
+      }
+      charBlocks.push(raw);
+      selectedCharFiles.push(id);
+      projectedLen += raw.length + 2;
+    }
+
+    var heroInfo = chooseHeroForCharFiles(P, selectedCharFiles, A.currentHeroMode, A.suppressHero);
+    var tail = charTailText(P, selectedCharFiles, heroInfo.heroText, shuryoMode, files);
+    var charInstructionBlocks = [];
+    if (tail.relation) charInstructionBlocks.push(tail.relation);
+    if (tail.template) charInstructionBlocks.push(tail.template);
+
+    function makeFinalTailBlocks() {
+      var blocks = [];
+      if (!A.suppressHero && heroInfo.currentHeroMode === 1 && heroInfo.heroText) blocks.push(heroInfo.heroText);
+      if (!A.suppressHero && heroInfo.currentHeroMode !== 0 && Math.random() * 100 >= P.noHeroRate && heroInfo.heroText) {
+        if (!blocks.length) blocks.push(heroInfo.heroText);
+      }
+      blocks.push(charCountText);
+      return blocks;
+    }
+    var finalTailBlocks = makeFinalTailBlocks();
+
+    // 視点・文字数も上限に含める。関係ルールとキャラテンプレは余白が
+    // ある場合だけ追加し、ベース生成の揺らぎで超えた場合は優先度の末尾から戻す。
+    function extraLen(blocks) { return blocks.reduce(function (n, x) { return n + (x ? x.length + 2 : 0); }, 0); }
+    while (selectedCharFiles.length && projectedLen + extraLen(finalTailBlocks) > maxChar) {
+      priorityStopped = true;
+      selectedCharFiles.pop();
+      charBlocks.pop();
+      projectedLen = baseLen + charBlocks.reduce(function (n, x) { return n + x.length + 2; }, 0);
+      heroInfo = chooseHeroForCharFiles(P, selectedCharFiles, A.currentHeroMode, A.suppressHero);
+      tail = charTailText(P, selectedCharFiles, heroInfo.heroText, shuryoMode, files);
+      charInstructionBlocks = [];
+      if (tail.relation) charInstructionBlocks.push(tail.relation);
+      if (tail.template) charInstructionBlocks.push(tail.template);
+      finalTailBlocks = makeFinalTailBlocks();
+    }
+    finalTailBlocks = makeFinalTailBlocks();
+
+    // 追加余地があれば、関係ルールとキャラテンプレをキャラ資料側に付加する。
+    var prefixBlocks = charBlocks.slice();
+    charInstructionBlocks.forEach(function (x) {
+      if (projectedLen + x.length + 2 + extraLen(finalTailBlocks) <= maxChar) {
+        prefixBlocks.push(x);
+        projectedLen += x.length + 2;
+      }
+    });
+    if (projectedLen + extraLen(finalTailBlocks) > maxChar) return null;
+    finalTailBlocks.forEach(function (x) {
+      baseContents.push(x);
+      baseLen += x.length + 2;
+      projectedLen += x.length + 2;
+    });
+
+    var finalContents = prefixBlocks.concat(baseContents);
+    var finalResultLen = finalContents.reduce(function (n, x) { return n + x.length + 2; }, 0);
+    if (finalResultLen > maxChar) return null;
+    return {
+      contents: finalContents,
+      selectedCharFiles: selectedCharFiles,
+      charPriority: priority,
+      heroText: heroInfo.heroText,
+      currentHeroMode: heroInfo.currentHeroMode,
+      priorityStopped: priorityStopped
+    };
+  }
+
+
+  // ============================================================
   // build_contents（プロンプト本体の組み立て） — py と同ロジック
   // ============================================================
   function buildContents(P, files, A) {
+    if (A.shuryoMode === -1 || A.shuryoMode === 3) {
+      return buildContentsWithPriority(P, files, A);
+    }
     var chosen = A.chosen;
     var useMarkov = A.useMarkov;
     var currentHeroMode = A.currentHeroMode;
@@ -1357,26 +1650,8 @@ var NovelGen = (function () {
       }
     }
 
-    // ---- ファイル収集 ----
-    var fileOrder = [];
-    var charFiles = [];
-    if (shuryoMode === 2) {
-      fileOrder = ['shiryou'];
-    } else if (shuryoMode === 3) {
-      fileOrder = ['shiryou'];
-      if (chosen['ブーン']) charFiles.push('nijisousaku');
-      if (chosen['モナー']) charFiles.push('choukasoku');
-      if (chosen['他の人']) charFiles.push('tanohito');
-      shuffle(charFiles);
-      fileOrder = fileOrder.concat(charFiles);
-    } else {
-      fileOrder = ['shiryou', 'ss'];
-      if (chosen['ブーン']) charFiles.push('nijisousaku');
-      if (chosen['モナー']) charFiles.push('choukasoku');
-      if (chosen['他の人']) charFiles.push('tanohito');
-      shuffle(charFiles);
-      fileOrder = fileOrder.concat(charFiles);
-    }
+    // ---- ファイル収集（この旧経路はモード2の互換処理でのみ使用） ----
+    var fileOrder = (shuryoMode === 2) ? ['shiryou'] : ['shiryou', 'ss'];
 
     // 資料.txt を1%でマルコフ化
     var preprocessMap = {};
@@ -1415,7 +1690,7 @@ var NovelGen = (function () {
     }
 
     // 主要AAキャラ限定制約
-    if (P.patternMode === 0 || randint(1, 1) === 1) {
+    if (randint(1, 1) === 1) {
       if (!addToContents('主要AAのキャラのみを使用し、モブを用意する場合も主要AAから使用する')) return null;
     }
 
@@ -1442,12 +1717,13 @@ var NovelGen = (function () {
         // 1つ目のマルコフ対象
         var combineTargets1;
         if (shuryoMode === 2) {
-          combineTargets1 = ['ss', 'nijisousaku', 'choukasoku', 'tanohito'];
+          combineTargets1 = ['ss'];
+          CHAR_MATERIALS.forEach(function (m) { combineTargets1.push(m.id); });
         } else {
           combineTargets1 = ['ss'];
           if (!chosen['ブーン']) combineTargets1.push('nijisousaku');
           if (!chosen['モナー']) combineTargets1.push('choukasoku');
-          if (!chosen['他の人']) combineTargets1.push('tanohito');
+          CHAR_MATERIALS.forEach(function (m) { if (!chosen[m.id]) combineTargets1.push(m.id); });
         }
         var parts1 = [];
         for (var ti = 0; ti < combineTargets1.length; ti++) {
@@ -1580,74 +1856,73 @@ var NovelGen = (function () {
   }
 
   // ============================================================
-  // キャラクター間の関係ルール（動的生成） — py と同ロジック
+  // キャラクター間の関係ルール（細分化資料対応）
   // ============================================================
   var REL_GROUPS = {
-    'ブーン': ['VIP', ['兄者', '弟者', 'ブーン', 'ドクオ', 'クー', 'シュー', 'モララー', 'ギコ', 'ショボン', 'シャキン']],
-    'モナー': ['モナーグループ', ['モナー', 'ロマネスク', 'しぃ', 'つー', 'ミセリ', 'トソン']],
-    '他の人': ['その他のグループ', ['ツン', '渡辺さん', 'デレ', 'キュート', 'ペニサス伊藤', '花瓶', 'ヒート', 'フォックス', 'ハイン', 'でぃ', 'またんき', 'フサギコ', 'ぃょぅ']]
+    nijisousaku: ['VIP', ['兄者', '弟者', 'ブーン', 'ドクオ', 'クー', 'シュー', 'モララー', 'ギコ', 'ショボン', 'シャキン']],
+    choukasoku: ['モナーグループ', ['モナー', 'ロマネスク', 'しぃ', 'つー', 'ミセリ', 'トソン']],
+    lab: ['ラボ組', ['フォックス', '花瓶', 'ヒート']],
+    school: ['学校組', ['デレ', 'キュート', 'ペニサス伊藤']],
+    host: ['ホスト組', ['またんき', 'フサギコ', 'ぃょぅ']],
+    tsun: ['単独（ツン）', ['ツン']],
+    watanabe: ['単独（渡辺さん）', ['渡辺さん']],
+    hain: ['単独（ハイン）', ['ハイン']]
   };
 
-  function generateRelationRule(chosen) {
-    var selected = ['ブーン', 'モナー', '他の人'].filter(function (k) { return chosen[k]; });
+  function generateRelationRule(selectedCharFiles) {
+    var selected = (selectedCharFiles || []).filter(function (id) { return !!REL_GROUPS[id]; });
     if (!selected.length) return '';
-    function memberStr(label, members) {
-      return label + '（' + members.join('、') + '）';
-    }
+    function memberStr(label, members) { return label + '（' + members.join('、') + '）'; }
     var lines = [];
     for (var i = 0; i < selected.length; i++) {
       for (var j = i + 1; j < selected.length; j++) {
-        var l1 = REL_GROUPS[selected[i]][0], m1 = REL_GROUPS[selected[i]][1];
-        var l2 = REL_GROUPS[selected[j]][0], m2 = REL_GROUPS[selected[j]][1];
-        lines.push(memberStr(l1, m1) + 'と' + memberStr(l2, m2) + 'は、互いに一切の面識・接点を持たない完全な無関係（他人）である。');
+        // ハインはミセリ（超加速）と学校の友人という例外関係を持つ。
+        if ((selected[i] === 'hain' && selected[j] === 'choukasoku') ||
+            (selected[i] === 'choukasoku' && selected[j] === 'hain') ||
+            (selected[i] === 'host' && selected[j] === 'choukasoku') ||
+            (selected[i] === 'choukasoku' && selected[j] === 'host')) continue;
+        var g1 = REL_GROUPS[selected[i]], g2 = REL_GROUPS[selected[j]];
+        lines.push(memberStr(g1[0], g1[1]) + 'と' + memberStr(g2[0], g2[1]) + 'は、互いに一切の面識・接点を持たない完全な無関係（他人）である。');
       }
     }
+    if (selected.indexOf('hain') >= 0 && selected.indexOf('choukasoku') >= 0) {
+      lines.push('ハインは超加速資料のミセリと学校の友人であり、互いに面識がある。ただし、超加速資料の他の人物全員と知り合いという意味ではない。');
+    }
+    if (selected.indexOf('host') >= 0 && selected.indexOf('choukasoku') >= 0) {
+      lines.push('ホスト組のまたんきはモナーグループの面々と互いに顔と素性を認識しているが、モナーグループのメンバーではない。フサギコとぃょぅの接点はまたんき経由の個別関係に限る。');
+    }
     if (selected.length === 1) {
-      var l0 = REL_GROUPS[selected[0]][0], m0 = REL_GROUPS[selected[0]][1];
-      lines.push(memberStr(l0, m0) + 'のキャラクターは、このプロンプトに記述されていない他のグループのキャラクターと互いに一切の面識・接点を持たない完全な無関係（他人）である。');
+      var only = REL_GROUPS[selected[0]];
+      lines.push(memberStr(only[0], only[1]) + 'のキャラクターは、このプロンプトに記述されていない他のグループのキャラクターと互いに一切の面識・接点を持たない完全な無関係（他人）である。');
     }
     var rule = 'キャラクター間の関係：\n' + lines.join('\n');
     rule += '\nこの指定の趣旨は、互いに面識のないキャラクター同士を「顔を知っている」「旧知の仲」のような顔見知り・旧知扱いで描写することを防ぐことにある。顔合わせそのものを禁じる趣旨ではない。物語の展開やユーザーの指示に応じて、異なるグループのキャラクターが同じ場に現れ、顔を合わせることは許容する。その場合、両者は必ず初対面として描くこと：互いの名前・素性・性格・能力・過去を知らない前提で、初対面特有の距離感（警戒・探り・よそよそしさ・自己紹介）を持たせる。旧知同士のような馴染んだ口調、相手の内情を知っている前提の言動、根拠のない親密さや信頼を付加してはならない。顔合わせを避ける必要はないが、顔を合わせた以上、初対面以外の関係性を勝手に付与してはならない。';
-
-    // またんきは所属グループを持たない単独行動者であり、グループ単位の関係規定では
-    // 正しく表現できない（モナー側からは選出されるが名簿上は「その他」に属する）。
-    // グループ名簿は動かさず、個別の例外条項で関係を明示する。
-    if (chosen['モナー'] || chosen['他の人']) {
-      var mtRule = '\n\nまたんきの扱い（上記のグループ間無関係規定の例外）：\n' +
-        'またんきはいずれのグループにも所属しない単独の放浪者である。拠点を持たず常に一人で行動しており、上記の「グループ間は完全な無関係」という規定を、またんきに対してそのまま適用してはならない。';
-      if (chosen['モナー']) {
-        mtRule += '\nまたんきはモナーグループの「メンバーではない」が、無関係でもない。モナーグループの面々とは互いに顔と素性を認識しており、初対面ではない。ただし仲間ではなく、拠点に居座ることもない。利害（主に食料と闘争）が一致した時、または偶然出くわした時にだけ一時的・局所的に関わる。モナーグループ側は彼を、常に暴発の危険がある扱いの難しい存在として警戒しており、馴れ合った親密さで描いてはならない。';
-      }
-      if (chosen['他の人']) {
-        mtRule += '\nフサギコはまたんきを確保対象として執拗に追い続けており、互いに面識がある。ぃょぅはホストクラブでNo.1の座をまたんきに奪われた経緯から彼を知っており、敵意はなく「危ないが放っておけない相手」程度の距離感で覚えている。いずれも初対面ではないため、初対面として描いてはならない。';
-      }
-      mtRule += '\n以上に挙げた人物以外との関係は、所属グループによる一括規定ではなく個別に判断すること。ここに挙がっていないグループ（VIPなど）の人物とまたんきの間には面識がなく、同じ場に現れた場合は必ず初対面として描くこと。';
-      rule += mtRule;
-    }
     return rule;
   }
 
   // ============================================================
-  // 汎用キャラクター一覧（キャラテンプレ.txt）の動的出力 — py と同ロジック
-  // ・mode=2（AIオリジナル設定）: 全行を出力
-  // ・mode=-1 / 1 / 3: 選択された資料にプロフィールが存在するキャラの行を除外し、
-  //   残りをランダムな割合で間引いて出力（間引かれるキャラ数も実行ごとにランダム）
-  // ・視点（heroText）で指定されたキャラクターは間引かれても確定で含める
+  // 汎用キャラクター一覧（細分化資料の除外）
   // ============================================================
-  var TEMPLATE_EXCLUDE = {
-    'ブーン': ['兄者', '弟者', 'ブーン', 'ドクオ', 'クー', 'シュー', 'モララー', 'ギコ', 'ショボン', 'シャキン'],
-    'モナー': ['モナー', 'ロマネスク', 'しぃ', 'つー', 'ミセリ', 'トソン', 'またんき'],
-    '他の人': ['ツン', '渡辺さん', 'デレ', 'キュート', 'ペニサス伊藤', '花瓶', 'ヒート', 'フォックス', 'ハイン', 'でぃ', 'またんき', 'フサギコ', 'ぃょぅ']
+  var TEMPLATE_EXCLUDE_BY_FILE = {
+    nijisousaku: ['兄者', '弟者', 'ブーン', 'ドクオ', 'クー', 'シュー', 'モララー', 'ギコ', 'ショボン', 'シャキン'],
+    choukasoku: ['モナー', 'ロマネスク', 'しぃ', 'つー', 'ミセリ', 'トソン'],
+    lab: ['花瓶', 'ヒート', 'フォックス'],
+    school: ['デレ', 'キュート', 'ペニサス伊藤', 'ペニサス'],
+    host: ['またんき', 'フサギコ', 'ぃょぅ'],
+    tsun: ['ツン'],
+    watanabe: ['渡辺さん'],
+    hain: ['ハイン']
   };
 
-  // AAでの除外セット。
-  // 資料内ではキャラの名前が省略・表記揺れしている例が複数あるため、
-  // 同一人物かの判断は名前の一致よりもAA（ASCIIアート）の一致を優先する。
-  // 例: テンプレの「素直キュート」は資料の「キュート」とAAが同一 → 同一人物として除外。
-  var TEMPLATE_EXCLUDE_AA = {
-    'ブーン': ['（　＾ω＾）', "('A`)", '川 ﾟ -ﾟ)', "lw´‐ _‐ﾉv", '（ ・∀・）', '(,,ﾟДﾟ)', "(´・ω・`)", '(｀･ω･´)', '（ ´_ゝ`）', '（´<_` ）'],
-    'モナー': ['（ ´∀｀）', '（ ФωФ）', '(*ﾟーﾟ)', '(*ﾟ∀ﾟ)', 'ﾐｾ*ﾟーﾟ)ﾘ', '(ﾟ、ﾟﾄｿﾝ', '(・∀ ・)'],
-    '他の人': ['ξﾟ⊿ﾟ)ξ', "从'ー'从", 'ζ(ﾟーﾟ*ζ', 'o川*ﾟーﾟ)o', "('、`*川", 'i!iiﾘﾟ ヮﾟﾉﾙ', 'ﾉﾊﾟ⊿ﾟ)', "爪'ー`)y‐", '从 ﾟ∀从', '(#ﾟ;;-ﾟ)', 'ミ,,ﾟДﾟ彡', '(=ﾟωﾟ)ﾉ']
+  var TEMPLATE_EXCLUDE_AA_BY_FILE = {
+    nijisousaku: ['（　＾ω＾）', "('A`)", '川 ﾟ -ﾟ)', "lw´‐ _‐ﾉv", '（ ・∀・）', '(,,ﾟДﾟ)', "(´・ω・`)", '(｀･ω･´)', '（ ´_ゝ`）', '（´<_` ）'],
+    choukasoku: ['（ ´∀｀）', '（ ФωФ）', '(*ﾟーﾟ)', '(*ﾟ∀ﾟ)', 'ﾐｾ*ﾟーﾟ)ﾘ', '(ﾟ、ﾟﾄｿﾝ'],
+    lab: ['i!iiﾘﾟ ヮﾟﾉﾙ', 'ﾉﾊﾟ⊿ﾟ)', "爪'ー`)y‐"],
+    school: ['ζ(ﾟーﾟ*ζ', 'o川*ﾟーﾟ)o', "('、`*川"],
+    host: ['(・∀ ・)', 'ミ,,ﾟДﾟ彡', '(=ﾟωﾟ)ﾉ'],
+    tsun: ['ξﾟ⊿ﾟ)ξ'],
+    watanabe: ["从'ー'从"],
+    hain: ['从 ﾟ∀从']
   };
 
   function heroNameFromText(heroText) {
@@ -1659,7 +1934,7 @@ var NovelGen = (function () {
     return parts.length ? parts[parts.length - 1] : '';
   }
 
-  function buildCharTemplate(chosen, heroText, shuryoMode, files) {
+  function buildCharTemplate(selectedCharFiles, heroText, shuryoMode, files) {
     var text = files.charaTemplate;
     if (!text) return '';
     var header = null, sep = null, rows = [];
@@ -1677,21 +1952,16 @@ var NovelGen = (function () {
     if (shuryoMode === 2) {
       kept = rows;
     } else {
-      var exclude = {};
-      var excludeAA = {};
-      ['ブーン', 'モナー', '他の人'].forEach(function (k) {
-        if (chosen[k]) {
-          (TEMPLATE_EXCLUDE[k] || []).forEach(function (nm) { exclude[nm] = true; });
-          (TEMPLATE_EXCLUDE_AA[k] || []).forEach(function (aa) { excludeAA[aa] = true; });
-        }
+      var exclude = {}, excludeAA = {};
+      (selectedCharFiles || []).forEach(function (id) {
+        (TEMPLATE_EXCLUDE_BY_FILE[id] || []).forEach(function (nm) { exclude[nm] = true; });
+        (TEMPLATE_EXCLUDE_AA_BY_FILE[id] || []).forEach(function (aa) { excludeAA[aa] = true; });
       });
       var filtered = [];
       rows.forEach(function (r) {
         var core = r[0].split('（')[0].trim();
         var aa = (r[1] || '').trim();
-        // 同一人物判定は名前よりAAの一致を優先する（資料内で名前が省略されている例があるため）
-        if (core && exclude[core]) return;
-        if (aa && excludeAA[aa]) return;
+        if ((core && exclude[core]) || (aa && excludeAA[aa])) return;
         filtered.push(r);
       });
       var heroName = heroNameFromText(heroText);
@@ -1699,17 +1969,16 @@ var NovelGen = (function () {
       filtered.forEach(function (r) {
         var core = r[0].split('（')[0].trim();
         var aa = (r[1] || '').trim();
-        if ((heroName && core === heroName) || (aa && heroText && heroText.indexOf(aa) >= 0)) heroRows.push(r);
+        if ((heroName && (core === heroName || (heroName === 'ペニサス' && core === 'ペニサス伊藤'))) ||
+            (aa && heroText && heroText.indexOf(aa) >= 0)) heroRows.push(r);
         else rest.push(r);
       });
-      // ランダムな割合で間引き（間引かれるキャラ数も実行ごとにランダム）
       var keepRate = Math.random();
       var thinned = rest.filter(function () { return Math.random() < keepRate; });
       kept = heroRows.concat(thinned);
       if (!kept.length && filtered.length) kept = [filtered[Math.floor(Math.random() * filtered.length)]];
     }
     if (!kept.length) return '';
-
     var out = [
       '汎用キャラクター一覧（サブ・モブ用テンプレ）：',
       'この一覧に記載されたキャラクターのみを使用できる。一覧に無いキャラクターは使用しない。'
@@ -1720,118 +1989,86 @@ var NovelGen = (function () {
     return out.join('\n');
   }
 
-  // ============================================================
-  // run_generation — py と同ロジック
-  // ============================================================
-  var PATTERNS_7 = [
-    { 'ブーン': true,  'モナー': false, '他の人': false },
-    { 'ブーン': false, 'モナー': true,  '他の人': false },
-    { 'ブーン': false, 'モナー': false, '他の人': true },
-    { 'ブーン': true,  'モナー': true,  '他の人': false },
-    { 'ブーン': true,  'モナー': false, '他の人': true },
-    { 'ブーン': false, 'モナー': true,  '他の人': true },
-    { 'ブーン': true,  'モナー': true,  '他の人': true }
-  ];
-  var PATTERNS_8 = [
-    { 'ブーン': false, 'モナー': false, '他の人': false },
-    { 'ブーン': true,  'モナー': false, '他の人': false },
-    { 'ブーン': false, 'モナー': true,  '他の人': false },
-    { 'ブーン': true,  'モナー': true,  '他の人': false },
-    { 'ブーン': false, 'モナー': false, '他の人': true },
-    { 'ブーン': true,  'モナー': false, '他の人': true },
-    { 'ブーン': false, 'モナー': true,  '他の人': true },
-    { 'ブーン': true,  'モナー': true,  '他の人': true }
-  ];
 
-  function runGeneration(P, files, MARKOV_ORDER, suppressHero) {
+  // ============================================================
+  // run_generation — py と同ロジック（資料優先度対応）
+  // ============================================================
+  function priorityPatternText(priority, selected, useMarkov, shuryoMode, stopped) {
+    var p = (priority || []).map(charMaterialLabel).join(' ＞ ');
+    var s = (selected || []).map(charMaterialLabel).join('、') || 'なし';
+    var text = '選出パターン： キャラ資料優先度 ' + p + '　／　採用 ' + s + '　／　マルコフ ' + (useMarkov ? 'あり' : 'なし');
+    if (stopped) text += '　／　文字数上限で停止';
+    if (shuryoMode === 3) text += '　／　資料オンリー モード3';
+    return text;
+  }
+
+  function runGeneration(P, files, MARKOV_ORDER, suppressHero, tailText) {
     var shuryoMode;
-    if (P.shuryoOnlyMode === 0) {
-      shuryoMode = choice([-1, 2, 3]);
-    } else {
-      shuryoMode = P.shuryoOnlyMode;
-    }
-    // モード1は欠番。指定されても通常モード(-1)へ倒す。
+    if (P.shuryoOnlyMode === 0) shuryoMode = choice([-1, 2, 3]);
+    else shuryoMode = P.shuryoOnlyMode;
     if (shuryoMode === 1) shuryoMode = -1;
 
-    var bestCount = -1;
-    var bestArgs = null;
-    var iterations = (shuryoMode === -1) ? 1 : 2;
-
-    for (var it = 0; it < iterations; it++) {
-      var currentHeroMode = P.heroMode;
-      var chosen;
-      if (shuryoMode === 2) {
-        chosen = { 'ブーン': false, 'モナー': false, '他の人': false };
-      } else if (P.patternMode === 0) {
-        chosen = { 'ブーン': false, 'モナー': false, '他の人': false };
-        currentHeroMode = 0;
-      } else if (P.patternMode === 1) {
-        chosen = { 'ブーン': true, 'モナー': !!randint(0, 1), '他の人': !!randint(0, 1) };
-      } else if (P.patternMode === 2) {
-        chosen = { 'ブーン': !!randint(0, 1), 'モナー': true, '他の人': !!randint(0, 1) };
-      } else if (P.patternMode === 3) {
-        chosen = { 'ブーン': !!randint(0, 1), 'モナー': !!randint(0, 1), '他の人': true };
-      } else {
-        var patterns = (shuryoMode === -1) ? PATTERNS_7 : PATTERNS_8;
-        chosen = choice(patterns);
-      }
-
-      var trueCount = (chosen['ブーン'] ? 1 : 0) + (chosen['モナー'] ? 1 : 0) + (chosen['他の人'] ? 1 : 0);
-
-      var useMarkov;
-      if (shuryoMode === 2 || shuryoMode === 3) useMarkov = true;
-      else useMarkov = (P.useMarkovMode === 1);
-
-      // ---- 視点キャラ選択 ----
-      var candidates = [];
-      if (P.patternMode === 1 && (shuryoMode !== 2 && shuryoMode !== 3)) {
-        candidates = DATA.boon.slice();
-      } else if (P.patternMode === 2 && (shuryoMode !== 2 && shuryoMode !== 3)) {
-        candidates = DATA.mona.slice();
-      } else if (P.patternMode === 3 && (shuryoMode !== 2 && shuryoMode !== 3)) {
-        candidates = DATA.tano.slice();
-      } else {
-        if (chosen['ブーン']) candidates = candidates.concat(DATA.boon);
-        if (chosen['モナー']) candidates = candidates.concat(DATA.mona);
-        if (chosen['他の人']) candidates = candidates.concat(DATA.tano);
-        if (!candidates.length) {
-          candidates = DATA.boon.concat(DATA.mona, DATA.tano);
+    // -1 / 3 は、8資料の優先度を1回だけ決める。マルコフ生成の
+    // リトライで優先度を入れ替えないため、同一試行内の順序は固定される。
+    if (shuryoMode === -1 || shuryoMode === 3) {
+      var priority = cloneCharPriority();
+      var usePriorityMarkov = (shuryoMode === 3) || (P.useMarkovMode === 1);
+      var priorityMarkovMax = shuryoMode === 3 ? P.markovLinesMaxShuryo : P.markovLinesMax;
+      for (var pa = 1; pa <= P.maxRetry; pa++) {
+        var made = buildContents(P, files, {
+          chosen: {},
+          selectedCharFiles: [],
+          charPriority: priority,
+          useMarkov: usePriorityMarkov,
+          currentHeroMode: P.heroMode,
+          heroText: '',
+          markovLinesMax: priorityMarkovMax,
+          maxChar: P.maxChar,
+          shuryoMode: shuryoMode,
+          suppressHero: suppressHero,
+          tailText: tailText,
+          MARKOV_ORDER: MARKOV_ORDER
+        });
+        if (made === null) {
+          if (priorityMarkovMax > P.markovLinesMin) {
+            priorityMarkovMax = Math.max(P.markovLinesMin, priorityMarkovMax - randint(1, 500));
+          }
+          continue;
+        }
+        var priorityResult = made.contents.join('\n\n');
+        if (priorityResult.length <= P.maxChar) {
+          return {
+            result: priorityResult,
+            attempt: pa,
+            pattern: priorityPatternText(priority, made.selectedCharFiles, usePriorityMarkov, shuryoMode, made.priorityStopped),
+            chosen: {},
+            selectedCharFiles: made.selectedCharFiles,
+            charPriority: priority,
+            shuryoMode: shuryoMode
+          };
         }
       }
-
-      var hero1 = choice(candidates);
-      var isDoubleHero = (Math.random() * 100 < P.doubleHeroRate);
-      var heroText;
-      if (isDoubleHero && candidates.length >= 2) {
-        var hero2 = choice(candidates.filter(function (c) { return c !== hero1; }));
-        heroText = '今回の視点は[ ' + hero1 + '、' + hero2 + ' ]です';
-      } else {
-        heroText = '今回の視点は[ ' + hero1 + ' ]です';
-      }
-
-      // 特殊視点（5分の1で特殊視点）
-      if ((shuryoMode === -1 || shuryoMode === 2 || shuryoMode === 3) &&
-          Math.random() * 100 < P.specialHeroRate) {
-        var specialLabel = choice(DATA.specialLabels);
-        var bugai = choice(DATA.bugai);
-        heroText = '今回の視点は[ ' + specialLabel + '：' + bugai + ' ]です';
-        currentHeroMode = 1;
-      }
-
-      if (trueCount > bestCount) {
-        bestCount = trueCount;
-        bestArgs = { chosen: chosen, useMarkov: useMarkov, currentHeroMode: currentHeroMode, heroText: heroText };
-      }
+      return { result: null, attempt: -1, pattern: '', chosen: {}, selectedCharFiles: [], charPriority: priority, shuryoMode: shuryoMode };
     }
 
-    chosen = bestArgs.chosen;
-    useMarkov = bestArgs.useMarkov;
-    currentHeroMode = bestArgs.currentHeroMode;
-    heroText = bestArgs.heroText;
+    // モード2（AIオリジナル設定）は従来どおり。キャラ資料の優先度選出は行わない。
+    var chosen = { 'ブーン': false, 'モナー': false, '他の人': false };
+    var useMarkov = true;
+    var currentHeroMode = P.heroMode;
+    var candidates = (DATA.boon || []).concat(DATA.mona || [], DATA.tano || []);
+    var hero1 = choice(candidates);
+    var heroText;
+    if (Math.random() * 100 < P.doubleHeroRate && candidates.length >= 2) {
+      heroText = '今回の視点は[ ' + hero1 + '、' + choice(candidates.filter(function (c) { return c !== hero1; })) + ' ]です';
+    } else {
+      heroText = '今回の視点は[ ' + hero1 + ' ]です';
+    }
+    if (Math.random() * 100 < P.specialHeroRate) {
+      heroText = '今回の視点は[ ' + choice(DATA.specialLabels) + '：' + choice(DATA.bugai) + ' ]です';
+      currentHeroMode = 1;
+    }
 
-    var currentMarkovLinesMax = (shuryoMode === 2 || shuryoMode === 3)
-      ? P.markovLinesMaxShuryo : P.markovLinesMax;
-
+    var currentMarkovLinesMax = P.markovLinesMaxShuryo;
     for (var attempt = 1; attempt <= P.maxRetry; attempt++) {
       var contents = buildContents(P, files, {
         chosen: chosen,
@@ -1840,36 +2077,32 @@ var NovelGen = (function () {
         heroText: heroText,
         markovLinesMax: currentMarkovLinesMax,
         maxChar: P.maxChar,
-        shuryoMode: shuryoMode,
+        shuryoMode: 2,
         suppressHero: suppressHero,
         MARKOV_ORDER: MARKOV_ORDER
       });
-
       if (contents === null) {
         if (currentMarkovLinesMax > P.markovLinesMin) {
           currentMarkovLinesMax = Math.max(P.markovLinesMin, currentMarkovLinesMax - randint(1, 500));
         }
         continue;
       }
-      if (!contents.length) {
-        return { result: null, attempt: -1, pattern: '', chosen: chosen, shuryoMode: shuryoMode };
-      }
-
       var result = contents.join('\n\n');
       if (result.length < P.maxChar) {
-        var label = function (v) { return v ? 'あり' : 'なし'; };
-        var patternText = '選出パターン： ブーン ' + label(chosen['ブーン']) +
-          '　／　モナー ' + label(chosen['モナー']) +
-          '　／　他の人 ' + label(chosen['他の人']) +
-          '　／　マルコフ ' + label(useMarkov);
-        if (shuryoMode === 2) patternText += '　／　資料オンリー モード2';
-        else if (shuryoMode === 3) patternText += '　／　資料オンリー モード3';
-        return { result: result, attempt: attempt, pattern: patternText, chosen: chosen, shuryoMode: shuryoMode };
+        return {
+          result: result,
+          attempt: attempt,
+          pattern: '選出パターン： キャラ資料なし　／　マルコフ あり　／　資料オンリー モード2',
+          chosen: chosen,
+          selectedCharFiles: [],
+          charPriority: [],
+          shuryoMode: 2
+        };
       }
     }
-
-    return { result: null, attempt: -1, pattern: '', chosen: chosen, shuryoMode: shuryoMode };
+    return { result: null, attempt: -1, pattern: '', chosen: chosen, selectedCharFiles: [], charPriority: [], shuryoMode: 2 };
   }
+
 
   // ============================================================
   // 資料の機械分割（00_world.md / 01_characters.md）
@@ -1954,16 +2187,8 @@ var NovelGen = (function () {
     return out.join('\n\n');
   }
 
-  function writeSplitFiles(chosen, shuryoMode, files) {
-    var targets = [];
-    if (shuryoMode === 2) {
-      targets = [];
-    } else {
-      if (chosen['ブーン']) targets.push('nijisousaku');
-      if (chosen['モナー']) targets.push('choukasoku');
-      if (chosen['他の人']) targets.push('tanohito');
-    }
-
+  function writeSplitFiles(selectedCharFiles, shuryoMode, files) {
+    var targets = (shuryoMode === 2) ? [] : (selectedCharFiles || []).slice();
     var worldParts = [];
     var charEntries = [];
     for (var t = 0; t < targets.length; t++) {
@@ -1995,11 +2220,11 @@ var NovelGen = (function () {
       for (var pe = 0; pe < charEntries.length; pe++) {
         parts.push('### 人物: ' + charEntries[pe][0] + '\n\n' + charEntries[pe][1].trim() + '\n');
       }
-      // py は "\n".join(parts)（各パーツ末尾に \n があるため空行で区切られる）
       charactersMd = parts.join('\n').replace(/\n+$/, '') + '\n';
     }
     return { worldMd: worldMd, charactersMd: charactersMd };
   }
+
 
   // ============================================================
   // メイン実行（外側リトライ込み）— py のメイン部と同ロジック
@@ -2035,22 +2260,27 @@ var NovelGen = (function () {
     var finalResult = null;
     var finalPattern = null;
     var finalChosen = {};
+    var finalSelectedCharFiles = [];
+    var finalCharPriority = [];
     var finalShuryoMode = -1;
     var finalAttempt = -1;
 
+    function remember(r) {
+      finalResult = r.result;
+      finalPattern = r.pattern;
+      finalChosen = r.chosen || {};
+      finalSelectedCharFiles = r.selectedCharFiles || [];
+      finalCharPriority = r.charPriority || [];
+      finalShuryoMode = r.shuryoMode;
+      finalAttempt = r.attempt;
+    }
+
     for (var outer = 1; outer <= P.maxOuterRetry; outer++) {
-      var r1 = runGeneration(P, files, MARKOV_ORDER, suppressHero);
+      var r1 = runGeneration(P, files, MARKOV_ORDER, suppressHero, tail);
       if (r1.result === null) continue;
-      var r2 = runGeneration(P, files, MARKOV_ORDER, suppressHero);
-      if (r2.result !== null && r2.result.length > r1.result.length) {
-        finalResult = r2.result; finalPattern = r2.pattern;
-        finalChosen = r2.chosen; finalShuryoMode = r2.shuryoMode;
-        finalAttempt = r2.attempt;
-      } else {
-        finalResult = r1.result; finalPattern = r1.pattern;
-        finalChosen = r1.chosen; finalShuryoMode = r1.shuryoMode;
-        finalAttempt = r1.attempt;
-      }
+      var r2 = runGeneration(P, files, MARKOV_ORDER, suppressHero, tail);
+      if (r2.result !== null && r2.result.length > r1.result.length) remember(r2);
+      else remember(r1);
       break;
     }
 
@@ -2058,15 +2288,18 @@ var NovelGen = (function () {
       return { error: '外側 ' + P.maxOuterRetry + ' 回×内側 ' + P.maxRetry + ' 回、すべて失敗しました。' };
     }
 
-    if (tail) finalResult = finalResult + '\n\n' + tail;
+    // -1 / 3 は tail も上限計算済み。従来モード2だけ従来位置に追加する。
+    if (tail && finalShuryoMode === 2) finalResult = finalResult + '\n\n' + tail;
 
-    var split = writeSplitFiles(finalChosen, finalShuryoMode, files);
+    var split = writeSplitFiles(finalSelectedCharFiles, finalShuryoMode, files);
 
     return {
       result: finalResult,
       pattern: finalPattern,
       attempt: finalAttempt,
       chosen: finalChosen,
+      selectedCharFiles: finalSelectedCharFiles,
+      charPriority: finalCharPriority,
       shuryoMode: finalShuryoMode,
       worldMd: split.worldMd,
       charactersMd: split.charactersMd
@@ -2126,7 +2359,12 @@ NovelGen.setNovelData(NOVEL_DATA);
     { id: 'charaTemplate', label: 'キャラテンプレ.txt', repoFile: 'キャラテンプレ.txt', defMode: 'github' },
     { id: 'nijisousaku', label: '二次創作.txt', repoFile: '二次創作.txt', defMode: 'github' },
     { id: 'choukasoku',  label: '超加速.txt', repoFile: '超加速.txt', defMode: 'github' },
-    { id: 'tanohito',    label: '他の人.txt', repoFile: '他の人.txt', defMode: 'github' },
+    { id: 'lab',         label: 'ラボ組.txt', repoFile: 'ラボ組.txt', defMode: 'github' },
+    { id: 'school',      label: '学校組.txt', repoFile: '学校組.txt', defMode: 'github' },
+    { id: 'host',        label: 'ホスト組.txt', repoFile: 'ホスト組.txt', defMode: 'github' },
+    { id: 'tsun',        label: 'ツン.txt', repoFile: 'ツン.txt', defMode: 'github' },
+    { id: 'watanabe',    label: '渡辺さん.txt', repoFile: '渡辺さん.txt', defMode: 'github' },
+    { id: 'hain',        label: 'ハイン.txt', repoFile: 'ハイン.txt', defMode: 'github' },
     { id: 'markov',      label: 'マルコフ.txt', repoFile: 'マルコフ.txt', defMode: 'github' },
     { id: 'tone',        label: 'トーン.txt', repoFile: 'トーン.txt', defMode: 'github' },
     { id: 'last',        label: '最後.txt',   repoFile: '最後.txt',   defMode: 'github' },
@@ -2136,8 +2374,7 @@ NovelGen.setNovelData(NOVEL_DATA);
 
   var DEFAULT_PARAMS = {
     // 基本
-    shuryoOnlyMode: 0,        // 0=ランダム / -1=OFF / 2=モード2 / 3=モード3（モード1は欠番）
-    patternMode: -1,          // -1=ランダム / 0=全部なし / 1=ブーン固定 / 2=モナー固定 / 3=他の人固定
+    shuryoOnlyMode: 0,        // 0=ランダム / -1=通常（キャラ優先度） / 2=モード2 / 3=モード3（モード1は欠番）
     useMarkovMode: 1,         // 1=ON / 0=OFF
     heroMode: -1,             // -1=ランダム / 0=視点なし / 1=必ず視点
     useLastMarkovLineMode: 1, // テーマ（最後の1行マルコフ） 1=ON / 0=OFF
@@ -2162,9 +2399,7 @@ NovelGen.setNovelData(NOVEL_DATA);
 
   var PARAM_FIELDS = [
     { key: 'shuryoOnlyMode', label: '資料オンリーモード', type: 'select',
-      options: [[0, '0: ランダム（本家仕様）'], [-1, '-1: OFF'], [2, '2: モード2'], [3, '3: モード3']] },
-    { key: 'patternMode', label: 'パターンモード', type: 'select',
-      options: [[-1, '-1: ランダム'], [0, '0: 全部なし固定'], [1, '1: ブーン固定'], [2, '2: モナー固定'], [3, '3: 他の人固定']] },
+      options: [[0, '0: ランダム'], [-1, '-1: 通常（キャラ資料優先度）'], [2, '2: モード2'], [3, '3: モード3（キャラ資料優先度）']] },
     { key: 'useMarkovMode', label: 'マルコフ連鎖', type: 'select', options: [[1, '1: ON'], [0, '0: OFF']] },
     { key: 'heroMode', label: '視点モード', type: 'select',
       options: [[-1, '-1: ランダム（4/5で視点あり）'], [0, '0: 視点なし'], [1, '1: 必ず視点']] },
