@@ -311,7 +311,7 @@ footer { text-align: center; color: #5b6378; font-size: 11px; padding: 24px 0 40
           <code>SS.txt / 二次創作.txt / 超加速.txt / ラボ組.txt / 学校組.txt / ホスト組.txt / ツン.txt / 渡辺さん.txt / ハイン.txt / マルコフ.txt / トーン.txt / 最後.txt</code> を
           <code>raw.githubusercontent.com</code> から取得します。</li>
         <li><b>マルコフ.txt や 最後.txt、各キャラ資料をリポジトリ上で編集して保存 → このページで生成</b> すれば、最新版が反映されます（毎回最新を取得）。</li>
-        <li>資料オンリーモード（-1／3）では、二次創作・超加速・ラボ組・学校組・ホスト組・ツン・渡辺さん・ハインを候補に優先度をランダム設定し、文字数上限に収まる順番までをプロンプト先頭へ追加します。</li>
+        <li>資料オンリーモード（-1／3）では、8資料のキャラ計28名に対して優先度をランダム設定し、上から所属する資料（二次創作・超加速・ラボ組・学校組・ホスト組・ツン・渡辺さん・ハイン）のtxtを追加していき、文字数上限に収まる順番までをプロンプト先頭へ追加します。</li>
         <li>旧来の統合資料 <code>他の人.txt</code> は旧Python版との互換用に残っていますが、SS.htmlでは参照しません。</li>
         <li>取得に失敗した場合は「前回取得した内容」を自動で使い、警告を表示します。</li>
         <li>リポジトリを変えたい場合は「⚙ 設定」のリポジトリ欄を書き換えるか、各ファイルのURLを直接編集してください。</li>
@@ -1330,13 +1330,16 @@ var NovelGen = (function () {
   // キャラ資料の細分化と優先度選出
   // ============================================================
   // -1 / 3 では、旧「ブーン・モナー・他の人」の三択を使わない。
-  // ここに並ぶ8資料を毎回シャッフルし、上から順にプロンプト先頭へ加える。
+  // ここに並ぶ8資料のキャラ（計28名）を毎回シャッフルし、キャラの
+  // 所属資料（txt）を上から順にプロンプト先頭へ加える。
   var MIN_CHAR_MATERIAL_CHARS = 10000;
   var MARKOV_LINES_HARD_MAX = 1000;
   var CHAR_MATERIALS = [
     { id: 'nijisousaku', label: '二次創作', names: ['兄者', '弟者', 'ブーン', 'ドクオ', 'クー', 'シュー', 'モララー', 'ギコ', 'ショボン', 'シャキン'] },
     { id: 'choukasoku',  label: '超加速', names: ['モナー', 'ロマネスク', 'しぃ', 'つー', 'ミセリ', 'トソン'] },
     { id: 'lab',         label: 'ラボ組', names: ['フォックス', '花瓶', 'ヒート'] },
+    // 学校のペニサスは1人（テンプレ・資料側の表記「ペニサス伊藤」＝ヒーローリスト表記「ペニサス」）。
+    // ヒーロー候補の照合は DATA.tano の表記「ペニサス」で行うため、こちらに統一。
     { id: 'school',      label: '学校組', names: ['デレ', 'キュート', 'ペニサス'] },
     { id: 'host',        label: 'ホスト組', names: ['またんき', 'フサギコ', 'ぃょぅ'] },
     { id: 'tsun',        label: 'ツン', names: ['ツン'] },
@@ -1356,10 +1359,22 @@ var NovelGen = (function () {
     return m ? m.label : id;
   }
 
+  // キャラ単位の優先度プール：8資料のキャラをフラット化した計28名。
+  // 各要素は { char: キャラ名, matId: 所属txt } 。
+  function charPriorityPool() {
+    var pool = [];
+    CHAR_MATERIALS.forEach(function (m) {
+      (m.names || []).forEach(function (name) {
+        pool.push({ char: name, matId: m.id });
+      });
+    });
+    return pool;
+  }
+
   function cloneCharPriority() {
-    var ids = CHAR_MATERIALS.map(function (m) { return m.id; });
-    shuffle(ids);
-    return ids;
+    // 優先度はキャラ単位（28名）でシャッフルする。
+    // 挿入する資料はtxt単位（キャラの所属txt）で解決する。
+    return shuffle(charPriorityPool());
   }
 
   function entryHasName(entry, name) {
@@ -1535,14 +1550,20 @@ var NovelGen = (function () {
     var charCountText = '文字数は' + charMin + '~' + charMax + '文字';
 
     // ベース部分が完成した後に、キャラ資料の優先度を適用する。
+    // 優先度はキャラ単位（28名シャッフル）。挿入はtxt単位：
+    // キャラリストを上から歩き、そのキャラの所属txtを未追加なら追加する。
+    // 追加済みのtxtに属するキャラは無視する。
     var priority = (A.charPriority || cloneCharPriority()).slice();
     var selectedCharFiles = [];
     var selectedCharMaterialLength = 0;
     var charBlocks = [];
     var projectedLen = baseLen;
     var priorityStopped = false;
+    var triedMats = {};
     for (var pi = 0; pi < priority.length; pi++) {
-      var id = priority[pi];
+      var id = priority[pi].matId;
+      if (triedMats[id]) continue; // このtxtはもう処理済み（追加済み or 空でスキップ済み）
+      triedMats[id] = true;
       var raw = files[id];
       if (!raw || !raw.trim()) continue;
       if (projectedLen + raw.length + 2 + charCountText.length + 2 > maxChar) {
@@ -1913,7 +1934,7 @@ var NovelGen = (function () {
     nijisousaku: ['兄者', '弟者', 'ブーン', 'ドクオ', 'クー', 'シュー', 'モララー', 'ギコ', 'ショボン', 'シャキン'],
     choukasoku: ['モナー', 'ロマネスク', 'しぃ', 'つー', 'ミセリ', 'トソン'],
     lab: ['花瓶', 'ヒート', 'フォックス'],
-    school: ['デレ', 'キュート', 'ペニサス伊藤', 'ペニサス'],
+    school: ['デレ', 'キュート', 'ペニサス伊藤'], // ペニサスは1人（テンプレの行名「ペニサス伊藤」）。ヒーローリスト表記「ペニサス」はCHAR_MATERIALS側で処理
     host: ['またんき', 'フサギコ', 'ぃょぅ'],
     tsun: ['ツン'],
     watanabe: ['渡辺さん'],
@@ -2010,7 +2031,7 @@ var NovelGen = (function () {
     else shuryoMode = P.shuryoOnlyMode;
     if (shuryoMode === 1) shuryoMode = -1;
 
-    // -1 / 3 は、8資料の優先度を1回だけ決める。マルコフ生成の
+    // -1 / 3 は、キャラ単位の優先度（28名）を1回だけ決める。マルコフ生成の
     // リトライで優先度を入れ替えないため、同一試行内の順序は固定される。
     if (shuryoMode === -1 || shuryoMode === 3) {
       var usePriorityMarkov = (shuryoMode === 3) || (P.useMarkovMode === 1);
