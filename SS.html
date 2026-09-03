@@ -1896,34 +1896,50 @@ var NovelGen = (function () {
     hain: ['単独（ハイン）', ['ハイン']]
   };
 
+  // ============================================================
+  // グループ横断の既知接点（詳細資料明記分）
+  // 資料上に接点が明記されている組には「完全な無関係（他人）」宣言を出さず、
+  // 資料が明記する関係をそのまま宣言する（宣言の脳死一括適用防止）。
+  // 資料側へ新しい接点を追記した場合はこの表にも必ず反映すること。
+  // ============================================================
+  var CROSS_CONTACTS = [
+    { a: 'hain', b: 'choukasoku',
+      text: 'ハインは超加速資料のミセリと学校の友人であり、互いに面識がある。ハインが面識を持つのはミセリだけで、モナーグループの他の人物は引き続き無関係として扱う。' },
+    { a: 'hain', b: 'lab',
+      text: 'ハインの自宅の近隣にラボ（外観・規模は一般住宅）があり、ハインはその騒音・異常事態を「よくわからないが迷惑なもの」として認識している。ただしラボの3人の名前・素性・実態は知らない。' },
+    { a: 'host', b: 'choukasoku',
+      text: 'ホスト組のまたんきはモナーグループの面々と互いに顔と素性を認識しているが、モナーグループのメンバーではない。利害（肉）が一致した時や偶然遭遇した時のみ関わる。フサギコとぃょぅの接点はまたんき経由の個別関係に限る。' }
+  ];
+
   function generateRelationRule(selectedCharFiles) {
     var selected = (selectedCharFiles || []).filter(function (id) { return !!REL_GROUPS[id]; });
     if (!selected.length) return '';
-    function memberStr(label, members) { return label + '（' + members.join('、') + '）'; }
+    function memberStr(label, members) {
+      return label.indexOf('（') >= 0 ? label : label + '（' + members.join('、') + '）';
+    }
+    function findContact(x, y) {
+      for (var k = 0; k < CROSS_CONTACTS.length; k++) {
+        var c = CROSS_CONTACTS[k];
+        if ((c.a === x && c.b === y) || (c.a === y && c.b === x)) return c;
+      }
+      return null;
+    }
     var lines = [];
     for (var i = 0; i < selected.length; i++) {
       for (var j = i + 1; j < selected.length; j++) {
-        // ハインはミセリ（超加速）と学校の友人という例外関係を持つ。
-        if ((selected[i] === 'hain' && selected[j] === 'choukasoku') ||
-            (selected[i] === 'choukasoku' && selected[j] === 'hain') ||
-            (selected[i] === 'host' && selected[j] === 'choukasoku') ||
-            (selected[i] === 'choukasoku' && selected[j] === 'host')) continue;
+        var contact = findContact(selected[i], selected[j]);
+        if (contact) { lines.push(contact.text); continue; }
         var g1 = REL_GROUPS[selected[i]], g2 = REL_GROUPS[selected[j]];
         lines.push(memberStr(g1[0], g1[1]) + 'と' + memberStr(g2[0], g2[1]) + 'は、互いに一切の面識・接点を持たない完全な無関係（他人）である。');
       }
     }
-    if (selected.indexOf('hain') >= 0 && selected.indexOf('choukasoku') >= 0) {
-      lines.push('ハインは超加速資料のミセリと学校の友人であり、互いに面識がある。ただし、超加速資料の他の人物全員と知り合いという意味ではない。');
-    }
-    if (selected.indexOf('host') >= 0 && selected.indexOf('choukasoku') >= 0) {
-      lines.push('ホスト組のまたんきはモナーグループの面々と互いに顔と素性を認識しているが、モナーグループのメンバーではない。フサギコとぃょぅの接点はまたんき経由の個別関係に限る。');
-    }
     if (selected.length === 1) {
       var only = REL_GROUPS[selected[0]];
-      lines.push(memberStr(only[0], only[1]) + 'のキャラクターは、このプロンプトに記述されていない他のグループのキャラクターと互いに一切の面識・接点を持たない完全な無関係（他人）である。');
+      lines.push(memberStr(only[0], only[1]) + 'のキャラクターは、このプロンプトに記述されていない他のグループのキャラクターと互いに一切の面識・接点を持たない完全な無関係（他人）である。ただし詳細キャラ資料に関係・面識・接点の記載がある組合せは、その記載を優先する。');
     }
     var rule = 'キャラクター間の関係：\n' + lines.join('\n');
     rule += '\nこの指定の趣旨は、互いに面識のないキャラクター同士を「顔を知っている」「旧知の仲」のような顔見知り・旧知扱いで描写することを防ぐことにある。顔合わせそのものを禁じる趣旨ではない。物語の展開やユーザーの指示に応じて、異なるグループのキャラクターが同じ場に現れ、顔を合わせることは許容する。その場合、両者は必ず初対面として描くこと：互いの名前・素性・性格・能力・過去を知らない前提で、初対面特有の距離感（警戒・探り・よそよそしさ・自己紹介）を持たせる。旧知同士のような馴染んだ口調、相手の内情を知っている前提の言動、根拠のない親密さや信頼を付加してはならない。顔合わせを避ける必要はないが、顔を合わせた以上、初対面以外の関係性を勝手に付与してはならない。';
+    rule += '\n詳細キャラ資料に関係・面識・接点の記載がある組合せは、無関係（他人）として扱わず、資料の記載を優先すること。ただし記載された関係の範囲を超えて、顔見知り・旧知の関係へ勝手に拡張してはならない。';
     return rule;
   }
 
