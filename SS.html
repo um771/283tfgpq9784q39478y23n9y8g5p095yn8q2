@@ -308,7 +308,7 @@ footer { text-align: center; color: #5b6378; font-size: 11px; padding: 24px 0 40
       <ul>
         <li>デフォルトでは GitHub リポジトリ
           <code>um771/283tfgpq9784q39478y23n9y8g5p095yn8q2</code> の <code>main</code> ブランチにある
-          <code>SS.txt / 二次創作.txt / 超加速.txt / ラボ組.txt / 学校組.txt / ホスト組.txt / ツン.txt / 渡辺さん.txt / ハイン.txt / マルコフ.txt / トーン.txt / 最後.txt</code> を
+          <code>SS.txt / 二次創作.txt / 超加速.txt / ラボ組.txt / 学校組.txt / ホスト組.txt / ツン.txt / 渡辺さん.txt / ハイン.txt / マルコフ.txt / 冒頭.txt / 終盤.txt / トーン.txt / 最後.txt</code> を
           <code>raw.githubusercontent.com</code> から取得します。</li>
         <li><b>マルコフ.txt や 最後.txt、各キャラ資料をリポジトリ上で編集して保存 → このページで生成</b> すれば、最新版が反映されます（毎回最新を取得）。</li>
         <li>資料オンリーモード（-1／3）では、8資料のキャラ計28名に対して優先度をランダム設定し、上から所属する資料（二次創作・超加速・ラボ組・学校組・ホスト組・ツン・渡辺さん・ハイン）のtxtを追加していき、文字数上限に収まる順番までをプロンプト先頭へ追加します。</li>
@@ -1286,7 +1286,7 @@ var NovelGen = (function () {
   //  （原文ママ）はすべて禁止して再生成する。全試行が規格落ち・原文ママの
   //   場合は空文字を返し、冒頭ブロック自体を注入しない。
   //  （原文と同じ冒頭文を絶対に出さないための措置。テーマ側は無関係。）
-  function generateOpeningOneLiner(text, charLimit, P, orderMin, orderMax) {
+  function generateOpeningOneLiner(text, charLimit, P, orderMin, orderMax, cacheKey) {
     // 精度の下限は2。精度1は文章として成立しない超破綻文が
     // 大量に出るため禁止（実測済み）。
     if (orderMin == null) orderMin = 2;
@@ -1298,10 +1298,13 @@ var NovelGen = (function () {
     var puncts = ['。', '、', '.', '!', '？', '?', '！'];
     for (var att = 0; att < 24; att++) {
       // マルコフ精度を揺らがせる（orderMin〜orderMax）。
-      // 全行「冒頭は、」始まりなので、どの精度でも頭の骨格
-      // （冒頭は、）は開始gramから自然に保たれる。
+      // 統一構文コーパス（冒頭は、/終盤は、）なので、どの精度でも
+      // 頭の骨格は開始gramから自然に保たれる。
+      // ★ cacheKeyはコーパス毎に一意に（冒頭='__one_opening' /
+      //   終盤='__one_ending'）。渡さないと先に構築したチェーンを
+      //   使い回す。
       var order = randint(orderMin, orderMax);
-      var chain = getChain(cleaned, order, '__one_opening');
+      var chain = getChain(cleaned, order, cacheKey || '__one_opening');
       if (!chain) continue;
       var s = generateSentence(chain, order, isEnglish, P.markovSentenceMinChars, P.markovSentenceMaxChars);
       if (!s) continue;
@@ -1320,6 +1323,13 @@ var NovelGen = (function () {
       return s;
     }
     return '';
+  }
+
+  // ★ 終盤用1行生成。仕組みは冒頭用と同一（統一構文コーパス＋原文ママ禁止＋精度2〜4）。
+  //   終盤.txtも全行「終盤は、」始まり「〜ことになる。」終わりの統一構文のため、
+  //   頭と尻尾の骨格は連鎖合成でも自然に保たれる。
+  function generateEndingOneLiner(text, charLimit, P, orderMin, orderMax) {
+    return generateOpeningOneLiner(text, charLimit, P, orderMin, orderMax, '__one_ending');
   }
 
   function generateMarkovText(text, order, lineCount, charLimit, P, cacheKey) {
@@ -1573,6 +1583,20 @@ var NovelGen = (function () {
         if (op) {
           if (!addBase(op)) return null;
           if (!addBase('↑\nこれが冒頭の流れ。文が破綻していても、その意図を補完して強引に解釈し、この冒頭で仕込んだ独自の要素をセットアップとして必ず後半で回収しろ。ただしここに書かれた具体を倉庫での作業・解体・組み立て等の既視感のある場面へ読み替えて、毎回同じパターンへ落ち着かせることを禁止する。')) return null;
+        }
+      }
+    }
+
+    // ★ 終盤フロー指定（終盤.txtを1文マルコフで合成。冒頭と同じ流儀）
+    //   冒頭ブロックの直後・テーマ提示の直前に置く。
+    //   「終盤は、～～なる。」→「↑ これが終盤の流れ」の順。
+    if (P.useEndingMarkovMode === 1) {
+      var remE = maxChar - baseLen;
+      if (remE > 0 && files.ending) {
+        var en = generateEndingOneLiner(files.ending, Math.min(160, remE), P);
+        if (en) {
+          if (!addBase(en)) return null;
+          if (!addBase('↑\nこれが終盤の流れ。文が破綻していても、その意図を補完して強引に解釈し、この終盤の着地を、前半で既に置いた要素の回収によって実現しろ。ただしここに書かれた具体を最終決戦・土壇場の覚醒・仲間の到着等の既視感のある場面へ読み替えて、毎回同じパターンへ落ち着かせることを禁止する。')) return null;
         }
       }
     }
@@ -1899,6 +1923,20 @@ var NovelGen = (function () {
         if (op) {
           if (!addToContents(op)) return null;
           if (!addToContents('↑\nこれが冒頭の流れ。文が破綻していても、その意図を補完して強引に解釈し、この冒頭で仕込んだ独自の要素をセットアップとして必ず後半で回収しろ。ただしここに書かれた具体を倉庫での作業・解体・組み立て等の既視感のある場面へ読み替えて、毎回同じパターンへ落ち着かせることを禁止する。')) return null;
+        }
+      }
+    }
+
+    // ★ 終盤フロー指定（終盤.txtを1文マルコフで合成。冒頭と同じ流儀）
+    //   冒頭ブロックの直後・テーマ提示の直前に置く。
+    //   「終盤は、～～なる。」→「↑ これが終盤の流れ」の順。
+    if (P.useEndingMarkovMode === 1) {
+      var remE = maxChar - currentLen;
+      if (remE > 0 && files.ending) {
+        var en = generateEndingOneLiner(files.ending, Math.min(160, remE), P);
+        if (en) {
+          if (!addToContents(en)) return null;
+          if (!addToContents('↑\nこれが終盤の流れ。文が破綻していても、その意図を補完して強引に解釈し、この終盤の着地を、前半で既に置いた要素の回収によって実現しろ。ただしここに書かれた具体を最終決戦・土壇場の覚醒・仲間の到着等の既視感のある場面へ読み替えて、毎回同じパターンへ落ち着かせることを禁止する。')) return null;
         }
       }
     }
@@ -2514,6 +2552,7 @@ var NovelGen = (function () {
     _randint: randint,
     _generateMarkovOneLiner: generateMarkovOneLiner,
     _generateOpeningOneLiner: generateOpeningOneLiner,
+    _generateEndingOneLiner: generateEndingOneLiner,
     _heroPairNote: heroPairNote
   };
 })();
@@ -2556,6 +2595,7 @@ NovelGen.setNovelData(NOVEL_DATA);
     { id: 'hain',        label: 'ハイン.txt', repoFile: 'ハイン.txt', defMode: 'github' },
     { id: 'markov',      label: 'マルコフ.txt', repoFile: 'マルコフ.txt', defMode: 'github' },
     { id: 'opening',     label: '冒頭.txt',   repoFile: '冒頭.txt',   defMode: 'github' },
+    { id: 'ending',      label: '終盤.txt',   repoFile: '終盤.txt',   defMode: 'github' },
     { id: 'tone',        label: 'トーン.txt', repoFile: 'トーン.txt', defMode: 'github' },
     { id: 'last',        label: '最後.txt',   repoFile: '最後.txt',   defMode: 'github' },
     { id: 'kinshi',      label: '禁止.txt',   repoFile: '禁止.txt',   defMode: 'none',   note: 'リポジトリに無い場合はスキップ' },
@@ -2569,6 +2609,7 @@ NovelGen.setNovelData(NOVEL_DATA);
     heroMode: -1,             // -1=ランダム / 0=視点なし / 1=必ず視点
     useLastMarkovLineMode: 1, // テーマ（最後の1行マルコフ） 1=ON / 0=OFF
     useOpeningMarkovMode: 1,  // 冒頭パターン（冒頭.txtを1文マルコフ） 1=ON / 0=OFF
+    useEndingMarkovMode: 1,   // 終盤パターン（終盤.txtを1文マルコフ） 1=ON / 0=OFF
     specialHeroRate: 20,      // 特殊視点レート（％）
     doubleHeroRate: 20,       // 視点キャラ2人レート（％）
     noHeroRate: 20,           // 視点なしレート（％）
@@ -2596,6 +2637,7 @@ NovelGen.setNovelData(NOVEL_DATA);
       options: [[-1, '-1: ランダム（4/5で視点あり）'], [0, '0: 視点なし'], [1, '1: 必ず視点']] },
     { key: 'useLastMarkovLineMode', label: 'テーマ提示（最後の1行）', type: 'select', options: [[1, '1: ON'], [0, '0: OFF']] },
     { key: 'useOpeningMarkovMode', label: '冒頭パターン指定（冒頭.txt）', type: 'select', options: [[1, '1: ON'], [0, '0: OFF']] },
+    { key: 'useEndingMarkovMode', label: '終盤パターン指定（終盤.txt）', type: 'select', options: [[1, '1: ON'], [0, '0: OFF']] },
     { key: 'specialHeroRate', label: '特殊視点レート（％）', type: 'number', min: 0, max: 100 },
     { key: 'doubleHeroRate', label: '視点キャラ2人レート（％）', type: 'number', min: 0, max: 100 },
     { key: 'noHeroRate', label: '視点なしレート（％）', type: 'number', min: 0, max: 100 },

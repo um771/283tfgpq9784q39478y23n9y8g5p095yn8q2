@@ -17,6 +17,8 @@ USE_LAST_MARKOV_LINE_MODE = 1
 # === 追加 ===
 # 冒頭フロー指定（冒頭.txtを1文マルコフで合成し、テーマ提示の直前に注入）
 USE_OPENING_MARKOV_MODE = 1  # 1 = ON / 0 = OFF
+# 終盤フロー指定（終盤.txtを1文マルコフで合成し、冒頭ブロックの直後に注入）
+USE_ENDING_MARKOV_MODE = 1  # 1 = ON / 0 = OFF
 # =============
 
 # マルコフ連鎖パラメータ
@@ -77,6 +79,8 @@ markov_file = r"C:\Users\saaaa\Downloads\新しいフォルダー (2)\マルコ�
 # === 追加 ===
 # 冒頭フロー指定用ファイル（1文マルコフの素材。プロンプト素材には混ぜない）
 opening_file = r"C:\Users\saaaa\Downloads\新しいフォルダー (2)\冒頭.txt"
+# 終盤フロー指定用ファイル（冒頭.txtと同じ統一構文の素材）
+ending_file = r"C:\Users\saaaa\Downloads\新しいフォルダー (2)\終盤.txt"
 # =============
 
 # トーンジャンルファイル
@@ -651,6 +655,23 @@ def generate_opening_one_liner(
     return ""
 
 
+def generate_ending_one_liner(
+    filepath: str,
+    char_limit: int = 160,
+    order_min: int = 2,
+    order_max: int = 4,
+) -> str:
+    """終盤用1行生成。
+
+    仕組みは冒頭用と同一（統一構文コーパス＋原文ママ禁止＋精度2〜4の揺らぎ）。
+    終盤.txtも全行「終盤は、」始まり「〜ことになる。」終わりの統一構文のため、
+    頭と尻尾の骨格は連鎖合成でも自然に保たれる。
+    """
+    return generate_opening_one_liner(
+        filepath, char_limit=char_limit, order_min=order_min, order_max=order_max
+    )
+
+
 def generate_markov_text(filepath: str, order: int, line_count: int, char_limit: int,
                          raw_text: str | None = None) -> str:
     if raw_text is not None:
@@ -1080,6 +1101,37 @@ def build_contents(
                     "これが冒頭の流れ。文が破綻していても、その意図を補完して強引に解釈し、"
                     "この冒頭で仕込んだ独自の要素をセットアップとして必ず後半で回収しろ。"
                     "ただしここに書かれた具体を倉庫での作業・解体・組み立て等の"
+                    "既視感のある場面へ読み替えて、毎回同じパターンへ落ち着かせることを禁止する。"
+                ):
+                    return None
+
+    # ==========================================================
+    # 終盤フロー指定
+    #
+    # 冒頭フローと同じ流儀。終盤.txtを1文マルコフで合成して、
+    # 冒頭ブロックの直後・テーマ提示の直前に注入する。
+    # 終盤.txtは全行「終盤は、」始まり「〜ことになる。」終わりの
+    # 統一構文のため、頭と尻尾の骨格は連鎖合成でも保たれる。
+    # 「終盤は、～～なる。」→「↑ これが終盤の流れ」の順になる。
+    # ==========================================================
+    if USE_ENDING_MARKOV_MODE == 1:
+        remaining_chars = max_char - current_len
+
+        if remaining_chars > 0:
+            ending_line = generate_ending_one_liner(
+                ending_file,
+                char_limit=min(160, remaining_chars),
+            )
+
+            if ending_line:
+                if not add_to_contents(ending_line):
+                    return None
+
+                if not add_to_contents(
+                    "↑\n"
+                    "これが終盤の流れ。文が破綻していても、その意図を補完して強引に解釈し、"
+                    "この終盤の着地を、前半で既に置いた要素の回収によって実現しろ。"
+                    "ただしここに書かれた具体を最終決戦・土壇場の覚醒・仲間の到着等の"
                     "既視感のある場面へ読み替えて、毎回同じパターンへ落ち着かせることを禁止する。"
                 ):
                     return None
