@@ -13,8 +13,11 @@ PATTERN_MODE = -1
 USE_MARKOV_MODE = 1
 HERO_MODE = -1
 USE_LAST_MARKOV_LINE_MODE = 1
-# 冒頭フロー（冒頭.txtを1文マルコフで合成） 1 = ON / 0 = OFF
-USE_OPENING_MARKOV_MODE = 1
+
+# === 追加 ===
+# 冒頭フロー指定（冒頭.txtを1文マルコフで合成し、テーマ提示の直前に注入）
+USE_OPENING_MARKOV_MODE = 1  # 1 = ON / 0 = OFF
+# =============
 
 # マルコフ連鎖パラメータ
 MARKOV_ORDER     = 0  # ★ 0 = ランダム(1～4) / 1～4 = 固定値
@@ -70,8 +73,10 @@ tsuzuki_file = r"C:\Users\saaaa\Downloads\新しいフォルダー (2)\続き.tx
 # マルコフ連鎖用ファイル
 markov_file = r"C:\Users\saaaa\Downloads\新しいフォルダー (2)\マルコフ.txt"
 
-# 冒頭フロー用ファイル（1文マルコフ）
+# === 追加 ===
+# 冒頭フロー指定用ファイル（1文マルコフの素材。プロンプト素材には混ぜない）
 opening_file = r"C:\Users\saaaa\Downloads\新しいフォルダー (2)\冒頭.txt"
+# =============
 
 # トーンジャンルファイル
 tone_file = r"C:\Users\saaaa\Downloads\新しいフォルダー (2)\トーン.txt"
@@ -133,6 +138,58 @@ CROSS_GROUP_CONTACTS = {
         "上記の組合せを初対面の他人として扱ってはならない。",
     ],
 }
+
+
+# ============================================================
+# 視点2人（ダブルヒーロー）用の短縮版・無関係宣言
+#
+# 視点が別組織のキャラ2人に指定されたとき、関係ルール本体は
+# 名簿入りで長すぎるため、視点指定の直後に「その2人だけ」の
+# 短縮版を付ける。接点あり（資料明記）のペアには付けない。
+# ============================================================
+
+# 視点ペア単位の「接点あり」例外（キャラ名の組）
+HERO_PAIR_KNOWN_CONTACTS = {
+    frozenset({"ハイン", "ミセリ"}),  # 学校の友人（モナー×他の人の横断接点）
+} | {
+    # またんきはモナーグループの面々と顔と素性を認識している
+    frozenset({"またんき", n})
+    for n in ("モナー", "ロマネスク", "しぃ", "つー", "ミセリ", "トソン")
+}
+
+
+def _hero_entry_name(entry: str) -> str:
+    """'AA　名前' 形式の視点候補から名前部を取り出す。区切りが無ければ全体。"""
+    return entry.rsplit("　", 1)[-1] if "　" in entry else entry
+
+
+def _hero_group_label(entry: str) -> str | None:
+    """視点候補が属する組織のラベルを返す（REL_GROUPS準拠）。不明はNone。"""
+    name = _hero_entry_name(entry)
+    for _key, (label, members) in REL_GROUPS.items():
+        if name in members:
+            return label
+        # 表記揺れ（ペニサス／ペニサス伊藤 等）は前方一致で救済
+        if any(m.startswith(name) or name.startswith(m) for m in members):
+            return label
+    return None
+
+
+def hero_pair_note(h1: str, h2: str) -> str:
+    """視点2人が別組織かつ接点なしのとき、短縮版の無関係宣言を返す。"""
+    g1 = _hero_group_label(h1)
+    g2 = _hero_group_label(h2)
+    if not g1 or not g2 or g1 == g2:
+        return ""
+
+    n1, n2 = _hero_entry_name(h1), _hero_entry_name(h2)
+    if frozenset({n1, n2}) in HERO_PAIR_KNOWN_CONTACTS:
+        return ""
+
+    return (
+        f"\n{n1}（{g1}）と{n2}（{g2}）は、"
+        "互いに一切の面識・接点を持たない完全な無関係（他人）である。"
+    )
 
 
 def generate_relation_rule(chosen: dict) -> str:
@@ -524,6 +581,73 @@ def generate_markov_one_liner(filepath: str, order: int, char_limit: int = 80) -
         return ""
 
     return s
+
+
+def generate_opening_one_liner(
+    filepath: str,
+    char_limit: int = 160,
+    order_min: int = 2,
+    order_max: int = 4,
+) -> str:
+    """冒頭用1行生成（原文ママ禁止・精度揺らぎ付き）。
+
+    冒頭.txtは全行「冒頭は、」始まりの統一構文のため、精度4固定だと
+    原文をそのまま再生しがち（実測で約3割が原文ママ）。
+    試行のたびにマルコフ精度を揺らがせ、コーパス本文にそのまま含まれる文
+    （原文ママ）はすべて禁止して再生成する。全試行が規格落ち・原文ママの
+    場合は空文字を返し、冒頭ブロック自体を注入しない。
+    精度の下限は2。精度1は文章として成立しない超破綻文が大量に出るため
+    禁止（実測済み）。
+    """
+    text = safe_read(filepath)
+    if text is None:
+        return ""
+
+    # ★ マルコフに食わせる前にマークダウンを破壊
+    text = strip_markdown(text)
+    if not text.strip():
+        return ""
+
+    is_english = is_english_text(text)
+
+    for _ in range(24):
+        # マルコフ精度を揺らがせる（order_min〜order_max）。
+        # 全行「冒頭は、」始まりなので、どの精度でも頭の骨格
+        # （冒頭は、）は開始gramから自然に保たれる。
+        order = random.randint(order_min, order_max)
+
+        chain_data = build_markov_chain(text, order)
+        if chain_data is None:
+            continue
+
+        s = generate_sentence(chain_data, order, is_english)
+        if not s:
+            continue
+
+        # 1行用途なので改行は潰す（念のため）
+        s = s.replace("\r", "").replace("\n", " ").strip()
+
+        # 長すぎたらカット（句読点があればそこで切る努力を少しする）
+        if len(s) > char_limit:
+            cut = s[:char_limit]
+            for p in ["。", "、", ".", "!", "？", "?", "！"]:
+                idx = cut.rfind(p)
+                if idx >= 10:
+                    cut = cut[:idx + 1]
+                    break
+            s = cut.strip()
+
+        # 最終防衛：下限未満なら捨てる
+        if len(s) < MARKOV_SENTENCE_MIN_CHARS:
+            continue
+
+        # ★ 原文ママ判定：コーパス本文にそのまま含まれる文は禁止
+        if s in text:
+            continue
+
+        return s
+
+    return ""
 
 
 def generate_markov_text(filepath: str, order: int, line_count: int, char_limit: int,
@@ -933,16 +1057,19 @@ def build_contents(
     # ==========================================================
     # 冒頭フロー指定
     #
-    # テーマ用の1行マルコフの直前に置く。
-    # 出力順: 冒頭指定 → テーマ用マルコフ → テーマ指定。
+    # 最後.txtの直後・テーマ提示の直前に、
+    # 冒頭.txtを1文マルコフで合成して注入する。
+    # 精度1〜4を揺らがせ、原文ママ（コーパスにそのまま
+    # 含まれる文）は禁止して再生成する。
+    # 「冒頭は、～～なる。」→「↑ これが冒頭の流れ」→
+    # テーマ1行 →「↑ これがテーマの話を書け」の順になる。
     # ==========================================================
     if USE_OPENING_MARKOV_MODE == 1:
         remaining_chars = max_char - current_len
 
         if remaining_chars > 0:
-            opening_line = generate_markov_one_liner(
+            opening_line = generate_opening_one_liner(
                 opening_file,
-                MARKOV_ORDER,
                 char_limit=min(160, remaining_chars),
             )
 
@@ -951,14 +1078,19 @@ def build_contents(
                     return None
 
                 if not add_to_contents(
-                    "↑\nこれが冒頭の流れ。文が破綻していても、その意図を補完して強引に解釈し、この冒頭で仕込んだ独自の要素をセットアップとして必ず後半で回収しろ。ただしここに書かれた具体を倉庫での作業・解体・組み立て等の既視感のある場面へ読み替えて、毎回同じパターンへ落ち着かせることを禁止する。"
+                    "↑\n"
+                    "これが冒頭の流れ。文が破綻していても、その意図を補完して強引に解釈し、"
+                    "この冒頭で仕込んだ独自の要素をセットアップとして必ず後半で回収しろ。"
+                    "ただしここに書かれた具体を倉庫での作業・解体・組み立て等の"
+                    "既視感のある場面へ読み替えて、毎回同じパターンへ落ち着かせることを禁止する。"
                 ):
                     return None
 
     # ==========================================================
     # テーマ提示
     #
-    # 冒頭フロー指定の直後に、マルコフ1行とテーマ指定を挿入する
+    # 最後.txtの後に、
+    # マルコフ1行とテーマ指定を挿入する
     # ==========================================================
     if USE_LAST_MARKOV_LINE_MODE == 1:
         remaining_chars = max_char - current_len
@@ -1703,6 +1835,8 @@ def run_generation(suppress_hero: bool = False) -> tuple[str | None, int, str]:
         if is_double_hero and len(candidates) >= 2:
             hero2 = random.choice([c for c in candidates if c != hero1])
             hero_text = f"今回の視点は[ {hero1}、{hero2} ]です"
+            # ★ 別組織かつ接点なしの2視点には短縮版の無関係宣言を付ける
+            hero_text += hero_pair_note(hero1, hero2)
         else:
             hero_text = f"今回の視点は[ {hero1} ]です"
 

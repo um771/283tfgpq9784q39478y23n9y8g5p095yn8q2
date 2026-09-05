@@ -1258,10 +1258,10 @@ var NovelGen = (function () {
     if (!cleaned.trim()) return '';
     var isEnglish = isEnglishText(cleaned);
     var baseOrder = 4;
-    // 冒頭.txt と マルコフ.txt を同一の "__one" キャッシュで共有すると、
-    // 先に生成した方の連鎖が後者へ誤用される。素材ごとに必ず分離する。
-    var oneLinerCacheKey = '__one:' + (cacheKey || cleaned);
-    var chain = getChain(cleaned, baseOrder, oneLinerCacheKey);
+    // ★ キャッシュキーはテキストを含まないため、複数コーパスで1行生成する
+    //   場合は呼び出し側で必ず個別の cacheKey を渡すこと（テーマ='__one' /
+    //   冒頭='__one_opening'）。渡さないと先に構築したチェーンを使い回す。
+    var chain = getChain(cleaned, baseOrder, cacheKey || '__one');
     if (!chain) return '';
     var s = generateSentence(chain, baseOrder, isEnglish, P.markovSentenceMinChars, P.markovSentenceMaxChars);
     if (!s) return '';
@@ -1277,6 +1277,49 @@ var NovelGen = (function () {
     }
     if (s.length < P.markovSentenceMinChars) return '';
     return s;
+  }
+
+  // ★ 冒頭用1行生成（原文ママ禁止・精度揺らぎ付き）
+  //   冒頭.txtは全行「冒頭は、」始まりの統一構文のため、精度4固定だと
+  //   原文をそのまま再生しがち（実測で約3割が原文ママ）。
+  //   試行のたびに精度1〜4を揺らがせ、コーパス本文にそのまま含まれる文
+  //  （原文ママ）はすべて禁止して再生成する。全試行が規格落ち・原文ママの
+  //   場合は空文字を返し、冒頭ブロック自体を注入しない。
+  //  （原文と同じ冒頭文を絶対に出さないための措置。テーマ側は無関係。）
+  function generateOpeningOneLiner(text, charLimit, P, orderMin, orderMax) {
+    // 精度の下限は2。精度1は文章として成立しない超破綻文が
+    // 大量に出るため禁止（実測済み）。
+    if (orderMin == null) orderMin = 2;
+    if (orderMax == null) orderMax = 4;
+    if (!text) return '';
+    var cleaned = stripMarkdown(text);
+    if (!cleaned.trim()) return '';
+    var isEnglish = isEnglishText(cleaned);
+    var puncts = ['。', '、', '.', '!', '？', '?', '！'];
+    for (var att = 0; att < 24; att++) {
+      // マルコフ精度を揺らがせる（orderMin〜orderMax）。
+      // 全行「冒頭は、」始まりなので、どの精度でも頭の骨格
+      // （冒頭は、）は開始gramから自然に保たれる。
+      var order = randint(orderMin, orderMax);
+      var chain = getChain(cleaned, order, '__one_opening');
+      if (!chain) continue;
+      var s = generateSentence(chain, order, isEnglish, P.markovSentenceMinChars, P.markovSentenceMaxChars);
+      if (!s) continue;
+      s = s.replace(/\r/g, '').replace(/\n/g, ' ').trim();
+      if (s.length > charLimit) {
+        var cut = s.slice(0, charLimit);
+        for (var pi = 0; pi < puncts.length; pi++) {
+          var idx = cut.lastIndexOf(puncts[pi]);
+          if (idx >= 10) { cut = cut.slice(0, idx + 1); break; }
+        }
+        s = cut.trim();
+      }
+      if (s.length < P.markovSentenceMinChars) continue;
+      // ★ 原文ママ判定：コーパス本文にそのまま含まれる文は禁止
+      if (cleaned.indexOf(s) !== -1) continue;
+      return s;
+    }
+    return '';
   }
 
   function generateMarkovText(text, order, lineCount, charLimit, P, cacheKey) {
@@ -1412,7 +1455,9 @@ var NovelGen = (function () {
       var isDoubleHero = Math.random() * 100 < P.doubleHeroRate;
       if (isDoubleHero && candidates.length >= 2) {
         var rest = candidates.filter(function (x) { return x !== hero1; });
-        heroText = '今回の視点は[ ' + hero1 + '、' + choice(rest) + ' ]です';
+        var hero2 = choice(rest);
+        // ★ 別組織かつ接点なしの2視点には短縮版の無関係宣言を付ける
+        heroText = '今回の視点は[ ' + hero1 + '、' + hero2 + ' ]です' + heroPairNote(hero1, hero2);
       } else {
         heroText = '今回の視点は[ ' + hero1 + ' ]です';
       }
@@ -1515,14 +1560,15 @@ var NovelGen = (function () {
     if (files.tsuzuki && !addBase(files.tsuzuki)) return null;
     if (files.last && !addBase(files.last)) return null;
 
-    // ★ 冒頭フロー指定（テーマの1行マルコフの直前に置く）
-    // 出力順: 冒頭指定 → テーマ用マルコフ → テーマ指定。
+    // ★ 冒頭フロー指定（冒頭.txtを1文マルコフで合成。精度1〜4を揺らがせ、原文ママは禁止）
+    //   最後.txtの直後・テーマ提示の直前に置く。
+    //   「冒頭は、～～なる。」→「↑ これが冒頭の流れ」→ テーマ1行 →「↑ これがテーマの話を書け」の順。
     if (P.useOpeningMarkovMode === 1) {
-      var openingRemaining = maxChar - baseLen;
-      if (openingRemaining > 0 && files.opening) {
-        var openingLine = generateMarkovOneLiner(files.opening, MARKOV_ORDER, Math.min(160, openingRemaining), P, 'opening');
-        if (openingLine) {
-          if (!addBase(openingLine)) return null;
+      var remO = maxChar - baseLen;
+      if (remO > 0 && files.opening) {
+        var op = generateOpeningOneLiner(files.opening, Math.min(160, remO), P);
+        if (op) {
+          if (!addBase(op)) return null;
           if (!addBase('↑\nこれが冒頭の流れ。文が破綻していても、その意図を補完して強引に解釈し、この冒頭で仕込んだ独自の要素をセットアップとして必ず後半で回収しろ。ただしここに書かれた具体を倉庫での作業・解体・組み立て等の既視感のある場面へ読み替えて、毎回同じパターンへ落ち着かせることを禁止する。')) return null;
         }
       }
@@ -1531,7 +1577,7 @@ var NovelGen = (function () {
     if (P.useLastMarkovLineMode === 1) {
       var left4 = maxChar - baseLen;
       if (left4 > 0) {
-        var oneLine = generateMarkovOneLiner(files.markov, MARKOV_ORDER, Math.min(120, left4), P, 'theme');
+        var oneLine = generateMarkovOneLiner(files.markov, MARKOV_ORDER, Math.min(120, left4), P);
         if (oneLine) {
           if (!addBase(oneLine)) return null;
           if (!addBase('↑\nこれがテーマの話を書け')) return null;
@@ -1612,7 +1658,11 @@ var NovelGen = (function () {
     // 視点・文字数も上限に含める。関係ルールとキャラテンプレは余白が
     // ある場合だけ追加し、ベース生成の揺らぎで超えた場合は優先度の末尾から戻す。
     function extraLen(blocks) { return blocks.reduce(function (n, x) { return n + (x ? x.length + 2 : 0); }, 0); }
-    while (selectedCharFiles.length && projectedLen + extraLen(finalTailBlocks) > maxChar) {
+    // ★ 関係ルールは「余白があれば」ではなく必ず入れる。
+    //    モード3などで上限ぎりぎりのときに関係ルールだけ弾かれる事故を防ぐため、
+    //    その分をキャラ資料の収容チェックに織り込んでおく。
+    function relationLen() { return tail.relation ? tail.relation.length + 2 : 0; }
+    while (selectedCharFiles.length && projectedLen + relationLen() + extraLen(finalTailBlocks) > maxChar) {
       priorityStopped = true;
       var removedCharFile = selectedCharFiles.pop();
       var removedCharBlock = charBlocks.pop();
@@ -1627,14 +1677,18 @@ var NovelGen = (function () {
     }
     finalTailBlocks = makeFinalTailBlocks();
 
-    // 追加余地があれば、関係ルールとキャラテンプレをキャラ資料側に付加する。
+    // 関係ルールは保護ブロックとして必ず載せる（載りきらない場合は
+    // 上のwhileでキャラ資料を削ってでも確保する。それでも無理なら
+    // 下の判定で生成自体をやり直す）。キャラテンプレは余白次第。
     var prefixBlocks = charBlocks.slice();
-    charInstructionBlocks.forEach(function (x) {
-      if (projectedLen + x.length + 2 + extraLen(finalTailBlocks) <= maxChar) {
-        prefixBlocks.push(x);
-        projectedLen += x.length + 2;
-      }
-    });
+    if (tail.relation) {
+      prefixBlocks.push(tail.relation);
+      projectedLen += tail.relation.length + 2;
+    }
+    if (tail.template && projectedLen + tail.template.length + 2 + extraLen(finalTailBlocks) <= maxChar) {
+      prefixBlocks.push(tail.template);
+      projectedLen += tail.template.length + 2;
+    }
     if (projectedLen + extraLen(finalTailBlocks) > maxChar) return null;
     finalTailBlocks.forEach(function (x) {
       baseContents.push(x);
@@ -1823,24 +1877,25 @@ var NovelGen = (function () {
       if (!addToContents(lastText)) return null;
     }
 
-    // ★ 冒頭フロー指定（テーマの1行マルコフの直前に置く）
-    // 出力順: 冒頭指定 → テーマ用マルコフ → テーマ指定。
+    // ★ 冒頭フロー指定（冒頭.txtを1文マルコフで合成。精度1〜4を揺らがせ、原文ママは禁止）
+    //   最後.txtの直後・テーマ提示の直前に置く。
+    //   「冒頭は、～～なる。」→「↑ これが冒頭の流れ」→ テーマ1行 →「↑ これがテーマの話を書け」の順。
     if (P.useOpeningMarkovMode === 1) {
-      var openingRemaining = maxChar - currentLen;
-      if (openingRemaining > 0 && files.opening) {
-        var openingLine = generateMarkovOneLiner(files.opening, MARKOV_ORDER, Math.min(160, openingRemaining), P, 'opening');
-        if (openingLine) {
-          if (!addToContents(openingLine)) return null;
+      var remO = maxChar - currentLen;
+      if (remO > 0 && files.opening) {
+        var op = generateOpeningOneLiner(files.opening, Math.min(160, remO), P);
+        if (op) {
+          if (!addToContents(op)) return null;
           if (!addToContents('↑\nこれが冒頭の流れ。文が破綻していても、その意図を補完して強引に解釈し、この冒頭で仕込んだ独自の要素をセットアップとして必ず後半で回収しろ。ただしここに書かれた具体を倉庫での作業・解体・組み立て等の既視感のある場面へ読み替えて、毎回同じパターンへ落ち着かせることを禁止する。')) return null;
         }
       }
     }
 
-    // テーマ提示（冒頭フロー指定の直後にマルコフ1行とテーマ指定）
+    // テーマ提示（最後.txtの後にマルコフ1行とテーマ指定）
     if (P.useLastMarkovLineMode === 1) {
       var remaining4 = maxChar - currentLen;
       if (remaining4 > 0) {
-        var oneLine = generateMarkovOneLiner(files.markov, MARKOV_ORDER, Math.min(120, remaining4), P, 'theme');
+        var oneLine = generateMarkovOneLiner(files.markov, MARKOV_ORDER, Math.min(120, remaining4), P);
         if (oneLine) {
           if (!addToContents(oneLine)) return null;
           if (!addToContents('↑\nこれがテーマの話を書け')) return null;
@@ -1939,6 +1994,53 @@ var NovelGen = (function () {
     { a: 'host', b: 'choukasoku',
       text: 'ホスト組のまたんきはモナーグループの面々と互いに顔と素性を認識しているが、モナーグループのメンバーではない。利害（肉）が一致した時や偶然遭遇した時のみ関わる。フサギコとぃょぅの接点はまたんき経由の個別関係に限る。' }
   ];
+
+  // ============================================================
+  // 視点2人（ダブルヒーロー）用の短縮版・無関係宣言
+  //
+  // 視点が別組織のキャラ2人に指定されたとき、関係ルール本体は
+  // 名簿入りで長すぎるため、視点指定の直後に「その2人だけ」の
+  // 短縮版を付ける。接点あり（資料明記）のペアには付けない。
+  // ============================================================
+  var HERO_PAIR_KNOWN_CONTACTS = [
+    ['ハイン', 'ミセリ'],  // 学校の友人（ハイン×モナーグループの横断接点）
+    // またんきはモナーグループの面々と顔と素性を認識している
+    ['またんき', 'モナー'], ['またんき', 'ロマネスク'], ['またんき', 'しぃ'],
+    ['またんき', 'つー'], ['またんき', 'ミセリ'], ['またんき', 'トソン']
+  ];
+
+  function heroEntryName(x) {
+    var i = x.lastIndexOf('　');
+    return i >= 0 ? x.slice(i + 1) : x;
+  }
+
+  function heroGroupLabel(x) {
+    var name = heroEntryName(x);
+    var ids = Object.keys(REL_GROUPS);
+    for (var i = 0; i < ids.length; i++) {
+      var members = REL_GROUPS[ids[i]][1];
+      for (var j = 0; j < members.length; j++) {
+        var m = members[j];
+        // 表記揺れ（ペニサス／ペニサス伊藤 等）は前方一致で救済
+        if (m === name || m.indexOf(name) === 0 || name.indexOf(m) === 0) {
+          var label = REL_GROUPS[ids[i]][0];
+          return label.indexOf('（') >= 0 ? '単独' : label;
+        }
+      }
+    }
+    return null;
+  }
+
+  function heroPairNote(h1, h2) {
+    var g1 = heroGroupLabel(h1), g2 = heroGroupLabel(h2);
+    if (!g1 || !g2 || g1 === g2) return '';
+    var n1 = heroEntryName(h1), n2 = heroEntryName(h2);
+    for (var i = 0; i < HERO_PAIR_KNOWN_CONTACTS.length; i++) {
+      var p = HERO_PAIR_KNOWN_CONTACTS[i];
+      if ((p[0] === n1 && p[1] === n2) || (p[0] === n2 && p[1] === n1)) return '';
+    }
+    return '\n' + n1 + '（' + g1 + '）と' + n2 + '（' + g2 + '）は、互いに一切の面識・接点を持たない完全な無関係（他人）である。';
+  }
 
   function generateRelationRule(selectedCharFiles) {
     var selected = (selectedCharFiles || []).filter(function (id) { return !!REL_GROUPS[id]; });
@@ -2129,7 +2231,9 @@ var NovelGen = (function () {
     var hero1 = choice(candidates);
     var heroText;
     if (Math.random() * 100 < P.doubleHeroRate && candidates.length >= 2) {
-      heroText = '今回の視点は[ ' + hero1 + '、' + choice(candidates.filter(function (c) { return c !== hero1; })) + ' ]です';
+      var hero2m2 = choice(candidates.filter(function (c) { return c !== hero1; }));
+      // ★ 別組織かつ接点なしの2視点には短縮版の無関係宣言を付ける
+      heroText = '今回の視点は[ ' + hero1 + '、' + hero2m2 + ' ]です' + heroPairNote(hero1, hero2m2);
     } else {
       heroText = '今回の視点は[ ' + hero1 + ' ]です';
     }
@@ -2395,7 +2499,10 @@ var NovelGen = (function () {
     buildCharTemplate: buildCharTemplate,
     _buildContents: buildContents,
     // テスト用
-    _randint: randint
+    _randint: randint,
+    _generateMarkovOneLiner: generateMarkovOneLiner,
+    _generateOpeningOneLiner: generateOpeningOneLiner,
+    _heroPairNote: heroPairNote
   };
 })();
 
