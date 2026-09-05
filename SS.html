@@ -1251,14 +1251,17 @@ var NovelGen = (function () {
     return c;
   }
 
-  function generateMarkovOneLiner(text, order, charLimit, P) {
+  function generateMarkovOneLiner(text, order, charLimit, P, cacheKey) {
     // py では「1行マルコフは常に精度4・揺らぎなしで固定」
     if (!text) return '';
     var cleaned = stripMarkdown(text);
     if (!cleaned.trim()) return '';
     var isEnglish = isEnglishText(cleaned);
     var baseOrder = 4;
-    var chain = getChain(cleaned, baseOrder, '__one');
+    // 冒頭.txt と マルコフ.txt を同一の "__one" キャッシュで共有すると、
+    // 先に生成した方の連鎖が後者へ誤用される。素材ごとに必ず分離する。
+    var oneLinerCacheKey = '__one:' + (cacheKey || cleaned);
+    var chain = getChain(cleaned, baseOrder, oneLinerCacheKey);
     if (!chain) return '';
     var s = generateSentence(chain, baseOrder, isEnglish, P.markovSentenceMinChars, P.markovSentenceMaxChars);
     if (!s) return '';
@@ -1512,10 +1515,23 @@ var NovelGen = (function () {
     if (files.tsuzuki && !addBase(files.tsuzuki)) return null;
     if (files.last && !addBase(files.last)) return null;
 
+    // ★ 冒頭フロー指定（テーマの1行マルコフの直前に置く）
+    // 出力順: 冒頭指定 → テーマ用マルコフ → テーマ指定。
+    if (P.useOpeningMarkovMode === 1) {
+      var openingRemaining = maxChar - baseLen;
+      if (openingRemaining > 0 && files.opening) {
+        var openingLine = generateMarkovOneLiner(files.opening, MARKOV_ORDER, Math.min(160, openingRemaining), P, 'opening');
+        if (openingLine) {
+          if (!addBase(openingLine)) return null;
+          if (!addBase('↑\nこれが冒頭の流れ。文が破綻していても、その意図を補完して強引に解釈し、この冒頭で仕込んだ独自の要素をセットアップとして必ず後半で回収しろ。ただしここに書かれた具体を倉庫での作業・解体・組み立て等の既視感のある場面へ読み替えて、毎回同じパターンへ落ち着かせることを禁止する。')) return null;
+        }
+      }
+    }
+
     if (P.useLastMarkovLineMode === 1) {
       var left4 = maxChar - baseLen;
       if (left4 > 0) {
-        var oneLine = generateMarkovOneLiner(files.markov, MARKOV_ORDER, Math.min(120, left4), P);
+        var oneLine = generateMarkovOneLiner(files.markov, MARKOV_ORDER, Math.min(120, left4), P, 'theme');
         if (oneLine) {
           if (!addBase(oneLine)) return null;
           if (!addBase('↑\nこれがテーマの話を書け')) return null;
@@ -1807,11 +1823,24 @@ var NovelGen = (function () {
       if (!addToContents(lastText)) return null;
     }
 
-    // テーマ提示（最後.txtの後にマルコフ1行とテーマ指定）
+    // ★ 冒頭フロー指定（テーマの1行マルコフの直前に置く）
+    // 出力順: 冒頭指定 → テーマ用マルコフ → テーマ指定。
+    if (P.useOpeningMarkovMode === 1) {
+      var openingRemaining = maxChar - currentLen;
+      if (openingRemaining > 0 && files.opening) {
+        var openingLine = generateMarkovOneLiner(files.opening, MARKOV_ORDER, Math.min(160, openingRemaining), P, 'opening');
+        if (openingLine) {
+          if (!addToContents(openingLine)) return null;
+          if (!addToContents('↑\nこれが冒頭の流れ。文が破綻していても、その意図を補完して強引に解釈し、この冒頭で仕込んだ独自の要素をセットアップとして必ず後半で回収しろ。ただしここに書かれた具体を倉庫での作業・解体・組み立て等の既視感のある場面へ読み替えて、毎回同じパターンへ落ち着かせることを禁止する。')) return null;
+        }
+      }
+    }
+
+    // テーマ提示（冒頭フロー指定の直後にマルコフ1行とテーマ指定）
     if (P.useLastMarkovLineMode === 1) {
       var remaining4 = maxChar - currentLen;
       if (remaining4 > 0) {
-        var oneLine = generateMarkovOneLiner(files.markov, MARKOV_ORDER, Math.min(120, remaining4), P);
+        var oneLine = generateMarkovOneLiner(files.markov, MARKOV_ORDER, Math.min(120, remaining4), P, 'theme');
         if (oneLine) {
           if (!addToContents(oneLine)) return null;
           if (!addToContents('↑\nこれがテーマの話を書け')) return null;

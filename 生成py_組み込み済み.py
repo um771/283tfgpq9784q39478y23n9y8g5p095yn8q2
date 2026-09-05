@@ -13,6 +13,8 @@ PATTERN_MODE = -1
 USE_MARKOV_MODE = 1
 HERO_MODE = -1
 USE_LAST_MARKOV_LINE_MODE = 1
+# 冒頭フロー（冒頭.txtを1文マルコフで合成） 1 = ON / 0 = OFF
+USE_OPENING_MARKOV_MODE = 1
 
 # マルコフ連鎖パラメータ
 MARKOV_ORDER     = 0  # ★ 0 = ランダム(1～4) / 1～4 = 固定値
@@ -67,6 +69,9 @@ tsuzuki_file = r"C:\Users\saaaa\Downloads\新しいフォルダー (2)\続き.tx
 
 # マルコフ連鎖用ファイル
 markov_file = r"C:\Users\saaaa\Downloads\新しいフォルダー (2)\マルコフ.txt"
+
+# 冒頭フロー用ファイル（1文マルコフ）
+opening_file = r"C:\Users\saaaa\Downloads\新しいフォルダー (2)\冒頭.txt"
 
 # トーンジャンルファイル
 tone_file = r"C:\Users\saaaa\Downloads\新しいフォルダー (2)\トーン.txt"
@@ -926,10 +931,34 @@ def build_contents(
             return None
 
     # ==========================================================
+    # 冒頭フロー指定
+    #
+    # テーマ用の1行マルコフの直前に置く。
+    # 出力順: 冒頭指定 → テーマ用マルコフ → テーマ指定。
+    # ==========================================================
+    if USE_OPENING_MARKOV_MODE == 1:
+        remaining_chars = max_char - current_len
+
+        if remaining_chars > 0:
+            opening_line = generate_markov_one_liner(
+                opening_file,
+                MARKOV_ORDER,
+                char_limit=min(160, remaining_chars),
+            )
+
+            if opening_line:
+                if not add_to_contents(opening_line):
+                    return None
+
+                if not add_to_contents(
+                    "↑\nこれが冒頭の流れ。文が破綻していても、その意図を補完して強引に解釈し、この冒頭で仕込んだ独自の要素をセットアップとして必ず後半で回収しろ。ただしここに書かれた具体を倉庫での作業・解体・組み立て等の既視感のある場面へ読み替えて、毎回同じパターンへ落ち着かせることを禁止する。"
+                ):
+                    return None
+
+    # ==========================================================
     # テーマ提示
     #
-    # 最後.txtの後に、
-    # マルコフ1行とテーマ指定を挿入する
+    # 冒頭フロー指定の直後に、マルコフ1行とテーマ指定を挿入する
     # ==========================================================
     if USE_LAST_MARKOV_LINE_MODE == 1:
         remaining_chars = max_char - current_len
