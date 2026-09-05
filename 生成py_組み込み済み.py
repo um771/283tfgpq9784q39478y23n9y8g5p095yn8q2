@@ -6,7 +6,7 @@ import subprocess
 # 設定
 # ============================================================
 
-# 資料オンリーモード（-1 = OFF / 1 = モード1 / 2 = モード2）
+# 資料オンリーモード（-1 = OFF / 2 = モード2 / 3 = モード3。1は欠番）
 SHURYO_ONLY_MODE = 0
 
 PATTERN_MODE = -1
@@ -62,7 +62,8 @@ tanohito    = r"C:\Users\saaaa\Downloads\新しいフォルダー (2)\他の人.
 kyoutsu_file = r"C:\Users\saaaa\Downloads\新しいフォルダー (2)\共通.txt"
 
 # 汎用キャラクター一覧（SS.txt 12-1 のテーブルを切り出したファイル）
-# 実行時に「資料で引き当てたキャラの行を除外＋半分程度に間引き」してプロンプトに載せる
+# 実行時に「資料で引き当てたキャラの行を除外＋半分程度に間引き」して、
+# 最後.txtの直後（プロンプト末尾寄り）に載せる
 chara_template_file = r"C:\Users\saaaa\Downloads\新しいフォルダー (2)\キャラテンプレ.txt"
 
 # 最後に必ず付けるファイル
@@ -245,7 +246,7 @@ def generate_relation_rule(chosen: dict) -> str:
 # 汎用キャラクター一覧（SS.txt 12-1 テーブル）の動的出力
 #
 # ・mode=2（AIオリジナル設定）: 全行を出力
-# ・mode=-1 / 1 / 3: 選択された資料にプロフィールが存在するキャラの行を除外し、
+# ・mode=-1 / 3: 選択された資料にプロフィールが存在するキャラの行を除外し、
 #   残りをランダムに約半分まで間引いて出力する
 # ・視点（hero_text）で指定されたキャラクターは間引かれても確定で含める
 #   （hero_text は「今回の視点は[ AA　名前 ]です」形式。名前・AAのどちらかで照合）
@@ -880,25 +881,12 @@ def build_contents(
     #
     # モード2は全行、それ以外は資料キャラ除外＋ランダム間引き。
     # 視点キャラは確定で含める。
+    # 出力位置は最後.txtの直後（プロンプト末尾寄り）。真ん中に置くと
+    # 重要度が下がり、AIが資料外のオリキャラ（名前付きの即席人物）を
+    # 出す原因になるため移動した。最後.txtの検査項目
+    # 「10. オリキャラの使用」とセットで機能する。
     # ==========================================================
     chara_template = build_char_template(chosen, hero_text, shuryo_mode)
-
-    if chara_template:
-        if not add_to_contents(chara_template):
-            return None
-
-    # ==========================================================
-    # モード1はここで終了
-    # ==========================================================
-    if shuryo_mode == 1:
-        if not suppress_hero and current_hero_mode == 1:
-            if not add_to_contents(hero_text):
-                return None
-
-        if not add_to_contents("これを全部覚えろ　覚えたとだけ言え"):
-            return None
-
-        return contents
 
     # ==========================================================
     # マルコフテキスト
@@ -1052,6 +1040,16 @@ def build_contents(
 
     if last_text is not None:
         if not add_to_contents(last_text):
+            return None
+
+    # ==========================================================
+    # 汎用キャラクター一覧（オリキャラ禁止の最終提示）
+    #
+    # 最後.txtの直後・冒頭フローの直前に置く。
+    # 最後.txtの検査項目「10. オリキャラの使用」とセットで機能する。
+    # ==========================================================
+    if chara_template:
+        if not add_to_contents(chara_template):
             return None
 
     # ==========================================================
@@ -1374,11 +1372,9 @@ def write_split_files(chosen: dict, shuryo_mode: int) -> list[str]:
     プロンプトに載っていない人物のファイルを作ると、AIが
     使ってよい人物を誤認するため。
     """
-    # --- そのプロンプトに含まれる資料だけを対象にする
+    # --- そのプロンプトに含まれる資料だけを対象にする（mode=1は欠番）
     if shuryo_mode == 2:
         targets = []
-    elif shuryo_mode == 1:
-        targets = [nijisousaku, choukasoku, tanohito]
     else:
         targets = []
         if chosen.get("ブーン"):
@@ -1461,10 +1457,12 @@ def write_split_files(chosen: dict, shuryo_mode: int) -> list[str]:
 
 
 def run_generation(suppress_hero: bool = False) -> tuple[str | None, int, str]:
+    # ★ mode=1は欠番（破棄）。ランダム選択に含めず、指定された場合は
+    #   -1 へ置換する（JSと同じ挙動）。
     if SHURYO_ONLY_MODE == 0:
-        shuryo_mode = random.choice([-1, 1, 2, 3])
+        shuryo_mode = random.choice([-1, 2, 3])
     else:
-        shuryo_mode = SHURYO_ONLY_MODE
+        shuryo_mode = -1 if SHURYO_ONLY_MODE == 1 else SHURYO_ONLY_MODE
 
     best_count = -1
     best_args = None
@@ -1476,9 +1474,7 @@ def run_generation(suppress_hero: bool = False) -> tuple[str | None, int, str]:
     for _ in range(iterations):
         current_hero_mode = HERO_MODE
 
-        if shuryo_mode == 1:
-            chosen = {"ブーン": True, "モナー": True, "他の人": True}
-        elif shuryo_mode == 2:
+        if shuryo_mode == 2:
             chosen = {"ブーン": False, "モナー": False, "他の人": False}
         elif PATTERN_MODE == 0:
             chosen = {"ブーン": False, "モナー": False, "他の人": False}
@@ -1517,9 +1513,7 @@ def run_generation(suppress_hero: bool = False) -> tuple[str | None, int, str]:
 
         true_count = sum(chosen.values())
 
-        if shuryo_mode == 1:
-            USE_MARKOV = False
-        elif shuryo_mode in (2, 3):
+        if shuryo_mode in (2, 3):
             USE_MARKOV = True
         else:
             USE_MARKOV = (USE_MARKOV_MODE == 1)
@@ -1886,9 +1880,7 @@ def run_generation(suppress_hero: bool = False) -> tuple[str | None, int, str]:
             label_mrkv = "あり" if USE_MARKOV else "なし"
             pattern_text = f"選出パターン： ブーン {label_niji}　／　モナー {label_chou}　／　他の人 {label_tano}　／　マルコフ {label_mrkv}"
 
-            if shuryo_mode == 1:
-                pattern_text += "　／　資料オンリー モード1"
-            elif shuryo_mode == 2:
+            if shuryo_mode == 2:
                 pattern_text += "　／　資料オンリー モード2"
             elif shuryo_mode == 3:
                 pattern_text += "　／　資料オンリー モード3"

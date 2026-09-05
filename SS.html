@@ -1559,6 +1559,9 @@ var NovelGen = (function () {
 
     if (files.tsuzuki && !addBase(files.tsuzuki)) return null;
     if (files.last && !addBase(files.last)) return null;
+    // ★ 汎用キャラクター一覧の挿入位置（最後.txtの直後）。テンプレ本体は
+    //   キャラ資料の優先度確定後に組み立てるので、後段でこの位置へspliceする。
+    var templateInsertIdx = baseContents.length;
 
     // ★ 冒頭フロー指定（冒頭.txtを1文マルコフで合成。精度1〜4を揺らがせ、原文ママは禁止）
     //   最後.txtの直後・テーマ提示の直前に置く。
@@ -1640,9 +1643,6 @@ var NovelGen = (function () {
 
     var heroInfo = chooseHeroForCharFiles(P, selectedCharFiles, A.currentHeroMode, A.suppressHero);
     var tail = charTailText(P, selectedCharFiles, heroInfo.heroText, shuryoMode, files);
-    var charInstructionBlocks = [];
-    if (tail.relation) charInstructionBlocks.push(tail.relation);
-    if (tail.template) charInstructionBlocks.push(tail.template);
 
     function makeFinalTailBlocks() {
       var blocks = [];
@@ -1655,14 +1655,17 @@ var NovelGen = (function () {
     }
     var finalTailBlocks = makeFinalTailBlocks();
 
-    // 視点・文字数も上限に含める。関係ルールとキャラテンプレは余白が
-    // ある場合だけ追加し、ベース生成の揺らぎで超えた場合は優先度の末尾から戻す。
+    // 視点・文字数も上限に含める。関係ルールと汎用キャラクター一覧は
+    // 「余白があれば」ではなく必ず入れる。ベース生成の揺らぎで超えた
+    // 場合は優先度の末尾のキャラ資料から戻す。
     function extraLen(blocks) { return blocks.reduce(function (n, x) { return n + (x ? x.length + 2 : 0); }, 0); }
-    // ★ 関係ルールは「余白があれば」ではなく必ず入れる。
-    //    モード3などで上限ぎりぎりのときに関係ルールだけ弾かれる事故を防ぐため、
+    // ★ 関係ルールと汎用キャラクター一覧は「余白があれば」ではなく必ず入れる。
+    //    モード3などで上限ぎりぎりのときに弾かれる事故を防ぐため、
     //    その分をキャラ資料の収容チェックに織り込んでおく。
-    function relationLen() { return tail.relation ? tail.relation.length + 2 : 0; }
-    while (selectedCharFiles.length && projectedLen + relationLen() + extraLen(finalTailBlocks) > maxChar) {
+    function tailLen() {
+      return (tail.relation ? tail.relation.length + 2 : 0) + (tail.template ? tail.template.length + 2 : 0);
+    }
+    while (selectedCharFiles.length && projectedLen + tailLen() + extraLen(finalTailBlocks) > maxChar) {
       priorityStopped = true;
       var removedCharFile = selectedCharFiles.pop();
       var removedCharBlock = charBlocks.pop();
@@ -1670,23 +1673,26 @@ var NovelGen = (function () {
       projectedLen = baseLen + charBlocks.reduce(function (n, x) { return n + x.length + 2; }, 0);
       heroInfo = chooseHeroForCharFiles(P, selectedCharFiles, A.currentHeroMode, A.suppressHero);
       tail = charTailText(P, selectedCharFiles, heroInfo.heroText, shuryoMode, files);
-      charInstructionBlocks = [];
-      if (tail.relation) charInstructionBlocks.push(tail.relation);
-      if (tail.template) charInstructionBlocks.push(tail.template);
       finalTailBlocks = makeFinalTailBlocks();
     }
     finalTailBlocks = makeFinalTailBlocks();
 
     // 関係ルールは保護ブロックとして必ず載せる（載りきらない場合は
     // 上のwhileでキャラ資料を削ってでも確保する。それでも無理なら
-    // 下の判定で生成自体をやり直す）。キャラテンプレは余白次第。
+    // 下の判定で生成自体をやり直す）。
+    // ★ 汎用キャラクター一覧も保護ブロックとして必ず載せるが、場所は
+    //   関係ルールの直後ではなく最後.txtの直後（プロンプト末尾寄り）。
+    //   真ん中に置くと重要度が下がり、AIが資料外のオリキャラ（名前付きの
+    //   即席人物）を出す原因になるため移動した。最後.txtの検査項目
+    //   「10. オリキャラの使用」とセットで機能する。
     var prefixBlocks = charBlocks.slice();
     if (tail.relation) {
       prefixBlocks.push(tail.relation);
       projectedLen += tail.relation.length + 2;
     }
-    if (tail.template && projectedLen + tail.template.length + 2 + extraLen(finalTailBlocks) <= maxChar) {
-      prefixBlocks.push(tail.template);
+    if (tail.template) {
+      baseContents.splice(templateInsertIdx, 0, tail.template);
+      baseLen += tail.template.length + 2;
       projectedLen += tail.template.length + 2;
     }
     if (projectedLen + extraLen(finalTailBlocks) > maxChar) return null;
@@ -1800,10 +1806,11 @@ var NovelGen = (function () {
     }
 
     // 汎用キャラクター一覧（キャラテンプレ.txt の動的出力）
+    // ★ 出力位置は最後.txtの直後（プロンプト末尾寄り）。真ん中に置くと
+    //   重要度が下がり、AIが資料外のオリキャラ（名前付きの即席人物）を
+    //   出す原因になるため移動した。最後.txtの検査項目
+    //   「10. オリキャラの使用」とセットで機能する。
     var charaTemplate = buildCharTemplate(chosen, heroText, shuryoMode, files);
-    if (charaTemplate) {
-      if (!addToContents(charaTemplate)) return null;
-    }
 
     // ---- マルコフテキスト ----
     if (useMarkov) {
@@ -1875,6 +1882,11 @@ var NovelGen = (function () {
     var lastText = files.last;
     if (lastText != null) {
       if (!addToContents(lastText)) return null;
+    }
+
+    // 汎用キャラクター一覧（オリキャラ禁止の最終提示。最後.txtの直後）
+    if (charaTemplate) {
+      if (!addToContents(charaTemplate)) return null;
     }
 
     // ★ 冒頭フロー指定（冒頭.txtを1文マルコフで合成。精度1〜4を揺らがせ、原文ママは禁止）
