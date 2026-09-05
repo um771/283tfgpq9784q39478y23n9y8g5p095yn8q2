@@ -27,6 +27,14 @@ USE_ENDING_MARKOV_MODE = 1  # 1 = ON / 0 = OFF
 # どちらも入らない回が出る。
 OPENING_RATE = 50
 ENDING_RATE = 50
+
+# キャラテンプレの提示数（全mode共通）
+# 一覧が大きくなるとプロンプトを圧迫し、mode=2のように全行提示する
+# 設定では破綻するため、毎回ここで決めた範囲内の体数までに絞る。
+# 実際の提示数はこの範囲の一様乱数で毎回変わる。
+# 上限が実在数を超える場合は実在数まで。視点キャラは数に関わらず必ず含める。
+CHAR_TEMPLATE_MIN = 12
+CHAR_TEMPLATE_MAX = 40
 # =============
 
 # マルコフ連鎖パラメータ
@@ -302,16 +310,47 @@ def _parse_template(text: str):
     return header, sep, rows
 
 
-def _hero_name_from_text(hero_text: str) -> str:
-    """「今回の視点は[ X ]です」からキャラ名（X の末尾部分）を抽出。"""
+def _hero_names_from_text(hero_text: str) -> list[str]:
+    """「今回の視点は[ X ]です」から視点キャラ名を全て抽出。
+
+    ダブル視点は「AA　名前、AA　名前」のように読点で連結されるため、
+    末尾だけを見ると2人目しか拾えず1人目が提示から漏れる。ここで
+    読点で分割し、各要素の「AA　名前」から名前部だけを取り出す。
+    """
     m = re.search(r"今回の視点は\[\s*(.+?)\s*\]です", hero_text)
     if not m:
-        return ""
+        return []
     x = m.group(1)
     if "：" in x:
         x = x.split("：", 1)[1]
-    parts = [p for p in x.split("　") if p.strip()]
-    return parts[-1] if parts else ""
+    names = []
+    for chunk in re.split(r"[、,]", x):
+        parts = [p for p in chunk.split("　") if p.strip()]
+        if parts:
+            names.append(parts[-1].strip())
+    return names
+
+
+def _hero_name_from_text(hero_text: str) -> str:
+    """後方互換用。最初の視点キャラ名を返す。"""
+    names = _hero_names_from_text(hero_text)
+    return names[0] if names else ""
+
+
+def _norm_aa(s: str) -> str:
+    """AA照合用の正規化。
+
+    視点表記は半角括弧、キャラテンプレ側は全角括弧という揺れがあり、
+    素朴な in 判定では視点キャラのAAが一致しない。括弧類と空白を
+    揃えてから比較する。
+    """
+    if not s:
+        return ""
+    z = "（）［］｛｝＜＞｜"
+    h = "()[]{}<>|"
+    for a, b in zip(z, h):
+        s = s.replace(a, b)
+    return re.sub(r"[\s\u3000]", "", s)
 
 
 def build_char_template(chosen: dict, hero_text: str, shuryo_mode: int) -> str:
@@ -322,9 +361,38 @@ def build_char_template(chosen: dict, hero_text: str, shuryo_mode: int) -> str:
     if not rows:
         return ""
 
-    # mode=2 は全行
+    # 提示数の決定（全mode共通）
+    # 一覧全体をそのまま出すと、体数が増えるほどプロンプトを圧迫し、
+    # AIがモブを無秩序に登場させて破綻する。毎回ここで上限体数を引く。
+    def _pick_count(pool_size: int) -> int:
+        lo = max(1, min(CHAR_TEMPLATE_MIN, CHAR_TEMPLATE_MAX))
+        hi = max(lo, max(CHAR_TEMPLATE_MIN, CHAR_TEMPLATE_MAX))
+        return min(pool_size, random.randint(lo, hi))
+
+    # 視点キャラの行を名前 or AA で拾う（全modeで共通に使う）
+    def _split_hero(src_rows):
+        hero_names = _hero_names_from_text(hero_text)
+        hero_aa_blob = _norm_aa(hero_text)
+        heroes, others = [], []
+        for r in src_rows:
+            core = r[0].split("（")[0].strip()
+            aa = _norm_aa(r[1]) if len(r) >= 2 else ""
+            if (core and core in hero_names) or (aa and aa in hero_aa_blob):
+                heroes.append(r)
+            else:
+                others.append(r)
+        return heroes, others
+
+    # mode=2 も含め、全modeで体数を毎回変える
     if shuryo_mode == 2:
-        kept = rows
+        # mode=2は詳細資料に依存しないため除外処理は行わないが、
+        # 提示数だけは他modeと同様に絞る。
+        # 単純なシャッフルだけだと視点キャラが提示から漏れるため、
+        # ここでも視点キャラは確定で含める。
+        hero_rows, rest = _split_hero(rows)
+        random.shuffle(rest)
+        slots = _pick_count(len(hero_rows) + len(rest)) - len(hero_rows)
+        kept = hero_rows + rest[:max(0, slots)]
     else:
         # 選択された資料に存在するキャラの行を除外
         exclude = set()
@@ -346,20 +414,17 @@ def build_char_template(chosen: dict, hero_text: str, shuryo_mode: int) -> str:
             filtered.append(r)
 
         # 視点キャラは確定で含める（名前 or AA で照合）
-        hero_name = _hero_name_from_text(hero_text)
-        hero_rows = []
-        rest = []
-        for r in filtered:
-            core = r[0].split("（")[0].strip()
-            aa = r[1].strip() if len(r) >= 2 else ""
-            if (hero_name and core == hero_name) or (aa and aa in hero_text):
-                hero_rows.append(r)
-            else:
-                rest.append(r)
+        hero_rows, rest = _split_hero(filtered)
 
-        # 残りをランダムな割合で間引き（間引かれるキャラ数も実行ごとにランダム）
-        keep_rate = random.random()
-        thinned = [r for r in rest if random.random() < keep_rate]
+        # 残りから提示数ぶんだけ抽出する。
+        # 旧実装は keep_rate による確率間引きだったため、一覧が
+        # 大きくなるほど提示体数の期待値も比例して増えてしまい、
+        # 体数を追加した分そのままプロンプトが膨張していた。
+        # 提示数を体数で決めることで、一覧を何体に増やしても
+        # 提示量は一定範囲に収まる。
+        random.shuffle(rest)
+        slots = _pick_count(len(hero_rows) + len(rest)) - len(hero_rows)
+        thinned = rest[:max(0, slots)]
         kept = hero_rows + thinned
 
         # 全部間引かれてしまった場合は最低1行残す

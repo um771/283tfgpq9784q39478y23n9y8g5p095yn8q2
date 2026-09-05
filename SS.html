@@ -1121,6 +1121,12 @@ var NovelGen = (function () {
     if (n > 100) return 100;
     return n;
   }
+  // 個数用の数値取得（numOr は％専用で100に丸めるため流用できない）
+  function intOr(v, fallback) {
+    var n = Math.floor(Number(v));
+    if (v === null || v === undefined || v === '' || isNaN(n)) return fallback;
+    return n < 1 ? 1 : n;
+  }
   function choice(arr) {
     return arr[Math.floor(Math.random() * arr.length)];
   }
@@ -2160,13 +2166,33 @@ var NovelGen = (function () {
     hain: ['从 ﾟ∀从']
   };
 
-  function heroNameFromText(heroText) {
+  // ダブル視点は「AA　名前、AA　名前」と連結されるため、末尾だけを見ると
+  // 2人目しか拾えず1人目が提示から漏れる。読点で分割して全員返す。
+  function heroNamesFromText(heroText) {
     var m = /今回の視点は\[\s*(.+?)\s*\]です/.exec(heroText || '');
-    if (!m) return '';
+    if (!m) return [];
     var x = m[1];
     if (x.indexOf('：') >= 0) x = x.split('：')[1];
-    var parts = x.split('　').filter(function (p) { return p.trim(); });
-    return parts.length ? parts[parts.length - 1] : '';
+    var names = [];
+    x.split(/[、,]/).forEach(function (chunk) {
+      var parts = chunk.split('　').filter(function (p) { return p.trim(); });
+      if (parts.length) names.push(parts[parts.length - 1].trim());
+    });
+    return names;
+  }
+
+  function heroNameFromText(heroText) {
+    var names = heroNamesFromText(heroText);
+    return names.length ? names[0] : '';
+  }
+
+  // 視点表記は半角括弧、キャラテンプレ側は全角括弧という揺れがあるため、
+  // 素朴な indexOf ではAAが一致しない。括弧類と空白を揃えて比較する。
+  function normAA(s) {
+    if (!s) return '';
+    var z = '（）［］｛｝＜＞｜', h = '()[]{}<>|';
+    for (var i = 0; i < z.length; i++) s = s.split(z.charAt(i)).join(h.charAt(i));
+    return s.replace(/[\s\u3000]/g, '');
   }
 
   function buildCharTemplate(selectedCharFiles, heroText, shuryoMode, files) {
@@ -2183,9 +2209,43 @@ var NovelGen = (function () {
     });
     if (!rows.length) return '';
 
+    // 提示数の決定（全mode共通）
+    // 一覧全体をそのまま出すと、体数が増えるほどプロンプトを圧迫し、
+    // AIがモブを無秩序に登場させて破綻する。毎回ここで上限体数を引く。
+    function pickCount(poolSize) {
+      var a = intOr(P.charTemplateMin, 12), b = intOr(P.charTemplateMax, 40);
+      var lo = Math.max(1, Math.min(a, b));
+      var hi = Math.max(lo, Math.max(a, b));
+      return Math.min(poolSize, randint(lo, hi));
+    }
+
+    // 視点キャラの行を名前 or AA で拾う（全modeで共通に使う）
+    function splitHero(srcRows) {
+      var heroNames = heroNamesFromText(heroText);
+      var heroBlob = normAA(heroText);
+      var heroes = [], others = [];
+      srcRows.forEach(function (r) {
+        var core = r[0].split('（')[0].trim();
+        var aa = normAA(r[1] || '');
+        var nameHit = core && (heroNames.indexOf(core) >= 0 ||
+          (heroNames.indexOf('ペニサス') >= 0 && core === 'ペニサス伊藤'));
+        if (nameHit || (aa && heroBlob.indexOf(aa) >= 0)) heroes.push(r);
+        else others.push(r);
+      });
+      return [heroes, others];
+    }
+
     var kept;
     if (shuryoMode === 2) {
-      kept = rows;
+      // mode=2は詳細資料に依存しないため除外処理は行わないが、
+      // 提示数だけは他modeと同様に絞る。
+      // 単純なシャッフルだけだと視点キャラが提示から漏れるため、
+      // ここでも視点キャラは確定で含める。
+      var sp2 = splitHero(rows);
+      var heroRows2 = sp2[0], rest2 = sp2[1];
+      shuffle(rest2);
+      var slots2 = pickCount(heroRows2.length + rest2.length) - heroRows2.length;
+      kept = heroRows2.concat(rest2.slice(0, Math.max(0, slots2)));
     } else {
       var exclude = {}, excludeAA = {};
       (selectedCharFiles || []).forEach(function (id) {
@@ -2199,17 +2259,15 @@ var NovelGen = (function () {
         if ((core && exclude[core]) || (aa && excludeAA[aa])) return;
         filtered.push(r);
       });
-      var heroName = heroNameFromText(heroText);
-      var heroRows = [], rest = [];
-      filtered.forEach(function (r) {
-        var core = r[0].split('（')[0].trim();
-        var aa = (r[1] || '').trim();
-        if ((heroName && (core === heroName || (heroName === 'ペニサス' && core === 'ペニサス伊藤'))) ||
-            (aa && heroText && heroText.indexOf(aa) >= 0)) heroRows.push(r);
-        else rest.push(r);
-      });
-      var keepRate = Math.random();
-      var thinned = rest.filter(function () { return Math.random() < keepRate; });
+      var sp = splitHero(filtered);
+      var heroRows = sp[0], rest = sp[1];
+      // 残りから提示数ぶんだけ抽出する。
+      // 旧実装は keepRate による確率間引きだったため、一覧が
+      // 大きくなるほど提示体数の期待値も比例して増えてしまい、
+      // 体数を追加した分そのままプロンプトが膨張していた。
+      shuffle(rest);
+      var slots = pickCount(heroRows.length + rest.length) - heroRows.length;
+      var thinned = rest.slice(0, Math.max(0, slots));
       kept = heroRows.concat(thinned);
       if (!kept.length && filtered.length) kept = [filtered[Math.floor(Math.random() * filtered.length)]];
     }
@@ -2623,6 +2681,8 @@ NovelGen.setNovelData(NOVEL_DATA);
     useEndingMarkovMode: 1,   // 終盤パターン（終盤.txtを1文マルコフ） 1=ON / 0=OFF
     openingRate: 50,          // 冒頭パターン注入レート（％）ONのとき、この確率で実際に注入する
     endingRate: 50,           // 終盤パターン注入レート（％）ONのとき、この確率で実際に注入する
+    charTemplateMin: 12,      // キャラテンプレ提示数の下限（全mode共通・毎回この範囲で変動）
+    charTemplateMax: 40,      // キャラテンプレ提示数の上限（全mode共通・毎回この範囲で変動）
     specialHeroRate: 20,      // 特殊視点レート（％）
     doubleHeroRate: 20,       // 視点キャラ2人レート（％）
     noHeroRate: 20,           // 視点なしレート（％）
@@ -2653,6 +2713,8 @@ NovelGen.setNovelData(NOVEL_DATA);
     { key: 'openingRate', label: '冒頭パターン注入レート（％）', type: 'number', min: 0, max: 100 },
     { key: 'useEndingMarkovMode', label: '終盤パターン指定（終盤.txt）', type: 'select', options: [[1, '1: ON'], [0, '0: OFF']] },
     { key: 'endingRate', label: '終盤パターン注入レート（％）', type: 'number', min: 0, max: 100 },
+    { key: 'charTemplateMin', label: 'キャラテンプレ提示数の下限', type: 'number', min: 1 },
+    { key: 'charTemplateMax', label: 'キャラテンプレ提示数の上限', type: 'number', min: 1 },
     { key: 'specialHeroRate', label: '特殊視点レート（％）', type: 'number', min: 0, max: 100 },
     { key: 'doubleHeroRate', label: '視点キャラ2人レート（％）', type: 'number', min: 0, max: 100 },
     { key: 'noHeroRate', label: '視点なしレート（％）', type: 'number', min: 0, max: 100 },
