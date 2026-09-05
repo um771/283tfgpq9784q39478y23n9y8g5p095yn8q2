@@ -1110,6 +1110,17 @@ var NovelGen = (function () {
     // Python の random.randint(a, b) は両端を含む
     return a + Math.floor(Math.random() * (b - a + 1));
   }
+
+  // 未設定・不正値のときは既定値へフォールバックする数値取得
+  // （旧バージョンの保存設定を読み込んだ場合に openingRate 等が
+  //   undefined になり、確率判定が常に false になるのを防ぐ）
+  function numOr(v, fallback) {
+    var n = Number(v);
+    if (v === null || v === undefined || v === '' || isNaN(n)) return fallback;
+    if (n < 0) return 0;
+    if (n > 100) return 100;
+    return n;
+  }
   function choice(arr) {
     return arr[Math.floor(Math.random() * arr.length)];
   }
@@ -1576,7 +1587,7 @@ var NovelGen = (function () {
     // ★ 冒頭フロー指定（冒頭.txtを1文マルコフで合成。精度1〜4を揺らがせ、原文ママは禁止）
     //   最後.txtの直後・テーマ提示の直前に置く。
     //   「冒頭は、～～なる。」→「↑ これが冒頭の流れ」→ テーマ1行 →「↑ これがテーマの話を書け」の順。
-    if (P.useOpeningMarkovMode === 1) {
+    if (P.useOpeningMarkovMode === 1 && Math.random() * 100 < numOr(P.openingRate, 100)) {
       var remO = maxChar - baseLen;
       if (remO > 0 && files.opening) {
         var op = generateOpeningOneLiner(files.opening, Math.min(160, remO), P);
@@ -1590,7 +1601,7 @@ var NovelGen = (function () {
     // ★ 終盤フロー指定（終盤.txtを1文マルコフで合成。冒頭と同じ流儀）
     //   冒頭ブロックの直後・テーマ提示の直前に置く。
     //   「終盤は、～～なる。」→「↑ これが終盤の流れ」の順。
-    if (P.useEndingMarkovMode === 1) {
+    if (P.useEndingMarkovMode === 1 && Math.random() * 100 < numOr(P.endingRate, 100)) {
       var remE = maxChar - baseLen;
       if (remE > 0 && files.ending) {
         var en = generateEndingOneLiner(files.ending, Math.min(160, remE), P);
@@ -1916,7 +1927,7 @@ var NovelGen = (function () {
     // ★ 冒頭フロー指定（冒頭.txtを1文マルコフで合成。精度1〜4を揺らがせ、原文ママは禁止）
     //   最後.txtの直後・テーマ提示の直前に置く。
     //   「冒頭は、～～なる。」→「↑ これが冒頭の流れ」→ テーマ1行 →「↑ これがテーマの話を書け」の順。
-    if (P.useOpeningMarkovMode === 1) {
+    if (P.useOpeningMarkovMode === 1 && Math.random() * 100 < numOr(P.openingRate, 100)) {
       var remO = maxChar - currentLen;
       if (remO > 0 && files.opening) {
         var op = generateOpeningOneLiner(files.opening, Math.min(160, remO), P);
@@ -1930,7 +1941,7 @@ var NovelGen = (function () {
     // ★ 終盤フロー指定（終盤.txtを1文マルコフで合成。冒頭と同じ流儀）
     //   冒頭ブロックの直後・テーマ提示の直前に置く。
     //   「終盤は、～～なる。」→「↑ これが終盤の流れ」の順。
-    if (P.useEndingMarkovMode === 1) {
+    if (P.useEndingMarkovMode === 1 && Math.random() * 100 < numOr(P.endingRate, 100)) {
       var remE = maxChar - currentLen;
       if (remE > 0 && files.ending) {
         var en = generateEndingOneLiner(files.ending, Math.min(160, remE), P);
@@ -2610,6 +2621,8 @@ NovelGen.setNovelData(NOVEL_DATA);
     useLastMarkovLineMode: 1, // テーマ（最後の1行マルコフ） 1=ON / 0=OFF
     useOpeningMarkovMode: 1,  // 冒頭パターン（冒頭.txtを1文マルコフ） 1=ON / 0=OFF
     useEndingMarkovMode: 1,   // 終盤パターン（終盤.txtを1文マルコフ） 1=ON / 0=OFF
+    openingRate: 50,          // 冒頭パターン注入レート（％）ONのとき、この確率で実際に注入する
+    endingRate: 50,           // 終盤パターン注入レート（％）ONのとき、この確率で実際に注入する
     specialHeroRate: 20,      // 特殊視点レート（％）
     doubleHeroRate: 20,       // 視点キャラ2人レート（％）
     noHeroRate: 20,           // 視点なしレート（％）
@@ -2637,7 +2650,9 @@ NovelGen.setNovelData(NOVEL_DATA);
       options: [[-1, '-1: ランダム（4/5で視点あり）'], [0, '0: 視点なし'], [1, '1: 必ず視点']] },
     { key: 'useLastMarkovLineMode', label: 'テーマ提示（最後の1行）', type: 'select', options: [[1, '1: ON'], [0, '0: OFF']] },
     { key: 'useOpeningMarkovMode', label: '冒頭パターン指定（冒頭.txt）', type: 'select', options: [[1, '1: ON'], [0, '0: OFF']] },
+    { key: 'openingRate', label: '冒頭パターン注入レート（％）', type: 'number', min: 0, max: 100 },
     { key: 'useEndingMarkovMode', label: '終盤パターン指定（終盤.txt）', type: 'select', options: [[1, '1: ON'], [0, '0: OFF']] },
+    { key: 'endingRate', label: '終盤パターン注入レート（％）', type: 'number', min: 0, max: 100 },
     { key: 'specialHeroRate', label: '特殊視点レート（％）', type: 'number', min: 0, max: 100 },
     { key: 'doubleHeroRate', label: '視点キャラ2人レート（％）', type: 'number', min: 0, max: 100 },
     { key: 'noHeroRate', label: '視点なしレート（％）', type: 'number', min: 0, max: 100 },

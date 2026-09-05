@@ -19,6 +19,14 @@ USE_LAST_MARKOV_LINE_MODE = 1
 USE_OPENING_MARKOV_MODE = 1  # 1 = ON / 0 = OFF
 # 終盤フロー指定（終盤.txtを1文マルコフで合成し、冒頭ブロックの直後に注入）
 USE_ENDING_MARKOV_MODE = 1  # 1 = ON / 0 = OFF
+
+# 冒頭・終盤フローの注入レート（％）
+# MODEがONのとき、さらにこの確率を引いて実際に注入するかを決める。
+# 100 = 毎回必ず注入（従来の挙動） / 50 = 2回に1回 / 0 = 実質OFF。
+# 冒頭と終盤は独立に判定するため、両方入る回・片方だけの回・
+# どちらも入らない回が出る。
+OPENING_RATE = 50
+ENDING_RATE = 50
 # =============
 
 # マルコフ連鎖パラメータ
@@ -1083,7 +1091,7 @@ def build_contents(
     # 「冒頭は、～～なる。」→「↑ これが冒頭の流れ」→
     # テーマ1行 →「↑ これがテーマの話を書け」の順になる。
     # ==========================================================
-    if USE_OPENING_MARKOV_MODE == 1:
+    if USE_OPENING_MARKOV_MODE == 1 and random.random() * 100 < OPENING_RATE:
         remaining_chars = max_char - current_len
 
         if remaining_chars > 0:
@@ -1114,7 +1122,7 @@ def build_contents(
     # 統一構文のため、頭と尻尾の骨格は連鎖合成でも保たれる。
     # 「終盤は、～～なる。」→「↑ これが終盤の流れ」の順になる。
     # ==========================================================
-    if USE_ENDING_MARKOV_MODE == 1:
+    if USE_ENDING_MARKOV_MODE == 1 and random.random() * 100 < ENDING_RATE:
         remaining_chars = max_char - current_len
 
         if remaining_chars > 0:
