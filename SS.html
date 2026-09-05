@@ -2407,6 +2407,7 @@ NovelGen.setNovelData(NOVEL_DATA);
     { id: 'watanabe',    label: '渡辺さん.txt', repoFile: '渡辺さん.txt', defMode: 'github' },
     { id: 'hain',        label: 'ハイン.txt', repoFile: 'ハイン.txt', defMode: 'github' },
     { id: 'markov',      label: 'マルコフ.txt', repoFile: 'マルコフ.txt', defMode: 'github' },
+    { id: 'opening',     label: '冒頭.txt',   repoFile: '冒頭.txt',   defMode: 'github' },
     { id: 'tone',        label: 'トーン.txt', repoFile: 'トーン.txt', defMode: 'github' },
     { id: 'last',        label: '最後.txt',   repoFile: '最後.txt',   defMode: 'github' },
     { id: 'kinshi',      label: '禁止.txt',   repoFile: '禁止.txt',   defMode: 'none',   note: 'リポジトリに無い場合はスキップ' },
@@ -2419,6 +2420,7 @@ NovelGen.setNovelData(NOVEL_DATA);
     useMarkovMode: 1,         // 1=ON / 0=OFF
     heroMode: -1,             // -1=ランダム / 0=視点なし / 1=必ず視点
     useLastMarkovLineMode: 1, // テーマ（最後の1行マルコフ） 1=ON / 0=OFF
+    useOpeningMarkovMode: 1,  // 冒頭パターン（冒頭.txtを1文マルコフ） 1=ON / 0=OFF
     specialHeroRate: 20,      // 特殊視点レート（％）
     doubleHeroRate: 20,       // 視点キャラ2人レート（％）
     noHeroRate: 20,           // 視点なしレート（％）
@@ -2445,6 +2447,7 @@ NovelGen.setNovelData(NOVEL_DATA);
     { key: 'heroMode', label: '視点モード', type: 'select',
       options: [[-1, '-1: ランダム（4/5で視点あり）'], [0, '0: 視点なし'], [1, '1: 必ず視点']] },
     { key: 'useLastMarkovLineMode', label: 'テーマ提示（最後の1行）', type: 'select', options: [[1, '1: ON'], [0, '0: OFF']] },
+    { key: 'useOpeningMarkovMode', label: '冒頭パターン指定（冒頭.txt）', type: 'select', options: [[1, '1: ON'], [0, '0: OFF']] },
     { key: 'specialHeroRate', label: '特殊視点レート（％）', type: 'number', min: 0, max: 100 },
     { key: 'doubleHeroRate', label: '視点キャラ2人レート（％）', type: 'number', min: 0, max: 100 },
     { key: 'noHeroRate', label: '視点なしレート（％）', type: 'number', min: 0, max: 100 },
