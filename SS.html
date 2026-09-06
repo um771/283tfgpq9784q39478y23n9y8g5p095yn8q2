@@ -312,6 +312,7 @@ footer { text-align: center; color: #5b6378; font-size: 11px; padding: 24px 0 40
           <code>raw.githubusercontent.com</code> から取得します。</li>
         <li><b>マルコフ.txt や 最後.txt、各キャラ資料をリポジトリ上で編集して保存 → このページで生成</b> すれば、最新版が反映されます（毎回最新を取得）。</li>
         <li>資料オンリーモード（-1／3）では、8資料のキャラ計28名に対して優先度をランダム設定し、上から所属する資料（二次創作・超加速・ラボ組・学校組・ホスト組・ツン・渡辺さん・ハイン）のtxtを追加していき、文字数上限に収まる順番までをプロンプト先頭へ追加します。</li>
+        <li><b>ブロックランダム順モード</b>（デフォルトOFF）をONにすると、プロンプトの各ブロック（採用キャラ資料群・関係ルール・SS.txt・共通.txt・各マルコフ＋区切り・最後.txt・キャラテンプレ・冒頭／終盤／テーマ／トーン等）を毎回ランダムな順番に並べ替えます。<b>「視点提示 → 文字数指定」の2つだけはシャッフルされず、常に最後の固定位置</b>です。ブロック内部（キャラ資料の優先度順、「マルコフ文＋これは資料です」等のペア）は順序のまま維持されます。</li>
         <li>旧来の統合資料 <code>他の人.txt</code> は旧Python版との互換用に残っていますが、SS.htmlでは参照しません。</li>
         <li>取得に失敗した場合は「前回取得した内容」を自動で使い、警告を表示します。</li>
         <li>リポジトリを変えたい場合は「⚙ 設定」のリポジトリ欄を書き換えるか、各ファイルのURLを直接編集してください。</li>
@@ -329,6 +330,7 @@ footer { text-align: center; color: #5b6378; font-size: 11px; padding: 24px 0 40
       <table>
         <tr><th>この画面</th><th>生成py_組み込み済み.py</th></tr>
         <tr><td>資料オンリーモード</td><td>SHURYO_ONLY_MODE</td></tr>
+        <tr><td>ブロックランダム順モード</td><td>—（SS.html独自機能。py版には無い）</td></tr>
         <tr><td>キャラ資料優先度</td><td>8資料を毎回シャッフルし、上限で停止</td></tr>
         <tr><td>マルコフ連鎖</td><td>USE_MARKOV_MODE</td></tr>
         <tr><td>視点モード</td><td>HERO_MODE</td></tr>
@@ -1501,7 +1503,7 @@ var NovelGen = (function () {
 
   function charTailText(P, selectedCharFiles, heroText, shuryoMode, files) {
     var relation = shuryoMode === 2 ? '' : generateRelationRule(selectedCharFiles);
-    var template = buildCharTemplate(selectedCharFiles, heroText, shuryoMode, files);
+    var template = buildCharTemplate(selectedCharFiles, heroText, shuryoMode, files, P);
     return { relation: relation, template: template };
   }
 
@@ -1510,18 +1512,28 @@ var NovelGen = (function () {
     var useMarkov = A.useMarkov;
     var maxChar = A.maxChar;
     var MARKOV_ORDER = A.MARKOV_ORDER;
-    var baseContents = [];
+
+    // ここではまだキャラ資料を追加しない。先にSS・共通資料・マルコフ・
+    // 最後.txt・テーマ・トーンまでを確定させる。
+    // ★ ブロック単位で管理する（ブロックランダム順モード用）。
+    //   addBase は「現在のブロック」に追記し、sealBase で1ブロックを確定する。
+    //   視点提示→文字数指定（finalTailBlocks）はブロック shuffle の対象外で常に最後。
+    var baseBlocks = [];
+    var curBaseBlock = null;
     var baseLen = 0;
 
     function addBase(text) {
       if (!text) return true;
-      baseContents.push(text);
+      if (!curBaseBlock) curBaseBlock = [];
+      curBaseBlock.push(text);
       baseLen += text.length + 2;
       return baseLen <= maxChar;
     }
+    function sealBase() {
+      if (curBaseBlock && curBaseBlock.length) baseBlocks.push(curBaseBlock);
+      curBaseBlock = null;
+    }
 
-    // ここではまだキャラ資料を追加しない。先にSS・共通資料・マルコフ・
-    // 最後.txt・テーマ・トーンまでを確定させる。
     var preprocessMap = {};
     if (files.shiryou && Math.random() < 0.01) {
       var mShiryou = generateMarkovText(files.shiryou, 3, 10000000, files.shiryou.length, P, 'shiryou');
@@ -1529,18 +1541,24 @@ var NovelGen = (function () {
     }
     if (shuryoMode === 3) {
       if (!addBase(preprocessMap.shiryou || files.shiryou)) return null;
+      sealBase();
     } else {
       if (!addBase(preprocessMap.shiryou || files.shiryou)) return null;
+      sealBase();
       if (!addBase(files.ss)) return null;
+      sealBase();
     }
 
     if (shuryoMode !== 2 && files.kinshi) {
       if (!addBase(files.kinshi)) return null;
+      sealBase();
     }
     if (files.kyoutsu) {
       if (!addBase(files.kyoutsu)) return null;
+      sealBase();
     }
     if (!addBase('主要AAのキャラのみを使用し、モブを用意する場合も主要AAから使用する')) return null;
+    sealBase();
 
     if (useMarkov) {
       var effectiveMin = Math.min(MARKOV_LINES_HARD_MAX, shuryoMode === 3 ? 1 : P.markovLinesMin);
@@ -1559,6 +1577,7 @@ var NovelGen = (function () {
             if (generated1) {
               if (!addBase(generated1)) return null;
               if (!addBase('---\nこれは資料です')) return null;
+              sealBase();
             }
           }
         }
@@ -1569,6 +1588,7 @@ var NovelGen = (function () {
             if (generated2) {
               if (!addBase(generated2)) return null;
               if (!addBase('---\nこれは資料です')) return null;
+              sealBase();
             }
           }
         }
@@ -1579,16 +1599,19 @@ var NovelGen = (function () {
           if (generated3) {
             if (!addBase(generated3)) return null;
             if (!addBase('↑\nこれは本編の資料です。軽度な改変はOK')) return null;
+            sealBase();
           }
         }
       }
     }
 
     if (files.tsuzuki && !addBase(files.tsuzuki)) return null;
+    sealBase();
     if (files.last && !addBase(files.last)) return null;
+    sealBase();
     // ★ 汎用キャラクター一覧の挿入位置（最後.txtの直後）。テンプレ本体は
-    //   キャラ資料の優先度確定後に組み立てるので、後段でこの位置へspliceする。
-    var templateInsertIdx = baseContents.length;
+    //   キャラ資料の優先度確定後に組み立てるので、後段でこの位置へ1ブロックとしてspliceする。
+    var templateBlockIdx = baseBlocks.length;
 
     // ★ 冒頭フロー指定（冒頭.txtを1文マルコフで合成。精度1〜4を揺らがせ、原文ママは禁止）
     //   最後.txtの直後・テーマ提示の直前に置く。
@@ -1600,6 +1623,7 @@ var NovelGen = (function () {
         if (op) {
           if (!addBase(op)) return null;
           if (!addBase('↑\nこれが冒頭の流れ。文が破綻していても、その意図を補完して強引に解釈し、この冒頭で仕込んだ独自の要素をセットアップとして必ず後半で回収しろ。ただしここに書かれた具体を倉庫での作業・解体・組み立て等の既視感のある場面へ読み替えて、毎回同じパターンへ落ち着かせることを禁止する。')) return null;
+          sealBase();
         }
       }
     }
@@ -1614,6 +1638,7 @@ var NovelGen = (function () {
         if (en) {
           if (!addBase(en)) return null;
           if (!addBase('↑\nこれが終盤の流れ。文が破綻していても、その意図を補完して強引に解釈し、この終盤の着地を、前半で既に置いた要素の回収によって実現しろ。ただしここに書かれた具体を最終決戦・土壇場の覚醒・仲間の到着等の既視感のある場面へ読み替えて、毎回同じパターンへ落ち着かせることを禁止する。')) return null;
+          sealBase();
         }
       }
     }
@@ -1625,6 +1650,7 @@ var NovelGen = (function () {
         if (oneLine) {
           if (!addBase(oneLine)) return null;
           if (!addBase('↑\nこれがテーマの話を書け')) return null;
+          sealBase();
         }
       }
     }
@@ -1649,7 +1675,11 @@ var NovelGen = (function () {
     }
     var toneLines = selectedNames.map(function (n, i) { return '・' + n + ' ' + values[i] + '%'; }).join('\n');
     if (!addBase('話のトーン（本編内でこの語彙を使用することを控えろ）\n' + toneLines)) return null;
-    if (A.tailText && !addBase(A.tailText)) return null;
+    sealBase();
+    if (A.tailText) {
+      if (!addBase(A.tailText)) return null;
+      sealBase();
+    }
 
     var charMin = randint(P.charCountMin, P.charCountMax);
     var charMax = randint(charMin, P.charCountMax);
@@ -1726,24 +1756,44 @@ var NovelGen = (function () {
     //   真ん中に置くと重要度が下がり、AIが資料外のオリキャラ（名前付きの
     //   即席人物）を出す原因になるため移動した。最後.txtの検査項目
     //   「10. オリキャラの使用」とセットで機能する。
-    var prefixBlocks = charBlocks.slice();
+    // 先頭ブロック群：採用キャラ資料グループ（内部は優先度順を維持）→ 関係ルール。
+    // これらは通常「プロンプト先頭」に来るが、ブロックランダム順モードでは
+    // 他のブロックと同じようにシャッフルされる。
+    var bodyBlocks = [];
+    if (charBlocks.length) bodyBlocks.push(charBlocks.slice());
     if (tail.relation) {
-      prefixBlocks.push(tail.relation);
+      bodyBlocks.push([tail.relation]);
       projectedLen += tail.relation.length + 2;
     }
     if (tail.template) {
-      baseContents.splice(templateInsertIdx, 0, tail.template);
+      sealBase();
+      baseBlocks.splice(templateBlockIdx, 0, [tail.template]);
       baseLen += tail.template.length + 2;
       projectedLen += tail.template.length + 2;
     }
+    sealBase();
+    bodyBlocks = bodyBlocks.concat(baseBlocks);
+
     if (projectedLen + extraLen(finalTailBlocks) > maxChar) return null;
     finalTailBlocks.forEach(function (x) {
-      baseContents.push(x);
       baseLen += x.length + 2;
       projectedLen += x.length + 2;
     });
 
-    var finalContents = prefixBlocks.concat(baseContents);
+    // ★ ブロックランダム順モード（shuffleBlocksMode=1）：
+    //   本体ブロックを丸ごとシャッフルする。
+    //   「視点提示 → 文字数指定」の2つ（finalTailBlocks）は対象外で、
+    //   シャッフル後も常にプロンプトの最後にこの順で固定される。
+    if (numOr(P.shuffleBlocksMode, 0) === 1) {
+      bodyBlocks = shuffle(bodyBlocks.slice());
+    }
+
+    var finalContents = [];
+    bodyBlocks.forEach(function (b) {
+      b.forEach(function (t) { finalContents.push(t); });
+    });
+    finalTailBlocks.forEach(function (x) { finalContents.push(x); });
+
     var finalResultLen = finalContents.reduce(function (n, x) { return n + x.length + 2; }, 0);
     if (finalResultLen > maxChar) return null;
     return {
@@ -1776,11 +1826,28 @@ var NovelGen = (function () {
     var MARKOV_ORDER = A.MARKOV_ORDER;
 
     var currentLen = 0;
-    var contents = [];
+    // ★ ブロック単位で管理する（ブロックランダム順モード用）。
+    //   addToContents は「現在のブロック」に追記し、sealBlock で1ブロックを確定する。
+    var blocks = [];
+    var curBlock = null;
 
     function addToContents(text) {
       if (!text) return true;
-      contents.push(text);
+      if (!curBlock) curBlock = [];
+      curBlock.push(text);
+      currentLen += text.length + 2;
+      if (currentLen > maxChar) return false;
+      return true;
+    }
+    function sealBlock() {
+      if (curBlock && curBlock.length) blocks.push(curBlock);
+      curBlock = null;
+    }
+    // 視点提示→文字数指定はシャッフル対象外（常に最後の固定ブロック）
+    var fixedTail = [];
+    function addFixedTail(text) {
+      if (!text) return true;
+      fixedTail.push(text);
       currentLen += text.length + 2;
       if (currentLen > maxChar) return false;
       return true;
@@ -1792,6 +1859,7 @@ var NovelGen = (function () {
       if (ssText != null) {
         if (!addToContents(ssText)) return null;
       }
+      sealBlock();
     }
 
     // ---- ファイル収集（この旧経路はモード2の互換処理でのみ使用） ----
@@ -1813,6 +1881,7 @@ var NovelGen = (function () {
       if (text != null) {
         if (!addToContents(text)) return null;
       }
+      sealBlock();
     }
 
     // 禁止.txt（モード2・3では除外）
@@ -1821,6 +1890,7 @@ var NovelGen = (function () {
       if (kinshiText != null) {
         if (!addToContents(kinshiText)) return null;
       }
+      sealBlock();
     }
 
     // ---- 共通.txt（モード2以外） ----
@@ -1831,11 +1901,13 @@ var NovelGen = (function () {
       if (kyoutsuText != null) {
         if (!addToContents(kyoutsuText)) return null;
       }
+      sealBlock();
     }
 
     // 主要AAキャラ限定制約
     if (randint(1, 1) === 1) {
       if (!addToContents('主要AAのキャラのみを使用し、モブを用意する場合も主要AAから使用する')) return null;
+      sealBlock();
     }
 
     // キャラクター間の関係ルール（モード2以外。モード2はAIオリジナル設定のため生成しない）
@@ -1843,6 +1915,7 @@ var NovelGen = (function () {
       var relationRule = generateRelationRule(chosen);
       if (relationRule) {
         if (!addToContents(relationRule)) return null;
+        sealBlock();
       }
     }
 
@@ -1851,7 +1924,7 @@ var NovelGen = (function () {
     //   重要度が下がり、AIが資料外のオリキャラ（名前付きの即席人物）を
     //   出す原因になるため移動した。最後.txtの検査項目
     //   「10. オリキャラの使用」とセットで機能する。
-    var charaTemplate = buildCharTemplate(chosen, heroText, shuryoMode, files);
+    var charaTemplate = buildCharTemplate(chosen, heroText, shuryoMode, files, P);
 
     // ---- マルコフテキスト ----
     if (useMarkov) {
@@ -1884,6 +1957,7 @@ var NovelGen = (function () {
             if (mText1) {
               if (!addToContents(mText1)) return null;
               if (!addToContents('---\nこれは資料です')) return null;
+              sealBlock();
             }
           }
         }
@@ -1897,6 +1971,7 @@ var NovelGen = (function () {
             if (mText2) {
               if (!addToContents(mText2)) return null;
               if (!addToContents('---\nこれは資料です')) return null;
+              sealBlock();
             }
           }
         }
@@ -1908,6 +1983,7 @@ var NovelGen = (function () {
           if (mText3) {
             if (!addToContents(mText3)) return null;
             if (!addToContents('↑\nこれは本編の資料です。軽度な改変はOK')) return null;
+            sealBlock();
           }
         }
       }
@@ -1918,16 +1994,19 @@ var NovelGen = (function () {
     if (tsuzukiText != null) {
       if (!addToContents(tsuzukiText)) return null;
     }
+    sealBlock();
 
     // 最後.txt
     var lastText = files.last;
     if (lastText != null) {
       if (!addToContents(lastText)) return null;
     }
+    sealBlock();
 
     // 汎用キャラクター一覧（オリキャラ禁止の最終提示。最後.txtの直後）
     if (charaTemplate) {
       if (!addToContents(charaTemplate)) return null;
+      sealBlock();
     }
 
     // ★ 冒頭フロー指定（冒頭.txtを1文マルコフで合成。精度1〜4を揺らがせ、原文ママは禁止）
@@ -1940,6 +2019,7 @@ var NovelGen = (function () {
         if (op) {
           if (!addToContents(op)) return null;
           if (!addToContents('↑\nこれが冒頭の流れ。文が破綻していても、その意図を補完して強引に解釈し、この冒頭で仕込んだ独自の要素をセットアップとして必ず後半で回収しろ。ただしここに書かれた具体を倉庫での作業・解体・組み立て等の既視感のある場面へ読み替えて、毎回同じパターンへ落ち着かせることを禁止する。')) return null;
+          sealBlock();
         }
       }
     }
@@ -1954,6 +2034,7 @@ var NovelGen = (function () {
         if (en) {
           if (!addToContents(en)) return null;
           if (!addToContents('↑\nこれが終盤の流れ。文が破綻していても、その意図を補完して強引に解釈し、この終盤の着地を、前半で既に置いた要素の回収によって実現しろ。ただしここに書かれた具体を最終決戦・土壇場の覚醒・仲間の到着等の既視感のある場面へ読み替えて、毎回同じパターンへ落ち着かせることを禁止する。')) return null;
+          sealBlock();
         }
       }
     }
@@ -1966,6 +2047,7 @@ var NovelGen = (function () {
         if (oneLine) {
           if (!addToContents(oneLine)) return null;
           if (!addToContents('↑\nこれがテーマの話を書け')) return null;
+          sealBlock();
         }
       }
     }
@@ -2008,27 +2090,42 @@ var NovelGen = (function () {
     }).join('\n');
     var toneText = '話のトーン（本編内でこの語彙を使用することを控えろ）\n' + toneLines;
     if (!addToContents(toneText)) return null;
+    sealBlock();
 
-    // ---- 視点提示 → 文字数提示 ----
+    // ---- 視点提示 → 文字数提示（末尾固定・シャッフル対象外） ----
     var charMin = randint(P.charCountMin, P.charCountMax);
     var charMax = randint(charMin, P.charCountMax);
     var charCountText = '文字数は' + charMin + '~' + charMax + '文字';
 
     if (suppressHero) {
-      if (!addToContents(charCountText)) return null;
+      if (!addFixedTail(charCountText)) return null;
     } else if (currentHeroMode === 1) {
-      if (!addToContents(heroText)) return null;
-      if (!addToContents(charCountText)) return null;
+      if (!addFixedTail(heroText)) return null;
+      if (!addFixedTail(charCountText)) return null;
     } else if (currentHeroMode === 0) {
-      if (!addToContents(charCountText)) return null;
+      if (!addFixedTail(charCountText)) return null;
     } else {
       if (Math.random() * 100 < P.noHeroRate) {
-        if (!addToContents(charCountText)) return null;
+        if (!addFixedTail(charCountText)) return null;
       } else {
-        if (!addToContents(heroText)) return null;
-        if (!addToContents(charCountText)) return null;
+        if (!addFixedTail(heroText)) return null;
+        if (!addFixedTail(charCountText)) return null;
       }
     }
+
+    // ★ ブロックランダム順モード（shuffleBlocksMode=1）：
+    //   本体ブロックを丸ごとシャッフルする。
+    //   「視点提示 → 文字数指定」の2つ（fixedTail）は対象外で、
+    //   シャッフル後も常にプロンプトの最後にこの順で固定される。
+    sealBlock();
+    var bodyBlocks = blocks;
+    if (numOr(P.shuffleBlocksMode, 0) === 1) bodyBlocks = shuffle(blocks.slice());
+
+    var contents = [];
+    bodyBlocks.forEach(function (b) {
+      b.forEach(function (t) { contents.push(t); });
+    });
+    fixedTail.forEach(function (t) { contents.push(t); });
 
     return contents;
   }
@@ -2195,7 +2292,7 @@ var NovelGen = (function () {
     return s.replace(/[\s\u3000]/g, '');
   }
 
-  function buildCharTemplate(selectedCharFiles, heroText, shuryoMode, files) {
+  function buildCharTemplate(selectedCharFiles, heroText, shuryoMode, files, params) {
     var text = files.charaTemplate;
     if (!text) return '';
     var header = null, sep = null, rows = [];
@@ -2213,7 +2310,9 @@ var NovelGen = (function () {
     // 一覧全体をそのまま出すと、体数が増えるほどプロンプトを圧迫し、
     // AIがモブを無秩序に登場させて破綻する。毎回ここで上限体数を引く。
     function pickCount(poolSize) {
-      var a = intOr(P.charTemplateMin, 12), b = intOr(P.charTemplateMax, 40);
+      // ★ 修正: 旧版はここが未渡入の P を参照しており、生成のたびに
+      //   ReferenceError（P is not defined）で落ちていた。params として受け取る。
+      var a = intOr(params && params.charTemplateMin, 12), b = intOr(params && params.charTemplateMax, 40);
       var lo = Math.max(1, Math.min(a, b));
       var hi = Math.max(lo, Math.max(a, b));
       return Math.min(poolSize, randint(lo, hi));
@@ -2331,7 +2430,7 @@ var NovelGen = (function () {
           return {
             result: priorityResult,
             attempt: pa,
-            pattern: priorityPatternText(made.selectedCharFiles, shuryoMode),
+            pattern: priorityPatternText(made.selectedCharFiles, shuryoMode) + (numOr(P.shuffleBlocksMode, 0) === 1 ? '　／ ブロックランダム順' : ''),
             chosen: {},
             selectedCharFiles: made.selectedCharFiles,
             charPriority: priority,
@@ -2385,7 +2484,7 @@ var NovelGen = (function () {
         return {
           result: result,
           attempt: attempt,
-          pattern: '採用 なし　／ モード2',
+            pattern: '採用 なし　／ モード2' + (numOr(P.shuffleBlocksMode, 0) === 1 ? '　／ ブロックランダム順' : ''),
           chosen: chosen,
           selectedCharFiles: [],
           charPriority: [],
@@ -2674,6 +2773,7 @@ NovelGen.setNovelData(NOVEL_DATA);
   var DEFAULT_PARAMS = {
     // 基本
     shuryoOnlyMode: 0,        // 0=ランダム / -1=通常（キャラ優先度） / 2=モード2 / 3=モード3（モード1は欠番）
+    shuffleBlocksMode: 0,     // ブロックランダム順 0=OFF（固定順） / 1=ON（視点→文字数は常に最後固定）
     useMarkovMode: 1,         // 1=ON / 0=OFF
     heroMode: -1,             // -1=ランダム / 0=視点なし / 1=必ず視点
     useLastMarkovLineMode: 1, // テーマ（最後の1行マルコフ） 1=ON / 0=OFF
@@ -2705,6 +2805,8 @@ NovelGen.setNovelData(NOVEL_DATA);
   var PARAM_FIELDS = [
     { key: 'shuryoOnlyMode', label: '資料オンリーモード', type: 'select',
       options: [[0, '0: ランダム'], [-1, '-1: 通常（キャラ資料優先度）'], [2, '2: モード2'], [3, '3: モード3（キャラ資料優先度）']] },
+    { key: 'shuffleBlocksMode', label: 'ブロックランダム順モード', type: 'select',
+      options: [[0, '0: OFF（固定順）'], [1, '1: ON（ランダム順・視点→文字数は最後固定）']] },
     { key: 'useMarkovMode', label: 'マルコフ連鎖', type: 'select', options: [[1, '1: ON'], [0, '0: OFF']] },
     { key: 'heroMode', label: '視点モード', type: 'select',
       options: [[-1, '-1: ランダム（4/5で視点あり）'], [0, '0: 視点なし'], [1, '1: 必ず視点']] },
@@ -3302,5 +3404,5 @@ NovelGen.setNovelData(NOVEL_DATA);
 })();
 
 </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a2c6d9a3f861fca3',t:'MTc4Njk1MDUzMw=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script><script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a32b5bbdea32d5f9',t:'MTc4ODAwNDQzOA=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a2c6d9a3f861fca3',t:'MTc4Njk1MDUzMw=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script><script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a32b5bbdea32d5f9',t:'MTc4ODAwNDQzOA=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script><script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a3697b95deb0d2f5',t:'MTc4ODY1NTg2MA=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
