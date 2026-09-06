@@ -1351,6 +1351,16 @@ var NovelGen = (function () {
     return generateOpeningOneLiner(text, charLimit, P, orderMin, orderMax, '__one_ending');
   }
 
+  // ★ 冒頭／終盤パターンの「注入レートを外した」場合の代替文。
+  //   冒頭.txt／終盤.txt は使わず、テーマ1行（これがテーマの話を書け）と
+  //   まったく同じアルゴリズム（マルコフ.txt・精度4固定の1行マルコフ）で
+  //   文を作り、「冒頭は、（〜）」「終盤は、（〜）」の形式に整形して返す。
+  function generateFlowFallbackLine(prefix, markovText, charLimit, P, cacheKey) {
+    var body = generateMarkovOneLiner(markovText, 4, Math.max(10, charLimit - prefix.length - 2), P, cacheKey);
+    if (!body) return '';
+    return prefix + '（' + body + '）';
+  }
+
   function generateMarkovText(text, order, lineCount, charLimit, P, cacheKey) {
     if (!text) return '';
     var cleaned = stripMarkdown(text);
@@ -1616,10 +1626,17 @@ var NovelGen = (function () {
     // ★ 冒頭フロー指定（冒頭.txtを1文マルコフで合成。精度1〜4を揺らがせ、原文ママは禁止）
     //   最後.txtの直後・テーマ提示の直前に置く。
     //   「冒頭は、～～なる。」→「↑ これが冒頭の流れ」→ テーマ1行 →「↑ これがテーマの話を書け」の順。
-    if (P.useOpeningMarkovMode === 1 && Math.random() * 100 < numOr(P.openingRate, 100)) {
+    if (P.useOpeningMarkovMode === 1) {
       var remO = maxChar - baseLen;
-      if (remO > 0 && files.opening) {
-        var op = generateOpeningOneLiner(files.opening, Math.min(160, remO), P);
+      if (remO > 0) {
+        var op = '';
+        if (Math.random() * 100 < numOr(P.openingRate, 100)) {
+          if (files.opening) op = generateOpeningOneLiner(files.opening, Math.min(160, remO), P);
+        }
+        // ★ 注入レートを外した（または生成失敗した）場合でも文面を消さず、
+        //   「これがテーマの話を書け」と同じアルゴリズム（マルコフ.txtの1行マルコフ）
+        //   で作った文を「冒頭は、（〜）」の形式で代わりに入れる。
+        if (!op) op = generateFlowFallbackLine('冒頭は、', files.markov, Math.min(160, remO), P, '__one_opening_fb');
         if (op) {
           if (!addBase(op)) return null;
           if (!addBase('↑\nこれが冒頭の流れ。文が破綻していても、その意図を補完して強引に解釈し、この冒頭で仕込んだ独自の要素をセットアップとして必ず後半で回収しろ。ただしここに書かれた具体を倉庫での作業・解体・組み立て等の既視感のある場面へ読み替えて、毎回同じパターンへ落ち着かせることを禁止する。')) return null;
@@ -1631,10 +1648,17 @@ var NovelGen = (function () {
     // ★ 終盤フロー指定（終盤.txtを1文マルコフで合成。冒頭と同じ流儀）
     //   冒頭ブロックの直後・テーマ提示の直前に置く。
     //   「終盤は、～～なる。」→「↑ これが終盤の流れ」の順。
-    if (P.useEndingMarkovMode === 1 && Math.random() * 100 < numOr(P.endingRate, 100)) {
+    if (P.useEndingMarkovMode === 1) {
       var remE = maxChar - baseLen;
-      if (remE > 0 && files.ending) {
-        var en = generateEndingOneLiner(files.ending, Math.min(160, remE), P);
+      if (remE > 0) {
+        var en = '';
+        if (Math.random() * 100 < numOr(P.endingRate, 100)) {
+          if (files.ending) en = generateEndingOneLiner(files.ending, Math.min(160, remE), P);
+        }
+        // ★ 注入レートを外した（または生成失敗した）場合でも文面を消さず、
+        //   「これがテーマの話を書け」と同じアルゴリズム（マルコフ.txtの1行マルコフ）
+        //   で作った文を「終盤は、（〜）」の形式で代わりに入れる。
+        if (!en) en = generateFlowFallbackLine('終盤は、', files.markov, Math.min(160, remE), P, '__one_ending_fb');
         if (en) {
           if (!addBase(en)) return null;
           if (!addBase('↑\nこれが終盤の流れ。文が破綻していても、その意図を補完して強引に解釈し、この終盤の着地を、前半で既に置いた要素の回収によって実現しろ。ただしここに書かれた具体を最終決戦・土壇場の覚醒・仲間の到着等の既視感のある場面へ読み替えて、毎回同じパターンへ落ち着かせることを禁止する。')) return null;
@@ -2012,10 +2036,17 @@ var NovelGen = (function () {
     // ★ 冒頭フロー指定（冒頭.txtを1文マルコフで合成。精度1〜4を揺らがせ、原文ママは禁止）
     //   最後.txtの直後・テーマ提示の直前に置く。
     //   「冒頭は、～～なる。」→「↑ これが冒頭の流れ」→ テーマ1行 →「↑ これがテーマの話を書け」の順。
-    if (P.useOpeningMarkovMode === 1 && Math.random() * 100 < numOr(P.openingRate, 100)) {
+    if (P.useOpeningMarkovMode === 1) {
       var remO = maxChar - currentLen;
-      if (remO > 0 && files.opening) {
-        var op = generateOpeningOneLiner(files.opening, Math.min(160, remO), P);
+      if (remO > 0) {
+        var op = '';
+        if (Math.random() * 100 < numOr(P.openingRate, 100)) {
+          if (files.opening) op = generateOpeningOneLiner(files.opening, Math.min(160, remO), P);
+        }
+        // ★ 注入レートを外した（または生成失敗した）場合でも文面を消さず、
+        //   「これがテーマの話を書け」と同じアルゴリズム（マルコフ.txtの1行マルコフ）
+        //   で作った文を「冒頭は、（〜）」の形式で代わりに入れる。
+        if (!op) op = generateFlowFallbackLine('冒頭は、', files.markov, Math.min(160, remO), P, '__one_opening_fb');
         if (op) {
           if (!addToContents(op)) return null;
           if (!addToContents('↑\nこれが冒頭の流れ。文が破綻していても、その意図を補完して強引に解釈し、この冒頭で仕込んだ独自の要素をセットアップとして必ず後半で回収しろ。ただしここに書かれた具体を倉庫での作業・解体・組み立て等の既視感のある場面へ読み替えて、毎回同じパターンへ落ち着かせることを禁止する。')) return null;
@@ -2027,10 +2058,17 @@ var NovelGen = (function () {
     // ★ 終盤フロー指定（終盤.txtを1文マルコフで合成。冒頭と同じ流儀）
     //   冒頭ブロックの直後・テーマ提示の直前に置く。
     //   「終盤は、～～なる。」→「↑ これが終盤の流れ」の順。
-    if (P.useEndingMarkovMode === 1 && Math.random() * 100 < numOr(P.endingRate, 100)) {
+    if (P.useEndingMarkovMode === 1) {
       var remE = maxChar - currentLen;
-      if (remE > 0 && files.ending) {
-        var en = generateEndingOneLiner(files.ending, Math.min(160, remE), P);
+      if (remE > 0) {
+        var en = '';
+        if (Math.random() * 100 < numOr(P.endingRate, 100)) {
+          if (files.ending) en = generateEndingOneLiner(files.ending, Math.min(160, remE), P);
+        }
+        // ★ 注入レートを外した（または生成失敗した）場合でも文面を消さず、
+        //   「これがテーマの話を書け」と同じアルゴリズム（マルコフ.txtの1行マルコフ）
+        //   で作った文を「終盤は、（〜）」の形式で代わりに入れる。
+        if (!en) en = generateFlowFallbackLine('終盤は、', files.markov, Math.min(160, remE), P, '__one_ending_fb');
         if (en) {
           if (!addToContents(en)) return null;
           if (!addToContents('↑\nこれが終盤の流れ。文が破綻していても、その意図を補完して強引に解釈し、この終盤の着地を、前半で既に置いた要素の回収によって実現しろ。ただしここに書かれた具体を最終決戦・土壇場の覚醒・仲間の到着等の既視感のある場面へ読み替えて、毎回同じパターンへ落ち着かせることを禁止する。')) return null;
@@ -2779,8 +2817,8 @@ NovelGen.setNovelData(NOVEL_DATA);
     useLastMarkovLineMode: 1, // テーマ（最後の1行マルコフ） 1=ON / 0=OFF
     useOpeningMarkovMode: 1,  // 冒頭パターン（冒頭.txtを1文マルコフ） 1=ON / 0=OFF
     useEndingMarkovMode: 1,   // 終盤パターン（終盤.txtを1文マルコフ） 1=ON / 0=OFF
-    openingRate: 50,          // 冒頭パターン注入レート（％）ONのとき、この確率で実際に注入する
-    endingRate: 50,           // 終盤パターン注入レート（％）ONのとき、この確率で実際に注入する
+    openingRate: 50,          // 冒頭パターン注入レート（％）ONのとき、この確率で冒頭.txt由来を注入。外れた場合はマルコフ.txt由来の「冒頭は、（〜）」を代わりに注入
+    endingRate: 50,           // 終盤パターン注入レート（％）ONのとき、この確率で終盤.txt由来を注入。外れた場合はマルコフ.txt由来の「終盤は、（〜）」を代わりに注入
     charTemplateMin: 12,      // キャラテンプレ提示数の下限（全mode共通・毎回この範囲で変動）
     charTemplateMax: 40,      // キャラテンプレ提示数の上限（全mode共通・毎回この範囲で変動）
     specialHeroRate: 20,      // 特殊視点レート（％）
@@ -2812,9 +2850,9 @@ NovelGen.setNovelData(NOVEL_DATA);
       options: [[-1, '-1: ランダム（4/5で視点あり）'], [0, '0: 視点なし'], [1, '1: 必ず視点']] },
     { key: 'useLastMarkovLineMode', label: 'テーマ提示（最後の1行）', type: 'select', options: [[1, '1: ON'], [0, '0: OFF']] },
     { key: 'useOpeningMarkovMode', label: '冒頭パターン指定（冒頭.txt）', type: 'select', options: [[1, '1: ON'], [0, '0: OFF']] },
-    { key: 'openingRate', label: '冒頭パターン注入レート（％）', type: 'number', min: 0, max: 100 },
+    { key: 'openingRate', label: '冒頭パターン注入レート（％）／外れたらマルコフ文', type: 'number', min: 0, max: 100 },
     { key: 'useEndingMarkovMode', label: '終盤パターン指定（終盤.txt）', type: 'select', options: [[1, '1: ON'], [0, '0: OFF']] },
-    { key: 'endingRate', label: '終盤パターン注入レート（％）', type: 'number', min: 0, max: 100 },
+    { key: 'endingRate', label: '終盤パターン注入レート（％）／外れたらマルコフ文', type: 'number', min: 0, max: 100 },
     { key: 'charTemplateMin', label: 'キャラテンプレ提示数の下限', type: 'number', min: 1 },
     { key: 'charTemplateMax', label: 'キャラテンプレ提示数の上限', type: 'number', min: 1 },
     { key: 'specialHeroRate', label: '特殊視点レート（％）', type: 'number', min: 0, max: 100 },
@@ -3404,5 +3442,6 @@ NovelGen.setNovelData(NOVEL_DATA);
 })();
 
 </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a2c6d9a3f861fca3',t:'MTc4Njk1MDUzMw=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script><script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a32b5bbdea32d5f9',t:'MTc4ODAwNDQzOA=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script><script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a3697b95deb0d2f5',t:'MTc4ODY1NTg2MA=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a2c6d9a3f861fca3',t:'MTc4Njk1MDUzMw=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script><script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a32b5bbdea32d5f9',t:'MTc4ODAwNDQzOA=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script><script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a3697b95deb0d2f5',t:'MTc4ODY1NTg2MA=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script><script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a36ad2cb9ce05db3',t:'MTc4ODY2OTkxOA=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script><script type="module" src="https://static.cloudflareinsights.com/beacon.min.js/v31edd6df95cf4e85bb4c19e7a9bdbcba1788362987495" integrity="sha512-iIg7k2xntmwu6/uSb5tpc/hySgZc4eoL31yB29W6tJFo2akwjPWcEqnCEdJvGexCL0KEQwVYv5BlowfhVz26hg==" data-cf-beacon='{"version":"2024.11.0","token":"1954b47c125f43f8b4338b3c4f804e4f","spa":2}' crossorigin="anonymous"></script>
+</body>
 </html>
