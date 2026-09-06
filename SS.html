@@ -308,10 +308,10 @@ footer { text-align: center; color: #5b6378; font-size: 11px; padding: 24px 0 40
       <ul>
         <li>デフォルトでは GitHub リポジトリ
           <code>um771/283tfgpq9784q39478y23n9y8g5p095yn8q2</code> の <code>main</code> ブランチにある
-          <code>SS.txt / 二次創作.txt / 超加速.txt / ラボ組.txt / 学校組.txt / ホスト組.txt / ツン.txt / 渡辺さん.txt / ハイン.txt / マルコフ.txt / 冒頭.txt / 終盤.txt / トーン.txt / 最後.txt</code> を
+          <code>SS.txt / 二次創作.txt / 超加速.txt / ラボ組.txt / 学校組.txt / ホスト組.txt / ツン.txt / 渡辺さん.txt / ハイン.txt / でぃ.txt / マルコフ.txt / 冒頭.txt / 終盤.txt / トーン.txt / 最後.txt</code> を
           <code>raw.githubusercontent.com</code> から取得します。</li>
         <li><b>マルコフ.txt や 最後.txt、各キャラ資料をリポジトリ上で編集して保存 → このページで生成</b> すれば、最新版が反映されます（毎回最新を取得）。</li>
-        <li>資料オンリーモード（-1／3）では、8資料のキャラ計28名に対して優先度をランダム設定し、上から所属する資料（二次創作・超加速・ラボ組・学校組・ホスト組・ツン・渡辺さん・ハイン）のtxtを追加していき、文字数上限に収まる順番までをプロンプト先頭へ追加します。</li>
+        <li>資料オンリーモード（-1／3）では、9資料のキャラ計29名に対して優先度をランダム設定し、上から所属する資料（二次創作・超加速・ラボ組・学校組・ホスト組・ツン・渡辺さん・ハイン・でぃ）のtxtを追加していき、文字数上限に収まる順番までをプロンプト先頭へ追加します。</li>
         <li><b>ブロックランダム順モード</b>（デフォルトOFF）をONにすると、プロンプトの各ブロック（採用キャラ資料群・関係ルール・SS.txt・共通.txt・各マルコフ＋区切り・最後.txt・キャラテンプレ・冒頭／終盤／テーマ／トーン等）を毎回ランダムな順番に並べ替えます。<b>「視点提示 → 文字数指定」の2つだけはシャッフルされず、常に最後の固定位置</b>です。ブロック内部（キャラ資料の優先度順、「マルコフ文＋これは資料です」等のペア）は順序のまま維持されます。</li>
         <li>旧来の統合資料 <code>他の人.txt</code> は旧Python版との互換用に残っていますが、SS.htmlでは参照しません。</li>
         <li>取得に失敗した場合は「前回取得した内容」を自動で使い、警告を表示します。</li>
@@ -331,7 +331,7 @@ footer { text-align: center; color: #5b6378; font-size: 11px; padding: 24px 0 40
         <tr><th>この画面</th><th>生成py_組み込み済み.py</th></tr>
         <tr><td>資料オンリーモード</td><td>SHURYO_ONLY_MODE</td></tr>
         <tr><td>ブロックランダム順モード</td><td>—（SS.html独自機能。py版には無い）</td></tr>
-        <tr><td>キャラ資料優先度</td><td>8資料を毎回シャッフルし、上限で停止</td></tr>
+        <tr><td>キャラ資料優先度</td><td>9資料を毎回シャッフルし、上限で停止</td></tr>
         <tr><td>マルコフ連鎖</td><td>USE_MARKOV_MODE</td></tr>
         <tr><td>視点モード</td><td>HERO_MODE</td></tr>
         <tr><td>テーマ提示（最後の1行）</td><td>USE_LAST_MARKOV_LINE_MODE</td></tr>
@@ -1419,7 +1419,7 @@ var NovelGen = (function () {
   // キャラ資料の細分化と優先度選出
   // ============================================================
   // -1 / 3 では、旧「ブーン・モナー・他の人」の三択を使わない。
-  // ここに並ぶ8資料のキャラ（計28名）を毎回シャッフルし、キャラの
+  // ここに並ぶ9資料のキャラ（計29名）を毎回シャッフルし、キャラの
   // 所属資料（txt）を上から順にプロンプト先頭へ加える。
   var MIN_CHAR_MATERIAL_CHARS = 10000;
   var MARKOV_LINES_HARD_MAX = 1000;
@@ -1433,7 +1433,8 @@ var NovelGen = (function () {
     { id: 'host',        label: 'ホスト組', names: ['またんき', 'フサギコ', 'ぃょぅ'] },
     { id: 'tsun',        label: 'ツン', names: ['ツン'] },
     { id: 'watanabe',    label: '渡辺さん', names: ['渡辺さん'] },
-    { id: 'hain',        label: 'ハイン', names: ['ハイン'] }
+    { id: 'hain',        label: 'ハイン', names: ['ハイン'] },
+    { id: 'di',          label: 'でぃ', names: ['でぃ'] }
   ];
 
   function charMaterialById(id) {
@@ -1448,7 +1449,7 @@ var NovelGen = (function () {
     return m ? m.label : id;
   }
 
-  // キャラ単位の優先度プール：8資料のキャラをフラット化した計28名。
+  // キャラ単位の優先度プール：9資料のキャラをフラット化した計29名。
   // 各要素は { char: キャラ名, matId: 所属txt } 。
   function charPriorityPool() {
     var pool = [];
@@ -1461,7 +1462,7 @@ var NovelGen = (function () {
   }
 
   function cloneCharPriority() {
-    // 優先度はキャラ単位（28名）でシャッフルする。
+    // 優先度はキャラ単位（29名）でシャッフルする。
     // 挿入する資料はtxt単位（キャラの所属txt）で解決する。
     return shuffle(charPriorityPool());
   }
@@ -2183,7 +2184,8 @@ var NovelGen = (function () {
     host: ['ホスト組', ['またんき', 'フサギコ', 'ぃょぅ']],
     tsun: ['単独（ツン）', ['ツン']],
     watanabe: ['単独（渡辺さん）', ['渡辺さん']],
-    hain: ['単独（ハイン）', ['ハイン']]
+    hain: ['単独（ハイン）', ['ハイン']],
+    di: ['単独（でぃ）', ['でぃ']]
   };
 
   // ============================================================
@@ -2291,7 +2293,8 @@ var NovelGen = (function () {
     host: ['またんき', 'フサギコ', 'ぃょぅ'],
     tsun: ['ツン'],
     watanabe: ['渡辺さん'],
-    hain: ['ハイン']
+    hain: ['ハイン'],
+    di: ['でぃ']
   };
 
   var TEMPLATE_EXCLUDE_AA_BY_FILE = {
@@ -2302,7 +2305,8 @@ var NovelGen = (function () {
     host: ['(・∀ ・)', 'ミ,,ﾟДﾟ彡', '(=ﾟωﾟ)ﾉ'],
     tsun: ['ξﾟ⊿ﾟ)ξ'],
     watanabe: ["从'ー'从"],
-    hain: ['从 ﾟ∀从']
+    hain: ['从 ﾟ∀从'],
+    di: ['(#ﾟ;;-ﾟ)']
   };
 
   // ダブル視点は「AA　名前、AA　名前」と連結されるため、末尾だけを見ると
@@ -2438,7 +2442,7 @@ var NovelGen = (function () {
     else shuryoMode = P.shuryoOnlyMode;
     if (shuryoMode === 1) shuryoMode = -1;
 
-    // -1 / 3 は、キャラ単位の優先度（28名）を1回だけ決める。マルコフ生成の
+    // -1 / 3 は、キャラ単位の優先度（29名）を1回だけ決める。マルコフ生成の
     // リトライで優先度を入れ替えないため、同一試行内の順序は固定される。
     if (shuryoMode === -1 || shuryoMode === 3) {
       var usePriorityMarkov = (shuryoMode === 3) || (P.useMarkovMode === 1);
@@ -2803,6 +2807,7 @@ NovelGen.setNovelData(NOVEL_DATA);
     { id: 'tsun',        label: 'ツン.txt', repoFile: 'ツン.txt', defMode: 'github' },
     { id: 'watanabe',    label: '渡辺さん.txt', repoFile: '渡辺さん.txt', defMode: 'github' },
     { id: 'hain',        label: 'ハイン.txt', repoFile: 'ハイン.txt', defMode: 'github' },
+    { id: 'di',          label: 'でぃ.txt', repoFile: 'でぃ.txt', defMode: 'github' },
     { id: 'markov',      label: 'マルコフ.txt', repoFile: 'マルコフ.txt', defMode: 'github' },
     { id: 'opening',     label: '冒頭.txt',   repoFile: '冒頭.txt',   defMode: 'github' },
     { id: 'ending',      label: '終盤.txt',   repoFile: '終盤.txt',   defMode: 'github' },
@@ -3446,5 +3451,5 @@ NovelGen.setNovelData(NOVEL_DATA);
 })();
 
 </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a2c6d9a3f861fca3',t:'MTc4Njk1MDUzMw=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script><script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a32b5bbdea32d5f9',t:'MTc4ODAwNDQzOA=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script><script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a3697b95deb0d2f5',t:'MTc4ODY1NTg2MA=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script><script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a36aebcd6828d75e',t:'MTc4ODY3MDk0Mg=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a2c6d9a3f861fca3',t:'MTc4Njk1MDUzMw=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script><script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a32b5bbdea32d5f9',t:'MTc4ODAwNDQzOA=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script><script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a3697b95deb0d2f5',t:'MTc4ODY1NTg2MA=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script><script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a36aebcd6828d75e',t:'MTc4ODY3MDk0Mg=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script><script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a36efbd5dc8cc5bf',t:'MTc4ODcxMzU0Mg=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
