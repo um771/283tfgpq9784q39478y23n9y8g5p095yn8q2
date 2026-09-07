@@ -312,7 +312,8 @@ footer { text-align: center; color: #5b6378; font-size: 11px; padding: 24px 0 40
           <code>raw.githubusercontent.com</code> から取得します。</li>
         <li><b>マルコフ.txt や 最後.txt、各キャラ資料をリポジトリ上で編集して保存 → このページで生成</b> すれば、最新版が反映されます（毎回最新を取得）。</li>
         <li>資料オンリーモード（-1／3）では、9資料のキャラ計29名に対して優先度をランダム設定し、上から所属する資料（二次創作・超加速・ラボ組・学校組・ホスト組・ツン・渡辺さん・ハイン・でぃ）のtxtを追加していき、文字数上限に収まる順番までをプロンプト先頭へ追加します。</li>
-        <li><b>ブロックランダム順モード</b>（デフォルトOFF）をONにすると、プロンプトの各ブロック（採用キャラ資料群・関係ルール・SS.txt・共通.txt・各マルコフ＋区切り・最後.txt・キャラテンプレ・冒頭／終盤／テーマ／トーン等）を毎回ランダムな順番に並べ替えます。<b>「視点提示 → 文字数指定」の2つだけはシャッフルされず、常に最後の固定位置</b>です。ブロック内部（キャラ資料の優先度順、「マルコフ文＋これは資料です」等のペア）は順序のまま維持されます。</li>
+        <li><b>ブロックランダム順モード</b>（デフォルトOFF）をONにすると、プロンプトの各ブロック（採用キャラ資料群・関係ルール・SS.txt・共通.txt・各マルコフ＋区切り・最後.txt・キャラテンプレ・冒頭／終盤／テーマ／トーン等）を毎回ランダムな順番に並べ替えます。<b>「視点提示 → 文字数指定」の2つだけはシャッフルされず、常に最後の固定位置</b>です。「マルコフ文＋これは資料です」等のペアは順序のまま維持されます。</li>
+        <li>採用した各キャラ資料txtの内部では、そのtxtの代表AAで始まる人物ブロックを毎回ランダムな順に並べ替えます（★欲の位置はファイルごとに違うため使いません）。グループ概要・世界設定など人物以外の見出し以降は末尾に残します。</li>
         <li>旧来の統合資料 <code>他の人.txt</code> は旧Python版との互換用に残っていますが、SS.htmlでは参照しません。</li>
         <li>取得に失敗した場合は「前回取得した内容」を自動で使い、警告を表示します。</li>
         <li>リポジトリを変えたい場合は「⚙ 設定」のリポジトリ欄を書き換えるか、各ファイルのURLを直接編集してください。</li>
@@ -1644,7 +1645,7 @@ var NovelGen = (function () {
         if (!op) op = generateFlowFallbackLine('冒頭は、', files.markov, Math.min(160, remO), P, '__one_opening_fb');
         if (op) {
           if (!addBase(op)) return null;
-          if (!addBase('↑\nこれが冒頭の流れ。文が破綻していても、その意図を補完して強引に解釈し、この冒頭で仕込んだ独自の要素をセットアップとして必ず後半で回収しろ。ただしここに書かれた具体を倉庫での作業・解体・組み立て等の既視感のある場面へ読み替えて、毎回同じパターンへ落ち着かせることを禁止する。')) return null;
+          if (!addBase('↑\nこれが冒頭の流れ。文が破綻していても、その意図を補完して強引に解釈し、この冒頭で仕込んだ独自の要素をセットアップとして必ず後半で回収しろ。')) return null;
           sealBase();
         }
       }
@@ -1666,7 +1667,7 @@ var NovelGen = (function () {
         if (!en) en = generateFlowFallbackLine('終盤は、', files.markov, Math.min(160, remE), P, '__one_ending_fb');
         if (en) {
           if (!addBase(en)) return null;
-          if (!addBase('↑\nこれが終盤の流れ。文が破綻していても、その意図を補完して強引に解釈し、この終盤の着地を、前半で既に置いた要素の回収によって実現しろ。ただしここに書かれた具体を最終決戦・土壇場の覚醒・仲間の到着等の既視感のある場面へ読み替えて、毎回同じパターンへ落ち着かせることを禁止する。')) return null;
+          if (!addBase('↑\nこれが終盤の流れ。文が破綻していても、その意図を補完して強引に解釈し、この終盤の着地を、前半で既に置いた要素の回収によって実現しろ。')) return null;
           sealBase();
         }
       }
@@ -1715,9 +1716,10 @@ var NovelGen = (function () {
     var charCountText = '文字数は' + charMin + '~' + charMax + '文字';
 
     // ベース部分が完成した後に、キャラ資料の優先度を適用する。
-    // 優先度はキャラ単位（28名シャッフル）。挿入はtxt単位：
+    // 優先度はキャラ単位（29名シャッフル）。挿入はtxt単位：
     // キャラリストを上から歩き、そのキャラの所属txtを未追加なら追加する。
     // 追加済みのtxtに属するキャラは無視する。
+    // 各txtの内部は人物ブロックを毎回シャッフルする（文頭偏り対策）。
     var priority = (A.charPriority || cloneCharPriority()).slice();
     var selectedCharFiles = [];
     var selectedCharMaterialLength = 0;
@@ -1729,7 +1731,7 @@ var NovelGen = (function () {
       var id = priority[pi].matId;
       if (triedMats[id]) continue; // このtxtはもう処理済み（追加済み or 空でスキップ済み）
       triedMats[id] = true;
-      var raw = files[id];
+      var raw = shuffleCharBlocksInMaterial(files[id], id);
       if (!raw || !raw.trim()) continue;
       if (projectedLen + raw.length + 2 + charCountText.length + 2 > maxChar) {
         priorityStopped = true;
@@ -1785,7 +1787,7 @@ var NovelGen = (function () {
     //   真ん中に置くと重要度が下がり、AIが資料外のオリキャラ（名前付きの
     //   即席人物）を出す原因になるため移動した。最後.txtの検査項目
     //   「10. オリキャラの使用」とセットで機能する。
-    // 先頭ブロック群：採用キャラ資料グループ（内部は優先度順を維持）→ 関係ルール。
+    // 先頭ブロック群：採用キャラ資料グループ（各txt内の人物順はシャッフル済み、txt間は優先度順）→ 関係ルール。
     // これらは通常「プロンプト先頭」に来るが、ブロックランダム順モードでは
     // 他のブロックと同じようにシャッフルされる。
     var bodyBlocks = [];
@@ -2054,7 +2056,7 @@ var NovelGen = (function () {
         if (!op) op = generateFlowFallbackLine('冒頭は、', files.markov, Math.min(160, remO), P, '__one_opening_fb');
         if (op) {
           if (!addToContents(op)) return null;
-          if (!addToContents('↑\nこれが冒頭の流れ。文が破綻していても、その意図を補完して強引に解釈し、この冒頭で仕込んだ独自の要素をセットアップとして必ず後半で回収しろ。ただしここに書かれた具体を倉庫での作業・解体・組み立て等の既視感のある場面へ読み替えて、毎回同じパターンへ落ち着かせることを禁止する。')) return null;
+          if (!addToContents('↑\nこれが冒頭の流れ。文が破綻していても、その意図を補完して強引に解釈し、この冒頭で仕込んだ独自の要素をセットアップとして必ず後半で回収しろ。')) return null;
           sealBlock();
         }
       }
@@ -2076,7 +2078,7 @@ var NovelGen = (function () {
         if (!en) en = generateFlowFallbackLine('終盤は、', files.markov, Math.min(160, remE), P, '__one_ending_fb');
         if (en) {
           if (!addToContents(en)) return null;
-          if (!addToContents('↑\nこれが終盤の流れ。文が破綻していても、その意図を補完して強引に解釈し、この終盤の着地を、前半で既に置いた要素の回収によって実現しろ。ただしここに書かれた具体を最終決戦・土壇場の覚醒・仲間の到着等の既視感のある場面へ読み替えて、毎回同じパターンへ落ち着かせることを禁止する。')) return null;
+          if (!addToContents('↑\nこれが終盤の流れ。文が破綻していても、その意図を補完して強引に解釈し、この終盤の着地を、前半で既に置いた要素の回収によって実現しろ。')) return null;
           sealBlock();
         }
       }
@@ -2607,6 +2609,74 @@ var NovelGen = (function () {
       var body = lines.slice(st, e).join('\n').replace(/^\n+|\n+$/g, '');
       body = body.replace(/\n[-=＝]{4,}\s*$/, '');
       if (body) out.push([nm, body]);
+    }
+    return out;
+  }
+
+  // 1つのキャラ資料txtについて、人物ブロックだけをシャッフルして組み直す。
+  // 先頭の前置き・末尾の世界設定は動かさない。人物が1人以下なら原文のまま。
+  function aaMatchKey(s) {
+    return normAA(s).replace(/[｀`´']/g, "'");
+  }
+  function lineIsCharStart(line, aas, names) {
+    var t = (line || '').trim();
+    if (!t || !aas || !aas.length) return false;
+    if (/[「『]/.test(t)) return false;
+    var nk = aaMatchKey(t);
+    var nameHit = false;
+    if (names && names.length) {
+      for (var n = 0; n < names.length; n++) {
+        if (names[n] && t.indexOf(names[n]) >= 0) { nameHit = true; break; }
+      }
+    }
+    for (var i = 0; i < aas.length; i++) {
+      var ak = aaMatchKey(aas[i]);
+      if (!ak) continue;
+      if (nk === ak) return true;
+      // AA＋名前が同一行（ペニサス伊藤）のみ許可。AA＋説明文は人物開始ではない。
+      if (nk.indexOf(ak) === 0 && nameHit) return true;
+    }
+    return false;
+  }
+  function shuffleCharBlocksInMaterial(raw, matId) {
+    if (!raw || !String(raw).trim()) return raw || '';
+    var text = String(raw).replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+    var aas = (TEMPLATE_EXCLUDE_AA_BY_FILE[matId] || []).slice();
+    var names = (TEMPLATE_EXCLUDE_BY_FILE[matId] || []).slice();
+    if (!aas.length) return raw;
+    var lines = text.split('\n');
+    var starts = [];
+    for (var i = 0; i < lines.length; i++) {
+      if (lineIsCharStart(lines[i], aas, names)) starts.push(i);
+    }
+    if (starts.length <= 1) return raw;
+    var prefix = lines.slice(0, starts[0]).join('\n').replace(/\n+$/, '');
+    var charParts = [];
+    var trailers = [];
+    for (var s = 0; s < starts.length; s++) {
+      var from = starts[s];
+      var to = (s + 1 < starts.length) ? starts[s + 1] : lines.length;
+      var blockLines = lines.slice(from, to);
+      var cut = -1;
+      for (var k = 0; k < blockLines.length; k++) {
+        if (WORLD_HEAD_RE.test(blockLines[k].trim())) { cut = k; break; }
+      }
+      if (cut > 0) {
+        charParts.push(blockLines.slice(0, cut).join('\n').replace(/\n+$/, ''));
+        trailers.push(blockLines.slice(cut).join('\n').replace(/^\n+|\n+$/g, ''));
+      } else if (cut === 0) {
+        trailers.push(blockLines.join('\n').replace(/^\n+|\n+$/g, ''));
+      } else {
+        charParts.push(blockLines.join('\n').replace(/\n+$/, ''));
+      }
+    }
+    if (charParts.length <= 1) return raw;
+    shuffle(charParts);
+    var out = charParts.filter(function (b) { return b && b.trim(); }).join('\n\n');
+    if (prefix && prefix.trim()) out = prefix + '\n\n' + out;
+    if (trailers.length) {
+      var tr = trailers.filter(function (b) { return b && b.trim(); }).join('\n\n');
+      if (tr) out = out.replace(/\n+$/, '') + '\n\n' + tr;
     }
     return out;
   }
@@ -3451,5 +3521,5 @@ NovelGen.setNovelData(NOVEL_DATA);
 })();
 
 </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a2c6d9a3f861fca3',t:'MTc4Njk1MDUzMw=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script><script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a32b5bbdea32d5f9',t:'MTc4ODAwNDQzOA=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script><script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a3697b95deb0d2f5',t:'MTc4ODY1NTg2MA=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script><script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a36aebcd6828d75e',t:'MTc4ODY3MDk0Mg=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script><script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a36efbd5dc8cc5bf',t:'MTc4ODcxMzU0Mg=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a37423e6cf8c57b5',t:'MTc4ODc2NzYxMQ=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
