@@ -302,6 +302,7 @@ footer { text-align: center; color: #5b6378; font-size: 11px; padding: 24px 0 40
         <li>このページをブラウザで開いて、<b>「🚀 ワンクリック生成＆コピー」</b>を押すだけ。</li>
         <li>生成されたプロンプトは自動でクリップボードにコピーされ、下の欄にも表示されます。そのままAI（ChatGPT等）に貼り付けて小説を生成してください。</li>
         <li>実行のたびにキャラ資料の優先度（および採用範囲）・視点・テーマ・トーン・文字数がランダムに変わります。</li>
+        <li>上級パラメータの<b>「視点キャラ固定」</b>で29名のいずれかを選ぶと、<code>今回の視点は[ AA 名前 ]です</code> がそのキャラに確定します（全モード共通）。固定時は視点モード・視点なしレート・特殊視点・2人視点を無視して必ず単独視点で出します。</li>
       </ul>
 
       <h4>◆ データはどこから来るの？（GitHub参照）</h4>
@@ -311,10 +312,11 @@ footer { text-align: center; color: #5b6378; font-size: 11px; padding: 24px 0 40
           <code>SS.txt / 二次創作.txt / 超加速.txt / ラボ組.txt / 学校組.txt / ホスト組.txt / ツン.txt / 渡辺さん.txt / ハイン.txt / でぃ.txt / マルコフ.txt / 冒頭.txt / 終盤.txt / トーン.txt / 最後.txt</code> を
           <code>raw.githubusercontent.com</code> から取得します。</li>
         <li><b>マルコフ.txt や 最後.txt、各キャラ資料をリポジトリ上で編集して保存 → このページで生成</b> すれば、最新版が反映されます（毎回最新を取得）。</li>
-        <li>資料オンリーモード（-1／3）では、9資料のキャラ計29名に対して優先度をランダム設定し、上から所属する資料（二次創作・超加速・ラボ組・学校組・ホスト組・ツン・渡辺さん・ハイン・でぃ）のtxtを追加していき、文字数上限に収まる順番までをプロンプト先頭へ追加します。</li>
+        <li>資料オンリーモード（-1／3）では、9資料のキャラ計29名に対して優先度をランダム設定し、上から所属する資料（二次創作・超加速・ラボ組・学校組・ホスト組・ツン・渡辺さん・ハイン・でぃ）のtxtを追加していき、文字数上限に収まる順番までをプロンプト先頭へ追加します。<b>視点キャラ固定時は固定キャラの所属txtが採用されていることを確認し、不採用ならリトライします</b>（例：ブーン固定なのに二次創作.txt不採用、という破綻は起きません。優先度の順序自体は改変しません）。</li>
         <li><b>ブロックランダム順モード</b>（デフォルトOFF）をONにすると、プロンプトの各ブロック（採用キャラ資料群・関係ルール・SS.txt・共通.txt・各マルコフ＋区切り・最後.txt・キャラテンプレ・冒頭／終盤／テーマ／トーン等）を毎回ランダムな順番に並べ替えます。<b>「視点提示 → 文字数指定」の2つだけはシャッフルされず、常に最後の固定位置</b>です。「マルコフ文＋これは資料です」等のペアは順序のまま維持されます。</li>
         <li>採用した各キャラ資料txtの内部では、そのtxtの代表AAで始まる人物ブロックを毎回ランダムな順に並べ替えます（★欲の位置はファイルごとに違うため使いません）。グループ概要・世界設定など人物以外の見出し以降は末尾に残します。</li>
         <li>旧来の統合資料 <code>他の人.txt</code> は旧Python版との互換用に残っていますが、SS.htmlでは参照しません。</li>
+        <li><b>特殊視点</b>（<code>今回の視点は[ ラベル：AA 名前 ]です</code>）の候補キャラは <code>キャラテンプレ.txt</code> の表から「代表AA＋全角スペース＋キャラ名（（…）以降を除去）」の形式で毎回組み立てます。テンプレに行を追加・修正すれば候補へ自動反映されます（テンプレ未取得時のみ内蔵リストを使用）。採用したキャラ資料に登場するキャラは資料側の名前を優先します（例：超加速採用時はテンプレ名「杉浦ロマネスク」ではなく資料名「ロマネスク」になります）。AA欄に <code>|</code> を含む場合は <code>\|</code> と書いてください（書いた通りの文字が候補に使われます）。</li>
         <li>取得に失敗した場合は「前回取得した内容」を自動で使い、警告を表示します。</li>
         <li>リポジトリを変えたい場合は「⚙ 設定」のリポジトリ欄を書き換えるか、各ファイルのURLを直接編集してください。</li>
       </ul>
@@ -335,6 +337,7 @@ footer { text-align: center; color: #5b6378; font-size: 11px; padding: 24px 0 40
         <tr><td>キャラ資料優先度</td><td>9資料を毎回シャッフルし、上限で停止</td></tr>
         <tr><td>マルコフ連鎖</td><td>USE_MARKOV_MODE</td></tr>
         <tr><td>視点モード</td><td>HERO_MODE</td></tr>
+        <tr><td>視点キャラ固定（上級）</td><td>—（SS.html独自機能。py版には無い。全モードで「今回の視点は～」を1名に確定。-1/3では所属txtの採用を確認、不採用ならリトライ。優先度順序は不変）</td></tr>
         <tr><td>テーマ提示（最後の1行）</td><td>USE_LAST_MARKOV_LINE_MODE</td></tr>
         <tr><td>特殊視点レート（％）</td><td>SPECIAL_HERO_RATE</td></tr>
         <tr><td>視点キャラ2人レート（％）</td><td>DOUBLE_HERO_RATE</td></tr>
@@ -1491,7 +1494,162 @@ var NovelGen = (function () {
     return out;
   }
 
-  function chooseHeroForCharFiles(P, fileIds, currentHeroMode, suppressHero) {
+  // ============================================================
+  // 視点キャラ固定（上級パラメータ fixedHero）
+  // 「今回の視点は[ AA 名前 ]です」に出るキャラを1名に確定する。
+  // 固定時は特殊視点・2人視点を無視し、単独視点で必ず出す。
+  // -1/3では所属txtが採用されていることだけを確認する（不採用なら試行失敗→リトライ）。
+  // 優先度の順序自体は改変しない（先頭寄せはSSの挙動を変えるため禁止）。
+  // モード2では資料採用なしのまま視点だけ固定（テンプレ側で視点行を保証）。
+  // ============================================================
+  function fixedHeroName(P) {
+    var v = P ? P.fixedHero : '';
+    if (v === null || v === undefined) return '';
+    v = String(v).trim();
+    if (!v || v === '0' || v === 'random' || v === 'ランダム') return '';
+    return v;
+  }
+  function matIdForHeroName(name) {
+    if (!name) return null;
+    if (name === 'ペニサス伊藤') name = 'ペニサス';
+    if (name === '都村トソン') name = 'トソン';
+    for (var i = 0; i < CHAR_MATERIALS.length; i++) {
+      var names = CHAR_MATERIALS[i].names || [];
+      if (names.indexOf(name) >= 0) return CHAR_MATERIALS[i].id;
+    }
+    return null;
+  }
+  function heroEntryForName(name) {
+    if (!name) return '';
+    var search = name;
+    if (search === 'ペニサス伊藤') search = 'ペニサス';
+    if (search === '都村トソン') search = 'トソン';
+    var all = (DATA.boon || []).concat(DATA.mona || [], DATA.tano || []);
+    var j;
+    // まず名前部分の完全一致で探す（部分一致の誤爆防止：しぃ/つー等）
+    for (var i = 0; i < all.length; i++) {
+      var en = heroEntryName(all[i]);
+      if (en === search || en === name) return all[i];
+    }
+    // フォールバック：従来の部分一致
+    for (j = 0; j < all.length; j++) {
+      if (entryHasName(all[j], search)) return all[j];
+    }
+    return '';
+  }
+
+  // ============================================================
+  // 特殊視点の候補キャラ（キャラテンプレ.txt参照）
+  // 特殊視点「[ ラベル：AA 名前 ]」のAA 名前部分は、キャラテンプレ.txtの
+  // 表（キャラ／代表AA列）から「AA　名前」形式で毎回組み立てる。
+  // テンプレに行を追加・修正すれば候補へ自動反映される。旧来の固定リスト
+  // DATA.bugai はテンプレ欠落時（未取得・空・破損）のフォールバックとして残す。
+  // 形式は現行維持：代表AA ＋ 全角スペース ＋ キャラ名（（…）以降を除去）。
+  // 表の分割は buildCharTemplate とは別実装（\| をAAの一部とみなす）。
+  // ★ 採用資料に登場するキャラは資料側の名前を優先する（例：超加速採用時、
+  // テンプレ「杉浦ロマネスク」→資料名「ロマネスク」。資料と特殊視点の
+  // 表記が食い違う事故を防ぐ。不採用ならテンプレ名のまま）。
+  // ============================================================
+  function splitTemplateRow(line) {
+    // テーブル行を | で分割する。\| はAA・本文の一部とみなし分割しない。
+    // バックスラッシュ類は除去せずそのまま保持する（阿部さん等、AA自体に
+    // 含まれる文字のため。テンプレに書いた通りの文字が候補に使われる）。
+    var cells = [];
+    var cur = '';
+    for (var i = 0; i < line.length; i++) {
+      var ch = line.charAt(i);
+      if (ch === '\\' && i + 1 < line.length && line.charAt(i + 1) === '|') {
+        cur += '\\|';
+        i++;
+        continue;
+      }
+      if (ch === '|') { cells.push(cur); cur = ''; continue; }
+      cur += ch;
+    }
+    cells.push(cur);
+    return cells;
+  }
+  function parseCharaTemplateRows(text) {
+    var rows = [];
+    if (!text) return rows;
+    var lines = String(text).split(/\r?\n/);
+    for (var li = 0; li < lines.length; li++) {
+      var s = lines[li].trim();
+      if (!s || s.charAt(0) !== '|') continue;
+      if (s.indexOf('代表AA') >= 0) continue;
+      if (/^\|[\s\-|]+\|$/.test(s)) continue;
+      var raw = splitTemplateRow(s);
+      if (raw.length && raw[0].trim() === '') raw.shift();
+      if (raw.length && raw[raw.length - 1].trim() === '') raw.pop();
+      var cells = raw.map(function (c) { return c.trim(); });
+      if (cells.length < 2 || !cells[0]) continue;
+      // 雪苺型の救済：AA末尾の素の | で列が1つ増えた場合（+空セル）、
+      // 切り落とされた | をAAセルへ戻す。
+      if (cells.length === 7 && cells[2] === '') {
+        cells = [cells[0], cells[1] + '|' + cells[2]].concat(cells.slice(3));
+      }
+      rows.push(cells);
+    }
+    return rows;
+  }
+  function specialHeroCandidates(files, fileIds) {
+    var rows = parseCharaTemplateRows(files && files.charaTemplate);
+    // 採用資料に登場するキャラの「素AA→資料名」「正規化AA→資料名」対応表
+    var adopted = {};
+    (fileIds || []).forEach(function (id) { adopted[id] = true; });
+    var matByRawAA = {};
+    var matByNormAA = {};
+    var normCount = {};
+    var all29 = (DATA.boon || []).concat(DATA.mona || [], DATA.tano || []);
+    for (var k = 0; k < all29.length; k++) {
+      var en = all29[k];
+      var sep = en.lastIndexOf('　');
+      var nm = sep >= 0 ? en.slice(sep + 1) : en;
+      var mid = matIdForHeroName(nm);
+      if (!mid || !adopted[mid]) continue;
+      var aa = sep >= 0 ? en.slice(0, sep) : en;
+      matByRawAA[aa] = nm;
+      var nk = normAA(aa);
+      normCount[nk] = (normCount[nk] || 0) + 1;
+      matByNormAA[nk] = nm;
+    }
+    // 正規化AAが複数キャラに衝突する場合は使わない（モララー／またんき対策）
+    for (var nk2 in normCount) {
+      if (normCount[nk2] > 1) delete matByNormAA[nk2];
+    }
+    function materialNameFor(core, aa) {
+      var cand = matByRawAA[aa];
+      if (cand === undefined) cand = matByNormAA[normAA(aa)];
+      if (cand === undefined) return null;
+      // 同一人物の確認：名前が一致・包含するものだけ置換（別人のAA被り対策）
+      if (core === cand || core.indexOf(cand) >= 0 || cand.indexOf(core) >= 0) return cand;
+      return null;
+    }
+    var out = [];
+    var seen = {};
+    for (var i = 0; i < rows.length; i++) {
+      var core = (rows[i][0] || '').split('（')[0].trim();
+      var aa = (rows[i][1] || '').trim();
+      if (!core || !aa) continue;
+      var over = materialNameFor(core, aa);
+      var entry = aa + '　' + (over || core);
+      if (!seen[entry]) { seen[entry] = true; out.push(entry); }
+    }
+    // テンプレが無い・空・壊れている場合は旧固定リストを使う（生成破綻防止）
+    if (!out.length) out = (DATA.bugai || []).slice();
+    return out;
+  }
+
+  function chooseHeroForCharFiles(P, fileIds, currentHeroMode, suppressHero, files) {
+    // ★ 視点固定時は候補・レートを無視して固定キャラの単独視点を返す
+    var fixed = fixedHeroName(P);
+    if (fixed) {
+      var fixedEntry = heroEntryForName(fixed);
+      if (fixedEntry) {
+        return { heroText: '今回の視点は[ ' + fixedEntry + ' ]です', currentHeroMode: 1 };
+      }
+      // 不正な固定名はランダムにフォールバック（破綻させない）
+    }
     var candidates = candidatesForCharFiles(fileIds);
     if (!candidates.length) candidates = (DATA.boon || []).concat(DATA.mona || [], DATA.tano || []);
     var heroText = '';
@@ -1510,8 +1668,12 @@ var NovelGen = (function () {
 
     var mode = currentHeroMode;
     if (!suppressHero && Math.random() * 100 < P.specialHeroRate) {
-      heroText = '今回の視点は[ ' + choice(DATA.specialLabels) + '：' + choice(DATA.bugai) + ' ]です';
-      mode = 1;
+      // ★ 特殊視点の候補はキャラテンプレ.txt参照（欠落時のみ旧固定リスト）
+      var spCands = specialHeroCandidates(files, fileIds);
+      if (spCands.length) {
+        heroText = '今回の視点は[ ' + choice(DATA.specialLabels) + '：' + choice(spCands) + ' ]です';
+        mode = 1;
+      }
     }
     if (!heroText) mode = 0;
     return { heroText: heroText, currentHeroMode: mode };
@@ -1721,6 +1883,14 @@ var NovelGen = (function () {
     // 追加済みのtxtに属するキャラは無視する。
     // 各txtの内部は人物ブロックを毎回シャッフルする（文頭偏り対策）。
     var priority = (A.charPriority || cloneCharPriority()).slice();
+    // ★ 視点固定時も優先度の順序は改変しない（先頭寄せ禁止：先頭と中盤ではSSの挙動が別物になる）。
+    // 固定キャラの所属txtが自然な優先度で採用されていることだけを後段で確認し、
+    // 不採用ならこの試行を失敗→リトライ（別シャッフル＋マルコフ縮小）する。
+    var fixedNamePri = fixedHeroName(P);
+    var fixedMatIdPri = fixedNamePri ? matIdForHeroName(fixedNamePri) : null;
+    var fixedEntryPri = fixedNamePri ? heroEntryForName(fixedNamePri) : '';
+    // 不正な固定名（entryなし）はランダム扱いに戻す（破綻・誤表示防止）
+    if (fixedNamePri && !fixedEntryPri) { fixedNamePri = ''; fixedMatIdPri = null; }
     var selectedCharFiles = [];
     var selectedCharMaterialLength = 0;
     var charBlocks = [];
@@ -1742,15 +1912,30 @@ var NovelGen = (function () {
       selectedCharMaterialLength += raw.length;
       projectedLen += raw.length + 2;
     }
+    // ★ 固定視点の所属txtが採用されていない場合はこの試行を失敗扱いにする。
+    // 上限超過で固定txtが入らないのに視点だけ固定すると破綻するため、
+    // リトライ（マルコフ縮小）へ回して整合性を保つ。ファイル自体が空・未取得の
+    // 場合は採用不能なので続行し、テンプレ側で視点キャラ行を保証する。
+    if (fixedMatIdPri) {
+      var _fixedRaw = files[fixedMatIdPri];
+      if (_fixedRaw && String(_fixedRaw).trim() && selectedCharFiles.indexOf(fixedMatIdPri) < 0) {
+        return null;
+      }
+    }
 
-    var heroInfo = chooseHeroForCharFiles(P, selectedCharFiles, A.currentHeroMode, A.suppressHero);
+    var heroInfo = chooseHeroForCharFiles(P, selectedCharFiles, A.currentHeroMode, A.suppressHero, files);
     var tail = charTailText(P, selectedCharFiles, heroInfo.heroText, shuryoMode, files);
 
     function makeFinalTailBlocks() {
       var blocks = [];
-      if (!A.suppressHero && heroInfo.currentHeroMode === 1 && heroInfo.heroText) blocks.push(heroInfo.heroText);
-      if (!A.suppressHero && heroInfo.currentHeroMode !== 0 && Math.random() * 100 >= P.noHeroRate && heroInfo.heroText) {
-        if (!blocks.length) blocks.push(heroInfo.heroText);
+      // ★ 視点固定時は視点モード・視点なしレート・suppressを無視して必ず視点を付ける
+      if (fixedNamePri && heroInfo.heroText) {
+        blocks.push(heroInfo.heroText);
+      } else {
+        if (!A.suppressHero && heroInfo.currentHeroMode === 1 && heroInfo.heroText) blocks.push(heroInfo.heroText);
+        if (!A.suppressHero && heroInfo.currentHeroMode !== 0 && Math.random() * 100 >= P.noHeroRate && heroInfo.heroText) {
+          if (!blocks.length) blocks.push(heroInfo.heroText);
+        }
       }
       blocks.push(charCountText);
       return blocks;
@@ -1768,12 +1953,17 @@ var NovelGen = (function () {
       return (tail.relation ? tail.relation.length + 2 : 0) + (tail.template ? tail.template.length + 2 : 0);
     }
     while (selectedCharFiles.length && projectedLen + tailLen() + extraLen(finalTailBlocks) > maxChar) {
+      // ★ 固定視点の所属txtは削らない。削らなければ収まらない場合は試行失敗→リトライ。
+      // （末尾から削るため固定txtは最後に残る。固定だけ残って溢れる＝固定と両立不可なので失敗。）
+      if (fixedMatIdPri && selectedCharFiles[selectedCharFiles.length - 1] === fixedMatIdPri) {
+        return null;
+      }
       priorityStopped = true;
       var removedCharFile = selectedCharFiles.pop();
       var removedCharBlock = charBlocks.pop();
       selectedCharMaterialLength -= removedCharBlock ? removedCharBlock.length : 0;
       projectedLen = baseLen + charBlocks.reduce(function (n, x) { return n + x.length + 2; }, 0);
-      heroInfo = chooseHeroForCharFiles(P, selectedCharFiles, A.currentHeroMode, A.suppressHero);
+      heroInfo = chooseHeroForCharFiles(P, selectedCharFiles, A.currentHeroMode, A.suppressHero, files);
       tail = charTailText(P, selectedCharFiles, heroInfo.heroText, shuryoMode, files);
       finalTailBlocks = makeFinalTailBlocks();
     }
@@ -2142,7 +2332,15 @@ var NovelGen = (function () {
     var charMax = randint(charMin, P.charCountMax);
     var charCountText = '文字数は' + charMin + '~' + charMax + '文字';
 
-    if (suppressHero) {
+    // ★ 視点固定時（モード2含む全モード共通）はsuppress・視点モード・視点なしレートを
+    // 無視して必ず固定視点を付ける。モード2は資料採用なしが仕様のため、視点と
+    // テンプレ（視点行を確定含有）の整合で破綻なく成立させる。
+    var fixedNameTail = fixedHeroName(P);
+    var fixedEntryTail = fixedNameTail ? heroEntryForName(fixedNameTail) : '';
+    if (fixedEntryTail && heroText) {
+      if (!addFixedTail(heroText)) return null;
+      if (!addFixedTail(charCountText)) return null;
+    } else if (suppressHero) {
       if (!addFixedTail(charCountText)) return null;
     } else if (currentHeroMode === 1) {
       if (!addFixedTail(heroText)) return null;
@@ -2475,10 +2673,12 @@ var NovelGen = (function () {
         if (made.selectedCharMaterialLength < MIN_CHAR_MATERIAL_CHARS) continue;
         var priorityResult = made.contents.join('\n\n');
         if (priorityResult.length <= P.maxChar) {
+          var _fixedNamePat = fixedHeroName(P);
+          var _fixedSuffixPri = (_fixedNamePat && heroEntryForName(_fixedNamePat)) ? '　／ 視点固定:' + _fixedNamePat : '';
           return {
             result: priorityResult,
             attempt: pa,
-            pattern: priorityPatternText(made.selectedCharFiles, shuryoMode) + (numOr(P.shuffleBlocksMode, 0) === 1 ? '　／ ブロックランダム順' : ''),
+            pattern: priorityPatternText(made.selectedCharFiles, shuryoMode) + (numOr(P.shuffleBlocksMode, 0) === 1 ? '　／ ブロックランダム順' : '') + _fixedSuffixPri,
             chosen: {},
             selectedCharFiles: made.selectedCharFiles,
             charPriority: priority,
@@ -2490,22 +2690,35 @@ var NovelGen = (function () {
     }
 
     // モード2（AIオリジナル設定）は従来どおり。キャラ資料の優先度選出は行わない。
+    // ★ ただし視点固定時はモード2でも固定視点を適用する（資料なし＋視点固定の整合はテンプレで担保）。
+    var fixedNameM2 = fixedHeroName(P);
+    var fixedEntryM2 = fixedNameM2 ? heroEntryForName(fixedNameM2) : '';
     var chosen = { 'ブーン': false, 'モナー': false, '他の人': false };
     var useMarkov = true;
     var currentHeroMode = P.heroMode;
     var candidates = (DATA.boon || []).concat(DATA.mona || [], DATA.tano || []);
-    var hero1 = choice(candidates);
     var heroText;
-    if (Math.random() * 100 < P.doubleHeroRate && candidates.length >= 2) {
-      var hero2m2 = choice(candidates.filter(function (c) { return c !== hero1; }));
-      // ★ 別組織かつ接点なしの2視点には短縮版の無関係宣言を付ける
-      heroText = '今回の視点は[ ' + hero1 + '、' + hero2m2 + ' ]です' + heroPairNote(hero1, hero2m2);
-    } else {
-      heroText = '今回の視点は[ ' + hero1 + ' ]です';
-    }
-    if (Math.random() * 100 < P.specialHeroRate) {
-      heroText = '今回の視点は[ ' + choice(DATA.specialLabels) + '：' + choice(DATA.bugai) + ' ]です';
+    if (fixedEntryM2) {
+      heroText = '今回の視点は[ ' + fixedEntryM2 + ' ]です';
       currentHeroMode = 1;
+    } else {
+      var hero1 = choice(candidates);
+      if (Math.random() * 100 < P.doubleHeroRate && candidates.length >= 2) {
+        var hero2m2 = choice(candidates.filter(function (c) { return c !== hero1; }));
+        // ★ 別組織かつ接点なしの2視点には短縮版の無関係宣言を付ける
+        heroText = '今回の視点は[ ' + hero1 + '、' + hero2m2 + ' ]です' + heroPairNote(hero1, hero2m2);
+      } else {
+        heroText = '今回の視点は[ ' + hero1 + ' ]です';
+      }
+      if (Math.random() * 100 < P.specialHeroRate) {
+        // ★ 特殊視点の候補はキャラテンプレ.txt参照（欠落時のみ旧固定リスト）
+        // モード2は詳細資料なし＝テンプレが唯一の典拠のためテンプレ名のまま
+        var spCandsM2 = specialHeroCandidates(files, []);
+        if (spCandsM2.length) {
+          heroText = '今回の視点は[ ' + choice(DATA.specialLabels) + '：' + choice(spCandsM2) + ' ]です';
+          currentHeroMode = 1;
+        }
+      }
     }
 
     var currentMarkovLinesMax = P.markovLinesMaxShuryo;
@@ -2529,10 +2742,11 @@ var NovelGen = (function () {
       }
       var result = contents.join('\n\n');
       if (result.length < P.maxChar) {
+        var _fixedSuffixM2 = fixedEntryM2 ? '　／ 視点固定:' + fixedNameM2 : '';
         return {
           result: result,
           attempt: attempt,
-            pattern: '採用 なし　／ モード2' + (numOr(P.shuffleBlocksMode, 0) === 1 ? '　／ ブロックランダム順' : ''),
+            pattern: '採用 なし　／ モード2' + (numOr(P.shuffleBlocksMode, 0) === 1 ? '　／ ブロックランダム順' : '') + _fixedSuffixM2,
           chosen: chosen,
           selectedCharFiles: [],
           charPriority: [],
@@ -2837,7 +3051,12 @@ var NovelGen = (function () {
     _generateMarkovOneLiner: generateMarkovOneLiner,
     _generateOpeningOneLiner: generateOpeningOneLiner,
     _generateEndingOneLiner: generateEndingOneLiner,
-    _heroPairNote: heroPairNote
+    _heroPairNote: heroPairNote,
+    _fixedHeroName: fixedHeroName,
+    _matIdForHeroName: matIdForHeroName,
+    _heroEntryForName: heroEntryForName,
+    _specialHeroCandidates: specialHeroCandidates,
+    _parseCharaTemplateRows: parseCharaTemplateRows
   };
 })();
 
@@ -2908,6 +3127,7 @@ NovelGen.setNovelData(NOVEL_DATA);
     markovLinesMax: 1000,
     maxToneCount: 10,
     // 上級
+    fixedHero: '',            // 視点キャラ固定（''=ランダム従来通り / 29名のいずれかを指定で「今回の視点は～」を確定）
     markovOrder: 0,           // 0=ランダム(1〜5) / 1〜5=固定
     markovFluctuation: 1,     // 1=ON / -1=OFF
     markovLinesMin: 1,
@@ -2941,6 +3161,8 @@ NovelGen.setNovelData(NOVEL_DATA);
     { key: 'charCountMax', label: '文字数上限', type: 'number', min: 1 },
     { key: 'markovLinesMax', label: 'マルコフ最大行数（上限1000）', type: 'number', min: 1, max: 1000 },
     { key: 'maxToneCount', label: 'トーン最大選出数', type: 'number', min: 0 },
+    { key: 'fixedHero', label: '視点キャラ固定（今回の視点は～）', type: 'select-str', adv: true,
+      options: [['', '0: ランダム（従来通り）'], ['ブーン', 'ブーン（二次創作）'], ['ドクオ', 'ドクオ（二次創作）'], ['クー', 'クー（二次創作）'], ['シュー', 'シュー（二次創作）'], ['モララー', 'モララー（二次創作）'], ['ギコ', 'ギコ（二次創作）'], ['ショボン', 'ショボン（二次創作）'], ['シャキン', 'シャキン（二次創作）'], ['兄者', '兄者（二次創作）'], ['弟者', '弟者（二次創作）'], ['モナー', 'モナー（超加速）'], ['ロマネスク', 'ロマネスク（超加速）'], ['しぃ', 'しぃ（超加速）'], ['つー', 'つー（超加速）'], ['ミセリ', 'ミセリ（超加速）'], ['トソン', 'トソン（超加速）'], ['フォックス', 'フォックス（ラボ組）'], ['花瓶', '花瓶（ラボ組）'], ['ヒート', 'ヒート（ラボ組）'], ['デレ', 'デレ（学校組）'], ['キュート', 'キュート（学校組）'], ['ペニサス', 'ペニサス（学校組）'], ['またんき', 'またんき（ホスト組）'], ['フサギコ', 'フサギコ（ホスト組）'], ['ぃょぅ', 'ぃょぅ（ホスト組）'], ['ツン', 'ツン'], ['渡辺さん', '渡辺さん'], ['ハイン', 'ハイン'], ['でぃ', 'でぃ']] },
     { key: 'markovOrder', label: 'マルコフ次数（0=ランダム1〜5）', type: 'number', min: 0, max: 5, adv: true },
     { key: 'markovFluctuation', label: 'マルコフ精度の揺らぎ', type: 'select', options: [[1, '1: ON'], [-1, '-1: OFF']], adv: true },
     { key: 'markovLinesMin', label: 'マルコフ最小行数', type: 'number', min: 1, adv: true },
@@ -3172,17 +3394,20 @@ NovelGen.setNovelData(NOVEL_DATA);
       wrap.appendChild(lab);
 
       var input;
-      if (f.type === 'select') {
+      if (f.type === 'select' || f.type === 'select-str') {
         input = document.createElement('select');
+        // 視点固定は選択肢が多いため幅を広げる
+        if (f.key === 'fixedHero') input.style.maxWidth = '220px';
         f.options.forEach(function (o) {
           var op = document.createElement('option');
           op.value = String(o[0]);
           op.textContent = String(o[1]);
-          if (String(o[0]) === String(state.params[f.key])) op.selected = true;
+          if (String(o[0]) === String(state.params[f.key] == null ? '' : state.params[f.key])) op.selected = true;
           input.appendChild(op);
         });
         input.addEventListener('change', function () {
-          state.params[f.key] = parseInt(input.value, 10);
+          if (f.type === 'select-str') state.params[f.key] = input.value;
+          else state.params[f.key] = parseInt(input.value, 10);
           saveState();
         });
       } else {
