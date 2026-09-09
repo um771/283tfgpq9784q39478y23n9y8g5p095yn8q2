@@ -313,7 +313,8 @@ footer { text-align: center; color: #5b6378; font-size: 11px; padding: 24px 0 40
           <code>raw.githubusercontent.com</code> から取得します。</li>
         <li><b>マルコフ.txt や 最後.txt、各キャラ資料をリポジトリ上で編集して保存 → このページで生成</b> すれば、最新版が反映されます（毎回最新を取得）。</li>
         <li>資料オンリーモード（-1／3）では、9資料のキャラ計29名に対して優先度をランダム設定し、上から所属する資料（二次創作・超加速・ラボ組・学校組・ホスト組・ツン・渡辺さん・ハイン・でぃ）のtxtを追加していき、文字数上限に収まる順番までをプロンプト先頭へ追加します。<b>視点キャラ固定時は固定キャラの所属txtが採用されていることを確認し、不採用ならリトライします</b>（例：ブーン固定なのに二次創作.txt不採用、という破綻は起きません。優先度の順序自体は改変しません）。</li>
-        <li><b>ブロックランダム順モード</b>（デフォルトOFF）をONにすると、プロンプトの各ブロック（採用キャラ資料群・関係ルール・SS.txt・共通.txt・各マルコフ＋区切り・最後.txt・キャラテンプレ・冒頭／終盤／テーマ／トーン等）を毎回ランダムな順番に並べ替えます。<b>「視点提示 → 文字数指定」の2つだけはシャッフルされず、常に最後の固定位置</b>です。「マルコフ文＋これは資料です」等のペアは順序のまま維持されます。</li>
+        <li><b>一人称視点指定（全モード共通）</b>：<b>一人称視点指定レート（％・既定50）</b>の確率で、末尾固定ブロックの <code>今回の視点は[ ～ ]です</code> の直後に<b>空行を挟まず</b> <code>一人称視点の形式で書くこと</code> を追加します（トーンブロックの後・<code>文字数は～文字</code> の前の固定位置）。ヒットした回は視点なしレート・視点モード0を無視して必ず視点行を出します（続き.txtによる視点抑止中を除く）。資料オンリーモードの設定値（-1／2／3およびランダム）に関係なく全モードで動作します。</li>
+        <li><b>ブロックランダム順モード</b>（デフォルトOFF）をONにすると、プロンプトの各ブロック（採用キャラ資料群・関係ルール・SS.txt・共通.txt・各マルコフ＋区切り・最後.txt・キャラテンプレ・冒頭／終盤／テーマ／トーン等）を毎回ランダムな順番に並べ替えます。<b>「視点提示 → 文字数指定」の2つだけはシャッフルされず、常に最後の固定位置</b>（一人称指定行は視点提示の一部として同じく固定）です。「マルコフ文＋これは資料です」等のペアは順序のまま維持されます。</li>
         <li>採用した各キャラ資料txtの内部では、そのtxtの代表AAで始まる人物ブロックを毎回ランダムな順に並べ替えます（★欲の位置はファイルごとに違うため使いません）。グループ概要・世界設定など人物以外の見出し以降は末尾に残します。</li>
         <li>旧来の統合資料 <code>他の人.txt</code> は旧Python版との互換用に残っていますが、SS.htmlでは参照しません。</li>
         <li><b>特殊視点</b>（<code>今回の視点は[ ラベル：AA 名前 ]です</code>）の候補キャラは <code>キャラテンプレ.txt</code> の表から「代表AA＋全角スペース＋キャラ名（（…）以降を除去）」の形式で毎回組み立てます。テンプレに行を追加・修正すれば候補へ自動反映されます（テンプレ未取得時のみ内蔵リストを使用）。採用したキャラ資料に登場するキャラは資料側の名前を優先します（例：超加速採用時はテンプレ名「杉浦ロマネスク」ではなく資料名「ロマネスク」になります）。AA欄に <code>|</code> を含む場合は <code>\|</code> と書いてください（書いた通りの文字が候補に使われます）。</li>
@@ -342,6 +343,7 @@ footer { text-align: center; color: #5b6378; font-size: 11px; padding: 24px 0 40
         <tr><td>特殊視点レート（％）</td><td>SPECIAL_HERO_RATE</td></tr>
         <tr><td>視点キャラ2人レート（％）</td><td>DOUBLE_HERO_RATE</td></tr>
         <tr><td>視点なしレート（％）</td><td>NO_HERO_RATE</td></tr>
+        <tr><td>一人称視点指定レート（％）</td><td>—（SS.html独自機能。py版には無い。全モードで、ヒット時は視点行に続けて空行なしで「一人称視点の形式で書くこと」を追加し、視点なしを無視して必ず視点行を出す）</td></tr>
         <tr><td>文字数下限／上限</td><td>CHAR_COUNT_MIN / CHAR_COUNT_MAX</td></tr>
         <tr><td>マルコフ最大行数</td><td>MARKOV_LINES_MAX（他は MARKOV_LINES_MAX_SHURYO_MODE）</td></tr>
         <tr><td>トーン最大選出数</td><td>MAX_TONE_COUNT</td></tr>
@@ -1640,6 +1642,9 @@ var NovelGen = (function () {
     return out;
   }
 
+  // ★ 一人称視点指定行（全モード共通。firstPersonRate ヒット時、視点行に改行で直結＝空行を挟まず隣接させる）
+  var FIRST_PERSON_LINE = '一人称視点の形式で書くこと';
+
   function chooseHeroForCharFiles(P, fileIds, currentHeroMode, suppressHero, files) {
     // ★ 視点固定時は候補・レートを無視して固定キャラの単独視点を返す
     var fixed = fixedHeroName(P);
@@ -1928,13 +1933,25 @@ var NovelGen = (function () {
 
     function makeFinalTailBlocks() {
       var blocks = [];
+      // ★ 一人称視点指定レート（firstPersonRate％・全モード共通）でヒットすると、
+      //   視点行「今回の視点は[ ～ ]です」の直後（空行なし・同じブロック内で改行直結）に
+      //   「一人称視点の形式で書くこと」を追加する。
+      //   ヒット時は視点なしレート・視点モード0による「視点なし」を無視して視点行を
+      //   必ず出す（suppressHero時＝続き.txtによる視点抑止中は従来どおり視点なしのまま）。
+      var fpHit = Math.random() * 100 < numOr(P.firstPersonRate, 0);
       // ★ 視点固定時は視点モード・視点なしレート・suppressを無視して必ず視点を付ける
       if (fixedNamePri && heroInfo.heroText) {
-        blocks.push(heroInfo.heroText);
+        blocks.push(fpHit ? heroInfo.heroText + '\n' + FIRST_PERSON_LINE : heroInfo.heroText);
       } else {
-        if (!A.suppressHero && heroInfo.currentHeroMode === 1 && heroInfo.heroText) blocks.push(heroInfo.heroText);
+        if (!A.suppressHero && heroInfo.currentHeroMode === 1 && heroInfo.heroText) {
+          blocks.push(fpHit ? heroInfo.heroText + '\n' + FIRST_PERSON_LINE : heroInfo.heroText);
+        }
         if (!A.suppressHero && heroInfo.currentHeroMode !== 0 && Math.random() * 100 >= P.noHeroRate && heroInfo.heroText) {
-          if (!blocks.length) blocks.push(heroInfo.heroText);
+          if (!blocks.length) blocks.push(fpHit ? heroInfo.heroText + '\n' + FIRST_PERSON_LINE : heroInfo.heroText);
+        }
+        // ★ 一人称視点指定ヒット時は視点なしにせず、必ず視点行を出して一人称指示を直結させる
+        if (fpHit && !A.suppressHero && !blocks.length && heroInfo.heroText) {
+          blocks.push(heroInfo.heroText + '\n' + FIRST_PERSON_LINE);
         }
       }
       blocks.push(charCountText);
@@ -2337,21 +2354,31 @@ var NovelGen = (function () {
     // テンプレ（視点行を確定含有）の整合で破綻なく成立させる。
     var fixedNameTail = fixedHeroName(P);
     var fixedEntryTail = fixedNameTail ? heroEntryForName(fixedNameTail) : '';
+    // ★ 一人称視点指定レート（firstPersonRate％・全モード共通）：ヒット時は視点行に
+    //   一人称指示を改行で直結（空行なし）し、視点なしを無視して必ず視点行を出す。
+    //   suppressHero時＝続き.txtによる視点抑止中は従来どおり視点なしのまま。
+    var fpHitM2 = Math.random() * 100 < numOr(P.firstPersonRate, 0);
+    function heroLineM2() {
+      if (!heroText) return heroText;
+      return fpHitM2 ? heroText + '\n' + FIRST_PERSON_LINE : heroText;
+    }
     if (fixedEntryTail && heroText) {
-      if (!addFixedTail(heroText)) return null;
+      if (!addFixedTail(heroLineM2())) return null;
       if (!addFixedTail(charCountText)) return null;
     } else if (suppressHero) {
       if (!addFixedTail(charCountText)) return null;
     } else if (currentHeroMode === 1) {
-      if (!addFixedTail(heroText)) return null;
+      if (!addFixedTail(heroLineM2())) return null;
       if (!addFixedTail(charCountText)) return null;
     } else if (currentHeroMode === 0) {
+      if (fpHitM2 && heroText) { if (!addFixedTail(heroLineM2())) return null; }
       if (!addFixedTail(charCountText)) return null;
     } else {
       if (Math.random() * 100 < P.noHeroRate) {
+        if (fpHitM2 && heroText) { if (!addFixedTail(heroLineM2())) return null; }
         if (!addFixedTail(charCountText)) return null;
       } else {
-        if (!addFixedTail(heroText)) return null;
+        if (!addFixedTail(heroLineM2())) return null;
         if (!addFixedTail(charCountText)) return null;
       }
     }
@@ -3122,6 +3149,7 @@ NovelGen.setNovelData(NOVEL_DATA);
     specialHeroRate: 20,      // 特殊視点レート（％）
     doubleHeroRate: 20,       // 視点キャラ2人レート（％）
     noHeroRate: 20,           // 視点なしレート（％）
+    firstPersonRate: 50,      // 一人称視点指定レート（％）全モード共通。この確率で視点行の直後に空行なしで「一人称視点の形式で書くこと」を追加（ヒット時は視点なしを無視して必ず視点行を出す）
     charCountMin: 9000,
     charCountMax: 20000,
     markovLinesMax: 1000,
@@ -3157,6 +3185,7 @@ NovelGen.setNovelData(NOVEL_DATA);
     { key: 'specialHeroRate', label: '特殊視点レート（％）', type: 'number', min: 0, max: 100 },
     { key: 'doubleHeroRate', label: '視点キャラ2人レート（％）', type: 'number', min: 0, max: 100 },
     { key: 'noHeroRate', label: '視点なしレート（％）', type: 'number', min: 0, max: 100 },
+    { key: 'firstPersonRate', label: '一人称視点指定レート（％）', type: 'number', min: 0, max: 100 },
     { key: 'charCountMin', label: '文字数下限', type: 'number', min: 0 },
     { key: 'charCountMax', label: '文字数上限', type: 'number', min: 1 },
     { key: 'markovLinesMax', label: 'マルコフ最大行数（上限1000）', type: 'number', min: 1, max: 1000 },
@@ -3746,5 +3775,5 @@ NovelGen.setNovelData(NOVEL_DATA);
 })();
 
 </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a37423e6cf8c57b5',t:'MTc4ODc2NzYxMQ=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a37423e6cf8c57b5',t:'MTc4ODc2NzYxMQ=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script><script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a385b37deb4d4b50',t:'MTc4ODk1MTc1MQ=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
