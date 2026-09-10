@@ -309,11 +309,14 @@ footer { text-align: center; color: #5b6378; font-size: 11px; padding: 24px 0 40
       <ul>
         <li>デフォルトでは GitHub リポジトリ
           <code>um771/283tfgpq9784q39478y23n9y8g5p095yn8q2</code> の <code>main</code> ブランチにある
-          <code>SS.txt / 二次創作.txt / 超加速.txt / ラボ組.txt / 学校組.txt / ホスト組.txt / ツン.txt / 渡辺さん.txt / ハイン.txt / でぃ.txt / マルコフ.txt / 冒頭.txt / 終盤.txt / トーン.txt / 最後.txt</code> を
+          <code>SS.txt / 二次創作.txt / 超加速.txt / ラボ組.txt / 学校組.txt / ホスト組.txt / ツン.txt / 渡辺さん.txt / ハイン.txt / でぃ.txt / マルコフ.txt / 冒頭.txt / 終盤.txt / 冒頭スロット.txt / 終盤スロット.txt / トーン.txt / 最後.txt</code> を
           <code>raw.githubusercontent.com</code> から取得します。</li>
         <li><b>マルコフ.txt や 最後.txt、各キャラ資料をリポジトリ上で編集して保存 → このページで生成</b> すれば、最新版が反映されます（毎回最新を取得）。</li>
         <li>資料オンリーモード（-1／3）では、9資料のキャラ計29名に対して優先度をランダム設定し、上から所属する資料（二次創作・超加速・ラボ組・学校組・ホスト組・ツン・渡辺さん・ハイン・でぃ）のtxtを追加していき、文字数上限に収まる順番までをプロンプト先頭へ追加します。<b>視点キャラ固定時は固定キャラの所属txtが採用されていることを確認し、不採用ならリトライします</b>（例：ブーン固定なのに二次創作.txt不採用、という破綻は起きません。優先度の順序自体は改変しません）。</li>
         <li><b>一人称視点指定（全モード共通）</b>：<b>一人称視点指定レート（％・既定50）</b>の確率で、末尾固定ブロックの <code>今回の視点は[ ～ ]です</code> の直後に<b>空行を挟まず</b> <code>一人称視点の形式で書くこと</code> を追加します（トーンブロックの後・<code>文字数は～文字</code> の前の固定位置）。ヒットした回は視点なしレート・視点モード0を無視して必ず視点行を出します（続き.txtによる視点抑止中を除く）。資料オンリーモードの設定値（-1／2／3およびランダム）に関係なく全モードで動作します。</li>
+        <li><b>冒頭／終盤のスロット辞書合成</b>（既定ON）：<code>冒頭スロット.txt</code> / <code>終盤スロット.txt</code> は意味スロット辞書です。品詞・意味役割ごとに分類された語彙プール（スロット）と、スロットの並び順と接続を固定した文型（フレーム）を直積して「冒頭は、〜ことになる。」「終盤は、〜ことになる。」の1文を組み立てます。フレームが助詞と接続を保持するため、出力は文法的に正しい日本語になります。語彙行の <code>@タグ</code> でフレーム側から候補を絞り込み、<code>^グループ=値</code> の排他指定で意味的に衝突する組み合わせを引き直します。パターン数は文型数と各スロットの語彙数の積で決まるため、<code>#SLOT</code> に語彙を1行足すだけで掛け算に増えます。辞書はリポジトリ上で編集するだけで反映されます。</li>
+        <li><b>既存行そのまま採用</b>：<b>スロット合成時の既存行そのまま採用率（％）</b>の確率で、<code>冒頭.txt</code> / <code>終盤.txt</code> の行をそのまま1行として使います。スロット合成の結果がこれらの行と一致した場合も、そのまま採用します。</li>
+        <li><b>フロー指示文</b>：スロット辞書で組み立てた1行の直後には「↑ これが冒頭の流れ。この冒頭で仕込んだ独自の要素をセットアップとして必ず後半で回収しろ。」（終盤は「↑ これが終盤の流れ。この終盤の着地を、前半で既に置いた要素の回収によって実現しろ。」）を置きます。マルコフ連鎖で組み立てた1行の直後には、文が破綻していても意図を補完して強引に解釈させる指示を含めた文を置きます。<b>冒頭／終盤のスロット辞書合成</b>をOFFにした場合、辞書が取得できない場合、試行回数内に合格文が出ない場合は、マルコフ連鎖で1行を組み立てます。</li>
         <li><b>ブロックランダム順モード</b>（デフォルトOFF）をONにすると、プロンプトの各ブロック（採用キャラ資料群・関係ルール・SS.txt・共通.txt・各マルコフ＋区切り・最後.txt・キャラテンプレ・冒頭／終盤／テーマ／トーン等）を毎回ランダムな順番に並べ替えます。<b>「視点提示 → 文字数指定」の2つだけはシャッフルされず、常に最後の固定位置</b>（一人称指定行は視点提示の一部として同じく固定）です。「マルコフ文＋これは資料です」等のペアは順序のまま維持されます。</li>
         <li>採用した各キャラ資料txtの内部では、そのtxtの代表AAで始まる人物ブロックを毎回ランダムな順に並べ替えます（★欲の位置はファイルごとに違うため使いません）。グループ概要・世界設定など人物以外の見出し以降は末尾に残します。</li>
         <li>旧来の統合資料 <code>他の人.txt</code> は旧Python版との互換用に残っていますが、SS.htmlでは参照しません。</li>
@@ -1098,6 +1101,394 @@ if (typeof module !== 'undefined' && module.exports) module.exports = NOVEL_DATA
 
 </script>
 <script>
+/* ============================================================
+ * SlotEngine — 意味スロット辞書 × 文型フレーム 直積合成エンジン
+ * ------------------------------------------------------------
+ * マルコフ連鎖の代替。文字レベルの確率生成ではなく、
+ *   (1) 品詞・意味役割ごとに分類された語彙プール（スロット）
+ *   (2) スロットの並び順と接続を固定した文型（フレーム）
+ * の直積で文を組み立てる。
+ *
+ * 特徴
+ *   ・出力は必ず文法的に正しい日本語（フレームが助詞・接続を保持するため）
+ *   ・パターン数 = 文型数 × 各スロットの語彙数 の積（実質無限）
+ *   ・タグ制約と排他グループで意味的な衝突を機械的に排除
+ *   ・既存コーパス（冒頭.txt / 終盤.txt）の行と一致した文もそのまま採用する
+ *     （一致・近似を理由にした引き直しは行わない）
+ *   ・辞書はプレーンテキストなので GitHub 上で編集するだけで拡張できる
+ *   ・依存ライブラリなし。ブラウザ / Node 双方で動く
+ * ============================================================ */
+(function (root, factory) {
+  if (typeof module === 'object' && module.exports) { module.exports = factory(); }
+  else { root.SlotEngine = factory(); }
+})(typeof self !== 'undefined' ? self : this, function () {
+  'use strict';
+
+  /* ---------- ユーティリティ ---------- */
+  function randint(a, b) { return a + Math.floor(Math.random() * (b - a + 1)); }
+  function choice(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
+  function shuffle(arr) {
+    var a = arr.slice();
+    for (var i = a.length - 1; i > 0; i--) {
+      var j = Math.floor(Math.random() * (i + 1));
+      var t = a[i]; a[i] = a[j]; a[j] = t;
+    }
+    return a;
+  }
+
+  /* ============================================================
+   * 1. 辞書のパーサ
+   * ------------------------------------------------------------
+   * フォーマット：
+   *   #SLOT 場所 @屋内 @自宅        … スロット定義（以降の行が語彙）
+   *   台所で
+   *   玄関の上がり框で
+   *   ; コメント行
+   *
+   *   #FRAME @重み2                 … 文型定義（以降の行がフレーム）
+   *   {時刻}{場所}、{物品}が{数量}{異変}{気づき}
+   *
+   * 語彙行の書式：
+   *   本文 @タグ1 @タグ2 ^グループ=値
+   *   ^グループ=値 は排他指定。同じグループで異なる値が同時に選ばれたら不合格。
+   *
+   * フレーム中のスロット参照：
+   *   {名前}          必須
+   *   {名前?}         任意（空文字になり得る）
+   *   {名前@タグ}     タグを持つ語彙のみ許可
+   *   {名前!タグ}     タグを持つ語彙を除外
+   * ============================================================ */
+  function parseEntry(line) {
+    var tokens = line.split(/\s+/);
+    var text = '';
+    var tags = [];
+    var mutex = {};
+    var started = false;
+    for (var i = 0; i < tokens.length; i++) {
+      var t = tokens[i];
+      if (!t) continue;
+      if (t.charAt(0) === '@' || t.charAt(0) === '^') started = true;
+      if (!started) { text += (text ? ' ' : '') + t; continue; }
+      if (t.charAt(0) === '@') { tags.push(t.slice(1)); continue; }
+      if (t.charAt(0) === '^') {
+        var kv = t.slice(1).split('=');
+        if (kv.length === 2) mutex[kv[0]] = kv[1];
+      }
+    }
+    return { text: text, tags: tags, mutex: mutex };
+  }
+
+  function parseFrame(line) {
+    var re = /\{([^{}]+)\}/g;
+    var parts = [];
+    var last = 0;
+    var m;
+    while ((m = re.exec(line)) !== null) {
+      if (m.index > last) parts.push({ lit: line.slice(last, m.index) });
+      var spec = m[1];
+      var opt = false;
+      if (/\?$/.test(spec)) { opt = true; spec = spec.slice(0, -1); }
+      var segs = spec.split('@');
+      var name = segs.shift();
+      var need = segs;
+      var segs2 = name.split('!');
+      name = segs2[0];
+      var deny = segs2.slice(1);
+      parts.push({ slot: name, optional: opt, need: need, deny: deny });
+      last = m.index + m[0].length;
+    }
+    if (last < line.length) parts.push({ lit: line.slice(last) });
+    return parts;
+  }
+
+  function parseDict(text) {
+    var lines = String(text || '').split(/\r?\n/);
+    var dict = { slots: {}, slotOrder: [], frames: [], prefix: '', suffix: '' };
+    var mode = null;         // 'slot' | 'frame' | null
+    var curSlot = null;
+    var frameWeight = 1;
+
+    for (var i = 0; i < lines.length; i++) {
+      var line = lines[i].replace(/^\uFEFF/, '').trim();
+      if (!line) continue;
+      if (line.charAt(0) === ';' || line.indexOf('//') === 0) continue;
+
+      // 大域指定
+      var g = /^#(PREFIX|SUFFIX)\s*(.*)$/.exec(line);
+      if (g) {
+        if (g[1] === 'PREFIX') dict.prefix = g[2];
+        else dict.suffix = g[2];
+        mode = null;
+        continue;
+      }
+
+      var h = /^#(SLOT|FRAME|WEIGHT)\s*(.*)$/.exec(line);
+      if (h) {
+        if (h[1] === 'SLOT') {
+          var toks = h[2].split(/\s+/);
+          var name = toks.shift() || ('slot' + i);
+          if (!dict.slots[name]) { dict.slots[name] = []; dict.slotOrder.push(name); }
+          curSlot = name;
+          mode = 'slot';
+        } else if (h[1] === 'FRAME') {
+          mode = 'frame';
+          frameWeight = 1;
+          var wt = /@重み(\d+)/.exec(h[2] || '');
+          if (wt) frameWeight = Math.max(1, parseInt(wt[1], 10));
+        } else if (h[1] === 'WEIGHT') {
+          frameWeight = Math.max(1, parseInt(h[2], 10) || 1);
+        }
+        continue;
+      }
+
+      if (mode === 'slot' && curSlot) {
+        var e = parseEntry(line);
+        if (e.text) dict.slots[curSlot].push(e);
+      } else if (mode === 'frame') {
+        dict.frames.push({ parts: parseFrame(line), weight: frameWeight, src: line });
+      }
+    }
+    return dict;
+  }
+
+  /* ============================================================
+   * 2. 候補絞り込み
+   * ============================================================ */
+  function entryHasTag(e, tag) { return e.tags.indexOf(tag) !== -1; }
+
+  function candidates(dict, ref) {
+    var pool = dict.slots[ref.slot];
+    if (!pool || !pool.length) return [];
+    if (!ref.need.length && !ref.deny.length) return pool;
+    var out = [];
+    for (var i = 0; i < pool.length; i++) {
+      var e = pool[i];
+      var ok = true;
+      for (var a = 0; a < ref.need.length; a++) { if (!entryHasTag(e, ref.need[a])) { ok = false; break; } }
+      if (ok) { for (var b = 0; b < ref.deny.length; b++) { if (entryHasTag(e, ref.deny[b])) { ok = false; break; } } }
+      if (ok) out.push(e);
+    }
+    return out;
+  }
+
+  /* 排他グループの衝突判定 */
+  function mutexConflict(picked) {
+    var seen = {};
+    for (var i = 0; i < picked.length; i++) {
+      var mx = picked[i].mutex || {};
+      for (var k in mx) {
+        if (!Object.prototype.hasOwnProperty.call(mx, k)) continue;
+        if (seen[k] !== undefined && seen[k] !== mx[k]) return true;
+        seen[k] = mx[k];
+      }
+    }
+    return false;
+  }
+
+  /* 語彙の包含衝突（同じ語が二重に入る）判定 */
+  function overlapConflict(picked) {
+    for (var i = 0; i < picked.length; i++) {
+      for (var j = i + 1; j < picked.length; j++) {
+        var a = picked[i].text, b = picked[j].text;
+        if (a.length < 2 || b.length < 2) continue;
+        if (a.indexOf(b) !== -1 || b.indexOf(a) !== -1) return true;
+      }
+    }
+    return false;
+  }
+
+  /* 語彙間で内容語が重複しているかの判定（「最初に」×3 などの防止）
+     機能語だけの 3-gram は無視する。 */
+  var CROSS_DUP_STOP = ['ことに', 'ことにな', 'とにな', 'になっ', 'ってい', 'ている', 'ているこ',
+    'ることに', '、{', 'のにな', 'になら', 'ならな', 'てしま', 'しませ', 'ません',
+    'あるこ', 'ることに', 'ことで', 'で決着', '決着す', '着する', 'によっ', 'よって',
+    'て終わ', '終わる', 'わるこ', 'ることに', 'ことが', 'が確定', '確定す', '定する',
+    'として', 'て残る', '残るこ', 'になっ', 'って知', 'て知る', '知るこ'];
+  function crossDup(picked, n) {
+    n = n || 3;
+    var seen = {};
+    for (var i = 0; i < picked.length; i++) {
+      var chars = Array.from(picked[i].text);
+      var mine = new Set();
+      for (var j = 0; j + n <= chars.length; j++) {
+        var g = chars.slice(j, j + n).join('');
+        if (CROSS_DUP_STOP.indexOf(g) !== -1) continue;
+        if (!/^[\u3040-\u30ff\u4e00-\u9fff]{3}$/.test(g)) continue;
+        mine.add(g);
+      }
+      mine.forEach(function (g) {
+        if (seen[g] === undefined) seen[g] = i;
+        else if (seen[g] !== i) seen[g] = -1;
+      });
+    }
+    for (var k in seen) { if (seen[k] === -1) return true; }
+    return false;
+  }
+
+  /* 同一 n-gram の反復（言い淀み・語の二重出現）判定 */
+  function repeatConflict(body, n) {
+    n = n || 5;
+    var chars = Array.from(body);
+    if (chars.length < n * 2) return false;
+    var seen = new Set();
+    for (var i = 0; i + n <= chars.length; i++) {
+      var g = chars.slice(i, i + n).join('');
+      if (seen.has(g)) return true;
+      seen.add(g);
+    }
+    return false;
+  }
+
+  /* 助詞の二重付与（「〜でに」「〜にで」「〜がが」等）の検出 */
+  function particleConflict(body) {
+    return /[でにへをごが][でにへをごが]/.test(body)
+        || /、、/.test(body)
+        || /[、。][、。]/.test(body);
+  }
+
+  /* ============================================================
+   * 3. 合成
+   * ============================================================ */
+  function weightedFrame(dict) {
+    var total = 0;
+    for (var i = 0; i < dict.frames.length; i++) total += dict.frames[i].weight;
+    var r = Math.random() * total;
+    for (var j = 0; j < dict.frames.length; j++) {
+      r -= dict.frames[j].weight;
+      if (r <= 0) return dict.frames[j];
+    }
+    return dict.frames[dict.frames.length - 1];
+  }
+
+  function assemble(dict, frame) {
+    var out = '';
+    var picked = [];
+    for (var i = 0; i < frame.parts.length; i++) {
+      var p = frame.parts[i];
+      if (p.lit !== undefined) { out += p.lit; continue; }
+      var cands = candidates(dict, p);
+      if (!cands.length) {
+        if (p.optional) continue;
+        return null;                      // 語彙欠落＝このフレームは不成立
+      }
+      var e = choice(cands);
+      picked.push(e);
+      out += e.text;
+    }
+    if (mutexConflict(picked)) return null;
+    if (overlapConflict(picked)) return null;
+    var body0 = out.replace(/\s+/g, '');
+    if (particleConflict(body0)) return null;
+    if (repeatConflict(body0, 5)) return null;
+    if (crossDup(picked, 3)) return null;
+    return { text: out, picked: picked };
+  }
+
+  /**
+   * 1行生成。
+   * @param dict      parseDict() の結果
+   * @param opt       { minChars, maxChars, recent:Set, prefix, suffix, tries }
+   * @return 生成文（prefix/suffix 込み）／失敗時 ''
+   */
+  function generate(dict, opt) {
+    opt = opt || {};
+    var tries = opt.tries || 200;
+    var minChars = opt.minChars != null ? opt.minChars : 18;
+    var maxChars = opt.maxChars != null ? opt.maxChars : 160;
+    var prefix = opt.prefix != null ? opt.prefix : dict.prefix;
+    var suffix = opt.suffix != null ? opt.suffix : dict.suffix;
+    if (!dict.frames.length) return '';
+
+    for (var t = 0; t < tries; t++) {
+      var frame = weightedFrame(dict);
+      var r = assemble(dict, frame);
+      if (!r) continue;
+      var body = r.text.replace(/\s+/g, '');
+      if (body.length < minChars || body.length > maxChars) continue;
+      if (opt.recent && opt.recent.has(body)) continue;
+      var full = prefix + body + suffix;
+      if (opt.recent) opt.recent.add(body);
+      return full;
+    }
+    return '';
+  }
+
+  /**
+   * 既存コーパスから1行をそのまま選ぶ。
+   * @param corpusLines  冒頭.txt / 終盤.txt の行（prefix/suffix 込み）の配列
+   * @param opt          { recent:Set }
+   */
+  function pickVerbatim(corpusLines, opt) {
+    opt = opt || {};
+    if (!corpusLines || !corpusLines.length) return '';
+    for (var t = 0; t < 40; t++) {
+      var l = choice(corpusLines);
+      if (!l) continue;
+      if (opt.recent && opt.recent.has(l)) continue;
+      if (opt.recent) opt.recent.add(l);
+      return l;
+    }
+    // 未使用の行が尽きた場合は重複を許して返す（空振りして注入ごと消えるのを防ぐ）
+    var f = choice(corpusLines);
+    if (opt.recent && f) opt.recent.add(f);
+    return f || '';
+  }
+
+  /**
+   * 冒頭／終盤フロー1行の総合入口。
+   * verbatimRate（％）の確率で既存コーパスの行をそのまま返し、
+   * 外れたら（または失敗したら）スロット合成する。
+   * @param opt { verbatimRate, corpusLines, minChars, maxChars, recent, tries }
+   */
+  function generateFlow(dict, opt) {
+    opt = opt || {};
+    var vr = opt.verbatimRate != null ? opt.verbatimRate : 0;
+    if (vr > 0 && opt.corpusLines && opt.corpusLines.length) {
+      if (Math.random() * 100 < vr) {
+        var v = pickVerbatim(opt.corpusLines, opt);
+        if (v) return v;
+      }
+    }
+    return generate(dict, opt);
+  }
+
+  /* 理論パターン数の概算（タグ制約を無視した上限） */
+  function countPatterns(dict) {
+    var total = 0;
+    for (var i = 0; i < dict.frames.length; i++) {
+      var f = dict.frames[i];
+      var n = 1;
+      var used = {};
+      for (var j = 0; j < f.parts.length; j++) {
+        var p = f.parts[j];
+        if (p.lit !== undefined) continue;
+        var c = candidates(dict, p).length || 1;
+        n *= c;
+        used[p.slot] = (used[p.slot] || 0) + 1;
+      }
+      total += n * f.weight;
+    }
+    return total;
+  }
+
+  function stats(dict) {
+    var s = { slots: {}, frames: dict.frames.length, patterns: countPatterns(dict) };
+    dict.slotOrder.forEach(function (k) { s.slots[k] = dict.slots[k].length; });
+    return s;
+  }
+
+  return {
+    parseDict: parseDict,
+    generate: generate,
+    generateFlow: generateFlow,
+    pickVerbatim: pickVerbatim,
+    stats: stats,
+    countPatterns: countPatterns,
+    _util: { randint: randint, choice: choice, shuffle: shuffle }
+  };
+});
+</script>
+<script>
 /*
  * 小説生成プロンプト エンジン
  * 「生成py_組み込み済み.py」のロジックをJavaScriptへ移植したもの。
@@ -1369,6 +1760,96 @@ var NovelGen = (function () {
     body = body.replace(/^(?:冒頭|終盤)は、\s*/, '');
     if (!body) return '';
     return prefix + body;
+  }
+
+  // ============================================================
+  // ★ 冒頭／終盤フロー1行（意味スロット辞書 × 文型フレーム 直積合成）
+  // ------------------------------------------------------------
+  //   品詞・意味役割ごとに分類された語彙プール（スロット）と、スロットの
+  //   並び順と接続を固定した文型（フレーム）を直積して1文を組み立てる。
+  //   フレームが助詞と接続を保持するため、出力は文法的に正しい日本語に
+  //   なる。パターン数は文型数と各スロットの語彙数の積で決まる。
+  //   辞書（冒頭スロット.txt / 終盤スロット.txt）はプレーンテキストなので、
+  //   リポジトリ上で編集するだけで反映される。
+  //   slotVerbatimRate（％）の確率で 冒頭.txt / 終盤.txt の既存行を
+  //   そのまま1行として使う。スロット合成の結果が既存行と一致した場合も、
+  //   一致を理由にした引き直しは行わない。
+  //   辞書が無い・空・試行回数内に合格文が出ない場合は空文字を返し、
+  //   呼び出し側がマルコフ合成へ回る。
+  // ============================================================
+  var FLOW_NOTE = {
+    '冒頭': {
+      slot:   '↑\nこれが冒頭の流れ。この冒頭で仕込んだ独自の要素をセットアップとして必ず後半で回収しろ。',
+      markov: '↑\nこれが冒頭の流れ。文が破綻していても、その意図を補完して強引に解釈し、この冒頭で仕込んだ独自の要素をセットアップとして必ず後半で回収しろ。'
+    },
+    '終盤': {
+      slot:   '↑\nこれが終盤の流れ。この終盤の着地を、前半で既に置いた要素の回収によって実現しろ。',
+      markov: '↑\nこれが終盤の流れ。文が破綻していても、その意図を補完して強引に解釈し、この終盤の着地を、前半で既に置いた要素の回収によって実現しろ。'
+    }
+  };
+
+  // スロット辞書と既存コーパスは stripMarkdown を通さない。
+  // stripMarkdown は行頭の #SLOT / #FRAME を見出し装飾として除去し、
+  // 強調記号や罫線も書き換えるため、辞書の構造が失われる。
+  // ここでは BOM と改行コードだけを揃える。
+  function normalizeFlowText(text) {
+    if (!text) return '';
+    return text.replace(/^\uFEFF/, '').replace(/\r\n?/g, '\n');
+  }
+
+  var SLOT_DICT_CACHE = {};
+  function getSlotDict(key, text) {
+    if (!text) return null;
+    if (typeof SlotEngine === 'undefined' || !SlotEngine) return null;
+    var hit = SLOT_DICT_CACHE[key];
+    if (hit && hit.src === text) return hit.dict;
+    var dict = null;
+    try { dict = SlotEngine.parseDict(text); } catch (e) { dict = null; }
+    if (!dict || !dict.frames || !dict.frames.length) return null;
+    SLOT_DICT_CACHE[key] = { src: text, dict: dict };
+    return dict;
+  }
+
+  // 辞書テキストから行を拾い、prefix で始まり charLimit に収まる行だけを返す
+  function slotCorpusLines(text, prefix, charLimit) {
+    var out = [];
+    if (!text) return out;
+    var lines = normalizeFlowText(text).split('\n');
+    for (var i = 0; i < lines.length; i++) {
+      var l = lines[i].trim();
+      if (!l || l.indexOf(prefix) !== 0) continue;
+      if (l.length > charLimit) continue;
+      out.push(l);
+    }
+    return out;
+  }
+
+  function generateSlotFlowLine(kind, files, charLimit, P) {
+    if (numOr(P.useSlotEngine, 1) !== 1) return '';
+    if (typeof SlotEngine === 'undefined' || !SlotEngine) return '';
+    var limit = Math.max(30, Math.floor(charLimit));
+    var prefix = kind + 'は、';
+    var dictText = kind === '冒頭' ? files.openingSlot : files.endingSlot;
+    if (!dictText) return '';
+    var dict = getSlotDict(kind, normalizeFlowText(dictText));
+    if (!dict) return '';
+    var corpusText = kind === '冒頭' ? files.opening : files.ending;
+    var bodyMax = limit - prefix.length - (dict.suffix ? dict.suffix.length : 0);
+    if (bodyMax < 12) return '';
+    var line = '';
+    try {
+      line = SlotEngine.generateFlow(dict, {
+        verbatimRate: numOr(P.slotVerbatimRate, 0),
+        corpusLines: slotCorpusLines(corpusText, prefix, limit),
+        minChars: 12,
+        maxChars: bodyMax,
+        tries: Math.max(1, Math.floor(numOr(P.slotTries, 200)))
+      });
+    } catch (e) { line = ''; }
+    if (!line) return '';
+    line = line.replace(/\r/g, '').replace(/\n/g, ' ').trim();
+    if (!line || line.length > limit) return '';
+    return line;
   }
 
   function generateMarkovText(text, order, lineCount, charLimit, P, cacheKey) {
@@ -1803,8 +2284,11 @@ var NovelGen = (function () {
       var remO = maxChar - baseLen;
       if (remO > 0) {
         var op = '';
+        var opFromSlot = false;
         if (Math.random() * 100 < numOr(P.openingRate, 100)) {
-          if (files.opening) op = generateOpeningOneLiner(files.opening, Math.min(160, remO), P);
+          op = generateSlotFlowLine('冒頭', files, Math.min(160, remO), P);
+          opFromSlot = !!op;
+          if (!op && files.opening) op = generateOpeningOneLiner(files.opening, Math.min(160, remO), P);
         }
         // ★ 注入レートを外した（または生成失敗した）場合でも文面を消さず、
         //   「これがテーマの話を書け」と同じアルゴリズム（マルコフ.txtの1行マルコフ）
@@ -1812,7 +2296,7 @@ var NovelGen = (function () {
         if (!op) op = generateFlowFallbackLine('冒頭は、', files.markov, Math.min(160, remO), P, '__one_opening_fb');
         if (op) {
           if (!addBase(op)) return null;
-          if (!addBase('↑\nこれが冒頭の流れ。文が破綻していても、その意図を補完して強引に解釈し、この冒頭で仕込んだ独自の要素をセットアップとして必ず後半で回収しろ。')) return null;
+          if (!addBase(opFromSlot ? FLOW_NOTE['冒頭'].slot : FLOW_NOTE['冒頭'].markov)) return null;
           sealBase();
         }
       }
@@ -1825,8 +2309,11 @@ var NovelGen = (function () {
       var remE = maxChar - baseLen;
       if (remE > 0) {
         var en = '';
+        var enFromSlot = false;
         if (Math.random() * 100 < numOr(P.endingRate, 100)) {
-          if (files.ending) en = generateEndingOneLiner(files.ending, Math.min(160, remE), P);
+          en = generateSlotFlowLine('終盤', files, Math.min(160, remE), P);
+          enFromSlot = !!en;
+          if (!en && files.ending) en = generateEndingOneLiner(files.ending, Math.min(160, remE), P);
         }
         // ★ 注入レートを外した（または生成失敗した）場合でも文面を消さず、
         //   「これがテーマの話を書け」と同じアルゴリズム（マルコフ.txtの1行マルコフ）
@@ -1834,7 +2321,7 @@ var NovelGen = (function () {
         if (!en) en = generateFlowFallbackLine('終盤は、', files.markov, Math.min(160, remE), P, '__one_ending_fb');
         if (en) {
           if (!addBase(en)) return null;
-          if (!addBase('↑\nこれが終盤の流れ。文が破綻していても、その意図を補完して強引に解釈し、この終盤の着地を、前半で既に置いた要素の回収によって実現しろ。')) return null;
+          if (!addBase(enFromSlot ? FLOW_NOTE['終盤'].slot : FLOW_NOTE['終盤'].markov)) return null;
           sealBase();
         }
       }
@@ -2254,8 +2741,11 @@ var NovelGen = (function () {
       var remO = maxChar - currentLen;
       if (remO > 0) {
         var op = '';
+        var opFromSlot = false;
         if (Math.random() * 100 < numOr(P.openingRate, 100)) {
-          if (files.opening) op = generateOpeningOneLiner(files.opening, Math.min(160, remO), P);
+          op = generateSlotFlowLine('冒頭', files, Math.min(160, remO), P);
+          opFromSlot = !!op;
+          if (!op && files.opening) op = generateOpeningOneLiner(files.opening, Math.min(160, remO), P);
         }
         // ★ 注入レートを外した（または生成失敗した）場合でも文面を消さず、
         //   「これがテーマの話を書け」と同じアルゴリズム（マルコフ.txtの1行マルコフ）
@@ -2263,7 +2753,7 @@ var NovelGen = (function () {
         if (!op) op = generateFlowFallbackLine('冒頭は、', files.markov, Math.min(160, remO), P, '__one_opening_fb');
         if (op) {
           if (!addToContents(op)) return null;
-          if (!addToContents('↑\nこれが冒頭の流れ。文が破綻していても、その意図を補完して強引に解釈し、この冒頭で仕込んだ独自の要素をセットアップとして必ず後半で回収しろ。')) return null;
+          if (!addToContents(opFromSlot ? FLOW_NOTE['冒頭'].slot : FLOW_NOTE['冒頭'].markov)) return null;
           sealBlock();
         }
       }
@@ -2276,8 +2766,11 @@ var NovelGen = (function () {
       var remE = maxChar - currentLen;
       if (remE > 0) {
         var en = '';
+        var enFromSlot = false;
         if (Math.random() * 100 < numOr(P.endingRate, 100)) {
-          if (files.ending) en = generateEndingOneLiner(files.ending, Math.min(160, remE), P);
+          en = generateSlotFlowLine('終盤', files, Math.min(160, remE), P);
+          enFromSlot = !!en;
+          if (!en && files.ending) en = generateEndingOneLiner(files.ending, Math.min(160, remE), P);
         }
         // ★ 注入レートを外した（または生成失敗した）場合でも文面を消さず、
         //   「これがテーマの話を書け」と同じアルゴリズム（マルコフ.txtの1行マルコフ）
@@ -2285,7 +2778,7 @@ var NovelGen = (function () {
         if (!en) en = generateFlowFallbackLine('終盤は、', files.markov, Math.min(160, remE), P, '__one_ending_fb');
         if (en) {
           if (!addToContents(en)) return null;
-          if (!addToContents('↑\nこれが終盤の流れ。文が破綻していても、その意図を補完して強引に解釈し、この終盤の着地を、前半で既に置いた要素の回収によって実現しろ。')) return null;
+          if (!addToContents(enFromSlot ? FLOW_NOTE['終盤'].slot : FLOW_NOTE['終盤'].markov)) return null;
           sealBlock();
         }
       }
@@ -3078,6 +3571,7 @@ var NovelGen = (function () {
     _generateMarkovOneLiner: generateMarkovOneLiner,
     _generateOpeningOneLiner: generateOpeningOneLiner,
     _generateEndingOneLiner: generateEndingOneLiner,
+    _generateSlotFlowLine: generateSlotFlowLine,
     _heroPairNote: heroPairNote,
     _fixedHeroName: fixedHeroName,
     _matIdForHeroName: matIdForHeroName,
@@ -3127,6 +3621,8 @@ NovelGen.setNovelData(NOVEL_DATA);
     { id: 'markov',      label: 'マルコフ.txt', repoFile: 'マルコフ.txt', defMode: 'github' },
     { id: 'opening',     label: '冒頭.txt',   repoFile: '冒頭.txt',   defMode: 'github' },
     { id: 'ending',      label: '終盤.txt',   repoFile: '終盤.txt',   defMode: 'github' },
+    { id: 'openingSlot', label: '冒頭スロット.txt', repoFile: '冒頭スロット.txt', defMode: 'github' },
+    { id: 'endingSlot',  label: '終盤スロット.txt', repoFile: '終盤スロット.txt', defMode: 'github' },
     { id: 'tone',        label: 'トーン.txt', repoFile: 'トーン.txt', defMode: 'github' },
     { id: 'last',        label: '最後.txt',   repoFile: '最後.txt',   defMode: 'github' },
     { id: 'kinshi',      label: '禁止.txt',   repoFile: '禁止.txt',   defMode: 'none',   note: 'リポジトリに無い場合はスキップ' },
@@ -3140,6 +3636,9 @@ NovelGen.setNovelData(NOVEL_DATA);
     useMarkovMode: 1,         // 1=ON / 0=OFF
     heroMode: -1,             // -1=ランダム / 0=視点なし / 1=必ず視点
     useLastMarkovLineMode: 1, // テーマ（最後の1行マルコフ） 1=ON / 0=OFF
+    useSlotEngine: 1,         // 冒頭／終盤の1行を 冒頭スロット.txt／終盤スロット.txt の直積合成で作る 1=ON / 0=OFF（OFFまたは合成失敗時はマルコフ）
+    slotVerbatimRate: 30,     // スロット合成時の「既存行そのまま採用率」（％）この確率で 冒頭.txt／終盤.txt の行をそのまま1行として使う
+    slotTries: 200,           // スロット合成の試行回数（タグ・排他グループで不合格になった組み合わせの引き直し上限）
     useOpeningMarkovMode: 1,  // 冒頭パターン（冒頭.txtを1文マルコフ） 1=ON / 0=OFF
     useEndingMarkovMode: 1,   // 終盤パターン（終盤.txtを1文マルコフ） 1=ON / 0=OFF
     openingRate: 50,          // 冒頭パターン注入レート（％）ONのとき、この確率で冒頭.txt由来を注入。外れた場合はマルコフ.txt由来の「冒頭は、〜」を代わりに注入
@@ -3176,6 +3675,9 @@ NovelGen.setNovelData(NOVEL_DATA);
     { key: 'heroMode', label: '視点モード', type: 'select',
       options: [[-1, '-1: ランダム（4/5で視点あり）'], [0, '0: 視点なし'], [1, '1: 必ず視点']] },
     { key: 'useLastMarkovLineMode', label: 'テーマ提示（最後の1行）', type: 'select', options: [[1, '1: ON'], [0, '0: OFF']] },
+    { key: 'useSlotEngine', label: '冒頭／終盤のスロット辞書合成（冒頭スロット.txt・終盤スロット.txt）', type: 'select', options: [[1, '1: ON'], [0, '0: OFF']] },
+    { key: 'slotVerbatimRate', label: 'スロット合成時の既存行そのまま採用率（％）', type: 'number', min: 0, max: 100 },
+    { key: 'slotTries', label: 'スロット合成の試行回数', type: 'number', min: 1, max: 1000 },
     { key: 'useOpeningMarkovMode', label: '冒頭パターン指定（冒頭.txt）', type: 'select', options: [[1, '1: ON'], [0, '0: OFF']] },
     { key: 'openingRate', label: '冒頭パターン注入レート（％）／外れたらマルコフ文', type: 'number', min: 0, max: 100 },
     { key: 'useEndingMarkovMode', label: '終盤パターン指定（終盤.txt）', type: 'select', options: [[1, '1: ON'], [0, '0: OFF']] },
