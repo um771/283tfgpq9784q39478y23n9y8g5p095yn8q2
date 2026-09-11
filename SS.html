@@ -309,14 +309,13 @@ footer { text-align: center; color: #5b6378; font-size: 11px; padding: 24px 0 40
       <ul>
         <li>デフォルトでは GitHub リポジトリ
           <code>um771/283tfgpq9784q39478y23n9y8g5p095yn8q2</code> の <code>main</code> ブランチにある
-          <code>SS.txt / 二次創作.txt / 超加速.txt / ラボ組.txt / 学校組.txt / ホスト組.txt / ツン.txt / 渡辺さん.txt / ハイン.txt / でぃ.txt / マルコフ.txt / 冒頭.txt / 終盤.txt / 冒頭スロット.txt / 終盤スロット.txt / トーン.txt / 最後.txt</code> を
+          <code>SS.txt / 二次創作.txt / 超加速.txt / ラボ組.txt / 学校組.txt / ホスト組.txt / ツン.txt / 渡辺さん.txt / ハイン.txt / でぃ.txt / マルコフ.txt / 冒頭スロット.txt / 終盤スロット.txt / トーン.txt / 最後.txt</code> を
           <code>raw.githubusercontent.com</code> から取得します。</li>
         <li><b>マルコフ.txt や 最後.txt、各キャラ資料をリポジトリ上で編集して保存 → このページで生成</b> すれば、最新版が反映されます（毎回最新を取得）。</li>
         <li>資料オンリーモード（-1／3）では、9資料のキャラ計29名に対して優先度をランダム設定し、上から所属する資料（二次創作・超加速・ラボ組・学校組・ホスト組・ツン・渡辺さん・ハイン・でぃ）のtxtを追加していき、文字数上限に収まる順番までをプロンプト先頭へ追加します。<b>視点キャラ固定時は固定キャラの所属txtが採用されていることを確認し、不採用ならリトライします</b>（例：ブーン固定なのに二次創作.txt不採用、という破綻は起きません。優先度の順序自体は改変しません）。</li>
         <li><b>一人称視点指定（全モード共通）</b>：<b>一人称視点指定レート（％・既定50）</b>の確率で、末尾固定ブロックの <code>今回の視点は[ ～ ]です</code> の直後に<b>空行を挟まず</b> <code>一人称視点の形式で書くこと</code> を追加します（トーンブロックの後・<code>文字数は～文字</code> の前の固定位置）。ヒットした回は視点なしレート・視点モード0を無視して必ず視点行を出します（続き.txtによる視点抑止中を除く）。資料オンリーモードの設定値（-1／2／3およびランダム）に関係なく全モードで動作します。</li>
         <li><b>冒頭／終盤のスロット辞書合成</b>（既定ON）：<code>冒頭スロット.txt</code> / <code>終盤スロット.txt</code> は意味スロット辞書です。品詞・意味役割ごとに分類された語彙プール（スロット）と、スロットの並び順と接続を固定した文型（フレーム）を直積して「冒頭は、〜ことになる。」「終盤は、〜ことになる。」の1文を組み立てます。フレームが助詞と接続を保持するため、出力は文法的に正しい日本語になります。語彙行の <code>@タグ</code> でフレーム側から候補を絞り込み、<code>^グループ=値</code> の排他指定で意味的に衝突する組み合わせを引き直します。パターン数は文型数と各スロットの語彙数の積で決まるため、<code>#SLOT</code> に語彙を1行足すだけで掛け算に増えます。辞書はリポジトリ上で編集するだけで反映されます。</li>
         <li><b>冒頭／終盤の骨格カード生成（構造層・既定ON）</b>：辞書は<b>既存の <code>冒頭スロット.txt</code> / <code>終盤スロット.txt</code> と同じファイル</b>から読み、中身を自動判別します。<code>#AXIS</code>／<code>#TEXT</code> を含む<b>骨格辞書形式</b>が入っていた場合はこちらを優先し、冒頭の型・決着機構・犠牲・決着の確定度など独立した軸から<b>物語骨格カード</b>を1枚抽選して「冒頭は、〜」「終盤は、〜」を合成します。旧スロット辞書のままなら自動で従来のスロット辞書合成にフォールバックするので、<b>txtの中身を書き換えるだけで方式が切り替わり、ファイルの追加は不要</b>です。単語ではなく<b>物語機能</b>を分散させることで、「日常→異変発見→調査・逃走」「能力ルール対決→条件反転→犠牲」への収束を防ぎます。直近の生成履歴で出過ぎた軸の重みは自動的に下がり、直近カードと物語機能が近い組合せは引き直されます（意味的重複のリジェクション）。履歴はブラウザの localStorage に保存され、ページをまたいで偏りが補正されます。生成した行の直後には抽選カードの中身を<code>［冒頭の型=…｜…｜犠牲=…］</code>（終盤は<code>［終盤の形式=…｜決着機構=…｜…］</code>）の<b>構造タグとしてプロンプト本体に同梱</b>し、執筆AIが物語機能から逃げられないようにします。特に犠牲=死亡するは、ぼかさず<b>死亡エンドとして直接描くよう指示文で強制</b>します。</li>
-        <li><b>冒頭.txt / 終盤.txt の扱い</b>：この2ファイルは、スロット辞書の語彙を採集する素材であり、マルコフ合成のコーパスです。<b>スロット合成時の既存行そのまま採用率（％）</b>は既定0で、0のときは行をそのまま1行として使うことはありません。スロット合成の結果がこの2ファイルの行と一致した場合、一致を理由に引き直さずそのまま採用します。</li>
         <li><b>フロー指示文</b>：スロット辞書で組み立てた1行の直後には「↑ これが冒頭の流れ。ここで出した要素や言及は、物語のどこかで必ず意味を持つ伏線として張っておけ。」（終盤は「↑ これが終盤の流れ。この終盤の着地を、物語のどこかで既に張った伏線を拾い上げる形で実現しろ。」）を置きます。マルコフ連鎖で組み立てた1行の直後には、文が破綻していても意図を補完して強引に解釈させる指示を含めた文を置きます。<b>冒頭／終盤のスロット辞書合成</b>をOFFにした場合、辞書が取得できない場合、試行回数内に合格文が出ない場合は、マルコフ連鎖で1行を組み立てます。</li>
         <li><b>ブロックランダム順モード</b>（デフォルトOFF）をONにすると、プロンプトの各ブロック（採用キャラ資料群・関係ルール・SS.txt・共通.txt・各マルコフ＋区切り・最後.txt・キャラテンプレ・冒頭／終盤／テーマ／トーン等）を毎回ランダムな順番に並べ替えます。<b>「視点提示 → 文字数指定」の2つだけはシャッフルされず、常に最後の固定位置</b>（一人称指定行は視点提示の一部として同じく固定）です。「マルコフ文＋これは資料です」等のペアは順序のまま維持されます。</li>
         <li>採用した各キャラ資料txtの内部では、そのtxtの代表AAで始まる人物ブロックを毎回ランダムな順に並べ替えます（★欲の位置はファイルごとに違うため使いません）。グループ概要・世界設定など人物以外の見出し以降は末尾に残します。</li>
@@ -1114,7 +1113,7 @@ if (typeof module !== 'undefined' && module.exports) module.exports = NOVEL_DATA
  *   ・出力は必ず文法的に正しい日本語（フレームが助詞・接続を保持するため）
  *   ・パターン数 = 文型数 × 各スロットの語彙数 の積（実質無限）
  *   ・タグ制約と排他グループで意味的な衝突を機械的に排除
- *   ・既存コーパス（冒頭.txt / 終盤.txt）の行と一致した文もそのまま採用する
+ *   ・既存コーパス行（corpusLines）と一致した文もそのまま採用する
  *     （一致・近似を理由にした引き直しは行わない）
  *   ・辞書はプレーンテキストなので GitHub 上で編集するだけで拡張できる
  *   ・依存ライブラリなし。ブラウザ / Node 双方で動く
@@ -1416,7 +1415,7 @@ if (typeof module !== 'undefined' && module.exports) module.exports = NOVEL_DATA
 
   /**
    * 既存コーパスから1行をそのまま選ぶ。
-   * @param corpusLines  冒頭.txt / 終盤.txt の行（prefix/suffix 込み）の配列
+   * @param corpusLines  既存コーパス行（prefix/suffix 込み）の配列（任意・空可）
    * @param opt          { recent:Set }
    */
   function pickVerbatim(corpusLines, opt) {
@@ -2143,59 +2142,6 @@ var NovelGen = (function () {
     return s;
   }
 
-  // ★ 冒頭用1行生成（原文ママ禁止・精度揺らぎ付き）
-  //   冒頭.txtは全行「冒頭は、」始まりの統一構文のため、精度4固定だと
-  //   原文をそのまま再生しがち（実測で約3割が原文ママ）。
-  //   試行のたびに精度1〜4を揺らがせ、コーパス本文にそのまま含まれる文
-  //  （原文ママ）はすべて禁止して再生成する。全試行が規格落ち・原文ママの
-  //   場合は空文字を返し、冒頭ブロック自体を注入しない。
-  //  （原文と同じ冒頭文を絶対に出さないための措置。テーマ側は無関係。）
-  function generateOpeningOneLiner(text, charLimit, P, orderMin, orderMax, cacheKey) {
-    // 精度の下限は2。精度1は文章として成立しない超破綻文が
-    // 大量に出るため禁止（実測済み）。
-    if (orderMin == null) orderMin = 2;
-    if (orderMax == null) orderMax = 4;
-    if (!text) return '';
-    var cleaned = stripMarkdown(text);
-    if (!cleaned.trim()) return '';
-    var isEnglish = isEnglishText(cleaned);
-    var puncts = ['。', '、', '.', '!', '？', '?', '！'];
-    for (var att = 0; att < 24; att++) {
-      // マルコフ精度を揺らがせる（orderMin〜orderMax）。
-      // 統一構文コーパス（冒頭は、/終盤は、）なので、どの精度でも
-      // 頭の骨格は開始gramから自然に保たれる。
-      // ★ cacheKeyはコーパス毎に一意に（冒頭='__one_opening' /
-      //   終盤='__one_ending'）。渡さないと先に構築したチェーンを
-      //   使い回す。
-      var order = randint(orderMin, orderMax);
-      var chain = getChain(cleaned, order, cacheKey || '__one_opening');
-      if (!chain) continue;
-      var s = generateSentence(chain, order, isEnglish, P.markovSentenceMinChars, P.markovSentenceMaxChars);
-      if (!s) continue;
-      s = s.replace(/\r/g, '').replace(/\n/g, ' ').trim();
-      if (s.length > charLimit) {
-        var cut = s.slice(0, charLimit);
-        for (var pi = 0; pi < puncts.length; pi++) {
-          var idx = cut.lastIndexOf(puncts[pi]);
-          if (idx >= 10) { cut = cut.slice(0, idx + 1); break; }
-        }
-        s = cut.trim();
-      }
-      if (s.length < P.markovSentenceMinChars) continue;
-      // ★ 原文ママ判定：コーパス本文にそのまま含まれる文は禁止
-      if (cleaned.indexOf(s) !== -1) continue;
-      return s;
-    }
-    return '';
-  }
-
-  // ★ 終盤用1行生成。仕組みは冒頭用と同一（統一構文コーパス＋原文ママ禁止＋精度2〜4）。
-  //   終盤.txtも全行「終盤は、」始まり「〜ことになる。」終わりの統一構文のため、
-  //   頭と尻尾の骨格は連鎖合成でも自然に保たれる。
-  function generateEndingOneLiner(text, charLimit, P, orderMin, orderMax) {
-    return generateOpeningOneLiner(text, charLimit, P, orderMin, orderMax, '__one_ending');
-  }
-
   // ★ 冒頭／終盤パターンの「注入レートを外した」場合の代替文。
   //   冒頭.txt／終盤.txt は使わず、テーマ1行（これがテーマの話を書け）と
   //   まったく同じアルゴリズム（マルコフ.txt・精度4固定の1行マルコフ）で
@@ -2219,10 +2165,7 @@ var NovelGen = (function () {
   //   なる。パターン数は文型数と各スロットの語彙数の積で決まる。
   //   辞書（冒頭スロット.txt / 終盤スロット.txt）はプレーンテキストなので、
   //   リポジトリ上で編集するだけで反映される。
-  //   slotVerbatimRate（％・既定0）の確率で 冒頭.txt / 終盤.txt の既存行を
-  //   そのまま1行として使う。0のときは使わない。
-  //   スロット合成の結果が既存行と一致した場合も、一致を理由にした
-  //   引き直しは行わない。
+  //   ※ 冒頭.txt / 終盤.txt は参照から外した（コーパス・原文引用とも使わない）。
   //   辞書が無い・空・試行回数内に合格文が出ない場合は空文字を返し、
   //   呼び出し側がマルコフ合成へ回る。
   // ============================================================
@@ -2284,14 +2227,13 @@ var NovelGen = (function () {
     if (!dictText) return '';
     var dict = getSlotDict(kind, normalizeFlowText(dictText));
     if (!dict) return '';
-    var corpusText = kind === '冒頭' ? files.opening : files.ending;
     var bodyMax = limit - prefix.length - (dict.suffix ? dict.suffix.length : 0);
     if (bodyMax < 12) return '';
     var line = '';
     try {
       line = SlotEngine.generateFlow(dict, {
-        verbatimRate: numOr(P.slotVerbatimRate, 0),
-        corpusLines: slotCorpusLines(corpusText, prefix, limit),
+        verbatimRate: 0,
+        corpusLines: [],
         minChars: 12,
         maxChars: bodyMax,
         tries: Math.max(1, Math.floor(numOr(P.slotTries, 200)))
@@ -2322,9 +2264,9 @@ var NovelGen = (function () {
   //   プロンプトを受ける執筆AIは物語機能の指定から逃げられなくなり、
   //   特に犠牲=死亡するを勝手に回避できなくなる。
   //   失敗・不発時は既存のフォールバック順に従う：
-  //     スロット辞書合成 → 冒頭.txt／終盤.txtの1文マルコフ
-  //     → テーマ行（これがテーマの話を書け）とまったく同じ
-  //       マルコフ.txt・精度4固定の1行マルコフ（「冒頭は、」「終盤は、」の形で代用）
+  //     スロット辞書合成 → テーマ行（これがテーマの話を書け）とまったく同じ
+  //     マルコフ.txt・精度4固定の1行マルコフ（「冒頭は、」「終盤は、」の形で代用）。
+  //   ※ 冒頭.txt／終盤.txt をコーパスにするマルコフは冒頭・終盤行には使わない。
   // ============================================================
   var SKEL_DICT_CACHE = {};
   function getSkeletonDict(key, text) {
@@ -2794,7 +2736,7 @@ var NovelGen = (function () {
     //   キャラ資料の優先度確定後に組み立てるので、後段でこの位置へ1ブロックとしてspliceする。
     var templateBlockIdx = baseBlocks.length;
 
-    // ★ 冒頭フロー指定（冒頭.txtを1文マルコフで合成。精度1〜4を揺らがせ、原文ママは禁止）
+    // ★ 冒頭フロー指定（骨格カード → スロット辞書 → マルコフ.txtの1行マルコフの順で合成）
     //   最後.txtの直後・テーマ提示の直前に置く。
     //   「冒頭は、～～なる。」→「↑ これが冒頭の流れ」→ テーマ1行 →「↑ これがテーマの話を書け」の順。
     if (P.useOpeningMarkovMode === 1) {
@@ -2810,7 +2752,7 @@ var NovelGen = (function () {
         if (!op && Math.random() * 100 < numOr(P.openingRate, 100)) {
           op = generateSlotFlowLine('冒頭', files, Math.min(160, remO), P);
           opFromSlot = !!op;
-          if (!op && files.opening) op = generateOpeningOneLiner(files.opening, Math.min(160, remO), P);
+          // 冒頭.txtをコーパスにするマルコフは使わない（代用マルコフはマルコフ.txt参照で固定）
         }
         // ★ 注入レートを外した（または生成失敗した）場合でも文面を消さず、
         //   「これがテーマの話を書け」と同じアルゴリズム（マルコフ.txtの1行マルコフ）
@@ -2824,7 +2766,7 @@ var NovelGen = (function () {
       }
     }
 
-    // ★ 終盤フロー指定（終盤.txtを1文マルコフで合成。冒頭と同じ流儀）
+    // ★ 終盤フロー指定（骨格カード → スロット辞書 → マルコフ.txtの1行マルコフの順で合成。冒頭と同じ流儀）
     //   冒頭ブロックの直後・テーマ提示の直前に置く。
     //   「終盤は、～～なる。」→「↑ これが終盤の流れ」の順。
     if (P.useEndingMarkovMode === 1) {
@@ -2840,7 +2782,7 @@ var NovelGen = (function () {
         if (!en && Math.random() * 100 < numOr(P.endingRate, 100)) {
           en = generateSlotFlowLine('終盤', files, Math.min(160, remE), P);
           enFromSlot = !!en;
-          if (!en && files.ending) en = generateEndingOneLiner(files.ending, Math.min(160, remE), P);
+          // 終盤.txtをコーパスにするマルコフは使わない（代用マルコフはマルコフ.txt参照で固定）
         }
         // ★ 注入レートを外した（または生成失敗した）場合でも文面を消さず、
         //   「これがテーマの話を書け」と同じアルゴリズム（マルコフ.txtの1行マルコフ）
@@ -3261,7 +3203,7 @@ var NovelGen = (function () {
       sealBlock();
     }
 
-    // ★ 冒頭フロー指定（冒頭.txtを1文マルコフで合成。精度1〜4を揺らがせ、原文ママは禁止）
+    // ★ 冒頭フロー指定（骨格カード → スロット辞書 → マルコフ.txtの1行マルコフの順で合成）
     //   最後.txtの直後・テーマ提示の直前に置く。
     //   「冒頭は、～～なる。」→「↑ これが冒頭の流れ」→ テーマ1行 →「↑ これがテーマの話を書け」の順。
     if (P.useOpeningMarkovMode === 1) {
@@ -3277,7 +3219,7 @@ var NovelGen = (function () {
         if (!op && Math.random() * 100 < numOr(P.openingRate, 100)) {
           op = generateSlotFlowLine('冒頭', files, Math.min(160, remO), P);
           opFromSlot = !!op;
-          if (!op && files.opening) op = generateOpeningOneLiner(files.opening, Math.min(160, remO), P);
+          // 冒頭.txtをコーパスにするマルコフは使わない（代用マルコフはマルコフ.txt参照で固定）
         }
         // ★ 注入レートを外した（または生成失敗した）場合でも文面を消さず、
         //   「これがテーマの話を書け」と同じアルゴリズム（マルコフ.txtの1行マルコフ）
@@ -3291,7 +3233,7 @@ var NovelGen = (function () {
       }
     }
 
-    // ★ 終盤フロー指定（終盤.txtを1文マルコフで合成。冒頭と同じ流儀）
+    // ★ 終盤フロー指定（骨格カード → スロット辞書 → マルコフ.txtの1行マルコフの順で合成。冒頭と同じ流儀）
     //   冒頭ブロックの直後・テーマ提示の直前に置く。
     //   「終盤は、～～なる。」→「↑ これが終盤の流れ」の順。
     if (P.useEndingMarkovMode === 1) {
@@ -3307,7 +3249,7 @@ var NovelGen = (function () {
         if (!en && Math.random() * 100 < numOr(P.endingRate, 100)) {
           en = generateSlotFlowLine('終盤', files, Math.min(160, remE), P);
           enFromSlot = !!en;
-          if (!en && files.ending) en = generateEndingOneLiner(files.ending, Math.min(160, remE), P);
+          // 終盤.txtをコーパスにするマルコフは使わない（代用マルコフはマルコフ.txt参照で固定）
         }
         // ★ 注入レートを外した（または生成失敗した）場合でも文面を消さず、
         //   「これがテーマの話を書け」と同じアルゴリズム（マルコフ.txtの1行マルコフ）
@@ -4106,8 +4048,6 @@ var NovelGen = (function () {
     // テスト用
     _randint: randint,
     _generateMarkovOneLiner: generateMarkovOneLiner,
-    _generateOpeningOneLiner: generateOpeningOneLiner,
-    _generateEndingOneLiner: generateEndingOneLiner,
     _generateSlotFlowLine: generateSlotFlowLine,
     _heroPairNote: heroPairNote,
     _fixedHeroName: fixedHeroName,
@@ -4156,8 +4096,6 @@ NovelGen.setNovelData(NOVEL_DATA);
     { id: 'hain',        label: 'ハイン.txt', repoFile: 'ハイン.txt', defMode: 'github' },
     { id: 'di',          label: 'でぃ.txt', repoFile: 'でぃ.txt', defMode: 'github' },
     { id: 'markov',      label: 'マルコフ.txt', repoFile: 'マルコフ.txt', defMode: 'github' },
-    { id: 'opening',     label: '冒頭.txt',   repoFile: '冒頭.txt',   defMode: 'github' },
-    { id: 'ending',      label: '終盤.txt',   repoFile: '終盤.txt',   defMode: 'github' },
     { id: 'openingSlot', label: '冒頭スロット.txt', repoFile: '冒頭スロット.txt', defMode: 'github' },
     { id: 'endingSlot',  label: '終盤スロット.txt', repoFile: '終盤スロット.txt', defMode: 'github' },
     { id: 'tone',        label: 'トーン.txt', repoFile: 'トーン.txt', defMode: 'github' },
@@ -4174,14 +4112,13 @@ NovelGen.setNovelData(NOVEL_DATA);
     heroMode: -1,             // -1=ランダム / 0=視点なし / 1=必ず視点
     useLastMarkovLineMode: 1, // テーマ（最後の1行マルコフ） 1=ON / 0=OFF
     useSkeletonEngine: 1,     // 冒頭／終盤の1行を 冒頭骨格.txt／終盤骨格.txt の骨格カード（構造層）で作る 1=ON / 0=OFF（OFFまたは失敗時はスロット辞書→マルコフ）
-    skeletonRate: 50,         // 骨格カード生成を試みる率（％）。外れた場合・失敗時は スロット辞書合成 → 冒頭.txt／終盤.txtの1文マルコフ → テーマ行と同じマルコフ.txtの1行マルコフ へフォールバック
+    skeletonRate: 50,         // 骨格カード生成を試みる率（％）。外れた場合・失敗時は スロット辞書合成 → テーマ行と同じマルコフ.txtの1行マルコフ へフォールバック（代用マルコフはマルコフ.txt参照で固定）
     useSlotEngine: 1,         // 冒頭／終盤の1行を 冒頭スロット.txt／終盤スロット.txt の直積合成で作る 1=ON / 0=OFF（OFFまたは合成失敗時はマルコフ）
-    slotVerbatimRate: 0,      // スロット合成時の「既存行そのまま採用率」（％）0=使わない。上げた分だけ 冒頭.txt／終盤.txt の行をそのまま1行として使う
     slotTries: 200,           // スロット合成の試行回数（タグ・排他グループで不合格になった組み合わせの引き直し上限）
-    useOpeningMarkovMode: 1,  // 冒頭パターン（冒頭.txtを1文マルコフ） 1=ON / 0=OFF
-    useEndingMarkovMode: 1,   // 終盤パターン（終盤.txtを1文マルコフ） 1=ON / 0=OFF
-    openingRate: 50,          // 冒頭パターン注入レート（％）ONのとき、この確率で冒頭.txt由来を注入。外れた場合はマルコフ.txt由来の「冒頭は、〜」を代わりに注入
-    endingRate: 50,           // 終盤パターン注入レート（％）ONのとき、この確率で終盤.txt由来を注入。外れた場合はマルコフ.txt由来の「終盤は、〜」を代わりに注入
+    useOpeningMarkovMode: 1,  // 冒頭フロー行（骨格→スロット→マルコフ代替）を入れる 1=ON / 0=OFF
+    useEndingMarkovMode: 1,   // 終盤フロー行（骨格→スロット→マルコフ代替）を入れる 1=ON / 0=OFF
+    openingRate: 50,          // 冒頭フロー行の注入レート（％）ONのとき、この確率で骨格/スロット由来を注入。外れ・失敗時はマルコフ.txtの1行マルコフで「冒頭は、〜」を代わりに注入
+    endingRate: 50,           // 終盤フロー行の注入レート（％）ONのとき、この確率で骨格/スロット由来を注入。外れ・失敗時はマルコフ.txtの1行マルコフで「終盤は、〜」を代わりに注入
     charTemplateMin: 12,      // キャラテンプレ提示数の下限（全mode共通・毎回この範囲で変動）
     charTemplateMax: 40,      // キャラテンプレ提示数の上限（全mode共通・毎回この範囲で変動）
     specialHeroRate: 20,      // 特殊視点レート（％）
@@ -4217,11 +4154,10 @@ NovelGen.setNovelData(NOVEL_DATA);
     { key: 'useSkeletonEngine', label: '冒頭／終盤の骨格カード生成（スロットtxt内の骨格辞書／構造層）', type: 'select', options: [[1, '1: ON'], [0, '0: OFF']] },
     { key: 'skeletonRate', label: '骨格カード生成レート（％）外れ・失敗時はスロット辞書→テーマ行と同じマルコフ.txtの1行マルコフ', type: 'number', min: 0, max: 100 },
     { key: 'useSlotEngine', label: '冒頭／終盤のスロット辞書合成（冒頭スロット.txt・終盤スロット.txt）', type: 'select', options: [[1, '1: ON'], [0, '0: OFF']] },
-    { key: 'slotVerbatimRate', label: 'スロット合成時の既存行そのまま採用率（％）0=使わない', type: 'number', min: 0, max: 100 },
     { key: 'slotTries', label: 'スロット合成の試行回数', type: 'number', min: 1, max: 1000 },
-    { key: 'useOpeningMarkovMode', label: '冒頭パターン指定（冒頭.txt）', type: 'select', options: [[1, '1: ON'], [0, '0: OFF']] },
+    { key: 'useOpeningMarkovMode', label: '冒頭パターン指定（骨格→スロット→マルコフ代替）', type: 'select', options: [[1, '1: ON'], [0, '0: OFF']] },
     { key: 'openingRate', label: '冒頭パターン注入レート（％）／外れたらマルコフ文', type: 'number', min: 0, max: 100 },
-    { key: 'useEndingMarkovMode', label: '終盤パターン指定（終盤.txt）', type: 'select', options: [[1, '1: ON'], [0, '0: OFF']] },
+    { key: 'useEndingMarkovMode', label: '終盤パターン指定（骨格→スロット→マルコフ代替）', type: 'select', options: [[1, '1: ON'], [0, '0: OFF']] },
     { key: 'endingRate', label: '終盤パターン注入レート（％）／外れたらマルコフ文', type: 'number', min: 0, max: 100 },
     { key: 'charTemplateMin', label: 'キャラテンプレ提示数の下限', type: 'number', min: 1 },
     { key: 'charTemplateMax', label: 'キャラテンプレ提示数の上限', type: 'number', min: 1 },
@@ -4819,5 +4755,5 @@ NovelGen.setNovelData(NOVEL_DATA);
 
 </script>
 <script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a37423e6cf8c57b5',t:'MTc4ODc2NzYxMQ=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script><script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a385b37deb4d4b50',t:'MTc4ODk1MTc1MQ=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script><script type="module" src="https://static.cloudflareinsights.com/beacon.min.js/v31edd6df95cf4e85bb4c19e7a9bdbcba1788362987495" integrity="sha512-iIg7k2xntmwu6/uSb5tpc/hySgZc4eoL31yB29W6tJFo2akwjPWcEqnCEdJvGexCL0KEQwVYv5BlowfhVz26hg==" data-cf-beacon='{"version":"2024.11.0","token":"1954b47c125f43f8b4338b3c4f804e4f","spa":2}' crossorigin="anonymous"></script>
-</body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a39405f6d93cd773',t:'MTc4OTEwMTkzMA=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
