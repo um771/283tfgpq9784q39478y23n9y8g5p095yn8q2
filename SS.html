@@ -2759,8 +2759,8 @@ var NovelGen = (function () {
         //   で作った文を「冒頭は、〜」の形式で代わりに入れる。
         if (!op) op = generateFlowFallbackLine('冒頭は、', files.markov, Math.min(160, remO), P, '__one_opening_fb');
         if (op) {
-          if (!addBase(op)) return null;
-          if (!addBase(opFromSkel ? FLOW_NOTE['冒頭'].skel : (opFromSlot ? FLOW_NOTE['冒頭'].slot : FLOW_NOTE['冒頭'].markov))) return null;
+          var opNote = opFromSkel ? FLOW_NOTE['冒頭'].skel : (opFromSlot ? FLOW_NOTE['冒頭'].slot : FLOW_NOTE['冒頭'].markov);
+          if (!addBase(op + '\n' + opNote)) return null;
           sealBase();
         }
       }
@@ -2789,8 +2789,8 @@ var NovelGen = (function () {
         //   で作った文を「終盤は、〜」の形式で代わりに入れる。
         if (!en) en = generateFlowFallbackLine('終盤は、', files.markov, Math.min(160, remE), P, '__one_ending_fb');
         if (en) {
-          if (!addBase(en)) return null;
-          if (!addBase(enFromSkel ? FLOW_NOTE['終盤'].skel : (enFromSlot ? FLOW_NOTE['終盤'].slot : FLOW_NOTE['終盤'].markov))) return null;
+          var enNote = enFromSkel ? FLOW_NOTE['終盤'].skel : (enFromSlot ? FLOW_NOTE['終盤'].slot : FLOW_NOTE['終盤'].markov);
+          if (!addBase(en + '\n' + enNote)) return null;
           sealBase();
         }
       }
@@ -2801,8 +2801,7 @@ var NovelGen = (function () {
       if (left4 > 0) {
         var oneLine = generateMarkovOneLiner(files.markov, MARKOV_ORDER, Math.min(120, left4), P);
         if (oneLine) {
-          if (!addBase(oneLine)) return null;
-          if (!addBase('↑\nこれがテーマの話を書け')) return null;
+          if (!addBase(oneLine + '\n↑\nこれがテーマの話を書け')) return null;
           sealBase();
         }
       }
@@ -3226,8 +3225,8 @@ var NovelGen = (function () {
         //   で作った文を「冒頭は、〜」の形式で代わりに入れる。
         if (!op) op = generateFlowFallbackLine('冒頭は、', files.markov, Math.min(160, remO), P, '__one_opening_fb');
         if (op) {
-          if (!addToContents(op)) return null;
-          if (!addToContents(opFromSkel ? FLOW_NOTE['冒頭'].skel : (opFromSlot ? FLOW_NOTE['冒頭'].slot : FLOW_NOTE['冒頭'].markov))) return null;
+          var opNote = opFromSkel ? FLOW_NOTE['冒頭'].skel : (opFromSlot ? FLOW_NOTE['冒頭'].slot : FLOW_NOTE['冒頭'].markov);
+          if (!addToContents(op + '\n' + opNote)) return null;
           sealBlock();
         }
       }
@@ -3256,8 +3255,8 @@ var NovelGen = (function () {
         //   で作った文を「終盤は、〜」の形式で代わりに入れる。
         if (!en) en = generateFlowFallbackLine('終盤は、', files.markov, Math.min(160, remE), P, '__one_ending_fb');
         if (en) {
-          if (!addToContents(en)) return null;
-          if (!addToContents(enFromSkel ? FLOW_NOTE['終盤'].skel : (enFromSlot ? FLOW_NOTE['終盤'].slot : FLOW_NOTE['終盤'].markov))) return null;
+          var enNote = enFromSkel ? FLOW_NOTE['終盤'].skel : (enFromSlot ? FLOW_NOTE['終盤'].slot : FLOW_NOTE['終盤'].markov);
+          if (!addToContents(en + '\n' + enNote)) return null;
           sealBlock();
         }
       }
@@ -3269,8 +3268,7 @@ var NovelGen = (function () {
       if (remaining4 > 0) {
         var oneLine = generateMarkovOneLiner(files.markov, MARKOV_ORDER, Math.min(120, remaining4), P);
         if (oneLine) {
-          if (!addToContents(oneLine)) return null;
-          if (!addToContents('↑\nこれがテーマの話を書け')) return null;
+          if (!addToContents(oneLine + '\n↑\nこれがテーマの話を書け')) return null;
           sealBlock();
         }
       }
@@ -4755,5 +4753,5 @@ NovelGen.setNovelData(NOVEL_DATA);
 
 </script>
 <script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a37423e6cf8c57b5',t:'MTc4ODc2NzYxMQ=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script><script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a385b37deb4d4b50',t:'MTc4ODk1MTc1MQ=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script><script type="module" src="https://static.cloudflareinsights.com/beacon.min.js/v31edd6df95cf4e85bb4c19e7a9bdbcba1788362987495" integrity="sha512-iIg7k2xntmwu6/uSb5tpc/hySgZc4eoL31yB29W6tJFo2akwjPWcEqnCEdJvGexCL0KEQwVYv5BlowfhVz26hg==" data-cf-beacon='{"version":"2024.11.0","token":"1954b47c125f43f8b4338b3c4f804e4f","spa":2}' crossorigin="anonymous"></script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a39405f6d93cd773',t:'MTc4OTEwMTkzMA=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a3940bb62e547955',t:'MTc4OTEwMjE2NQ=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
