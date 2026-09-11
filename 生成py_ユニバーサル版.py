@@ -2470,12 +2470,61 @@ def write_split_files(selected_ids: list[str], shuryo_mode: int) -> list[str]:
 # グローバルなファイル辞書（run_generation から参照）
 files_global: dict[str, str | None] = {}
 
+
+def _parse_cli_args():
+    """コマンドライン引数でグローバル設定を上書きする。
+
+    使い方例:
+      python3 生成py_ユニバーサル版.py --mode=3 --stdout
+      python3 生成py_ユニバーサル版.py --mode=-1 --hero=ブーン --first-person=100 --stdout
+      python3 生成py_ユニバーサル版.py --mode=2 --shuffle-blocks=1 --stdout
+
+    対応する引数:
+      --mode=N             SHURYO_ONLY_MODE (0=ランダム, -1=通常, 2=モード2, 3=モード3)
+      --hero=NAME          FIXED_HERO (キャラ名 or group:◯◯ or 空=ランダム)
+      --markov-order=N     MARKOV_ORDER (0=ランダム1〜5, 1〜5=固定)
+      --markov-max=N       MARKOV_LINES_MAX
+      --char-min=N         CHAR_COUNT_MIN
+      --char-max=N         CHAR_COUNT_MAX
+      --first-person=N     FIRST_PERSON_RATE (0〜100)
+      --shuffle-blocks=N   SHUFFLE_BLOCKS_MODE (0=OFF, 1=ON)
+      --opening-rate=N     OPENING_RATE (0〜100)
+      --ending-rate=N      ENDING_RATE (0〜100)
+      --stdout / -p        標準出力にプロンプト全文を出力
+    """
+    global SHURYO_ONLY_MODE, FIXED_HERO, MARKOV_ORDER, MARKOV_LINES_MAX
+    global CHAR_COUNT_MIN, CHAR_COUNT_MAX, FIRST_PERSON_RATE
+    global SHUFFLE_BLOCKS_MODE, OPENING_RATE, ENDING_RATE
+
+    arg_map = {
+        "--mode": ("SHURYO_ONLY_MODE", int),
+        "--hero": ("FIXED_HERO", str),
+        "--markov-order": ("MARKOV_ORDER", int),
+        "--markov-max": ("MARKOV_LINES_MAX", int),
+        "--char-min": ("CHAR_COUNT_MIN", int),
+        "--char-max": ("CHAR_COUNT_MAX", int),
+        "--first-person": ("FIRST_PERSON_RATE", int),
+        "--shuffle-blocks": ("SHUFFLE_BLOCKS_MODE", int),
+        "--opening-rate": ("OPENING_RATE", int),
+        "--ending-rate": ("ENDING_RATE", int),
+    }
+    for arg in sys.argv[1:]:
+        if arg.startswith("--") and "=" in arg:
+            key, val = arg.split("=", 1)
+            if key in arg_map:
+                var_name, typ = arg_map[key]
+                try:
+                    globals()[var_name] = typ(val)
+                except (ValueError, TypeError):
+                    print(f"⚠ 無視: {arg}（{typ.__name__}変換失敗）", file=sys.stderr)
+
+
 if __name__ == "__main__":
+    _parse_cli_args()
+
     # マルコフ次数のランダム化
     if MARKOV_ORDER == 0:
-        _markov_order = random.randint(1, 5)
-    else:
-        _markov_order = MARKOV_ORDER
+        MARKOV_ORDER = random.randint(1, 5)
 
     # ファイル読み込み
     files_global = {
