@@ -315,6 +315,7 @@ footer { text-align: center; color: #5b6378; font-size: 11px; padding: 24px 0 40
         <li>資料オンリーモード（-1／3）では、9資料のキャラ計29名に対して優先度をランダム設定し、上から所属する資料（二次創作・超加速・ラボ組・学校組・ホスト組・ツン・渡辺さん・ハイン・でぃ）のtxtを追加していき、文字数上限に収まる順番までをプロンプト先頭へ追加します。<b>視点キャラ固定時は固定キャラの所属txtが採用されていることを確認し、不採用ならリトライします</b>（例：ブーン固定なのに二次創作.txt不採用、という破綻は起きません。優先度の順序自体は改変しません）。</li>
         <li><b>一人称視点指定（全モード共通）</b>：<b>一人称視点指定レート（％・既定50）</b>の確率で、末尾固定ブロックの <code>今回の視点は[ ～ ]です</code> の直後に<b>空行を挟まず</b> <code>一人称視点の形式で書くこと</code> を追加します（トーンブロックの後・<code>文字数は～文字</code> の前の固定位置）。ヒットした回は視点なしレート・視点モード0を無視して必ず視点行を出します（続き.txtによる視点抑止中を除く）。資料オンリーモードの設定値（-1／2／3およびランダム）に関係なく全モードで動作します。</li>
         <li><b>冒頭／終盤のスロット辞書合成</b>（既定ON）：<code>冒頭スロット.txt</code> / <code>終盤スロット.txt</code> は意味スロット辞書です。品詞・意味役割ごとに分類された語彙プール（スロット）と、スロットの並び順と接続を固定した文型（フレーム）を直積して「冒頭は、〜ことになる。」「終盤は、〜ことになる。」の1文を組み立てます。フレームが助詞と接続を保持するため、出力は文法的に正しい日本語になります。語彙行の <code>@タグ</code> でフレーム側から候補を絞り込み、<code>^グループ=値</code> の排他指定で意味的に衝突する組み合わせを引き直します。パターン数は文型数と各スロットの語彙数の積で決まるため、<code>#SLOT</code> に語彙を1行足すだけで掛け算に増えます。辞書はリポジトリ上で編集するだけで反映されます。</li>
+        <li><b>冒頭／終盤の骨格カード生成（構造層・既定ON）</b>：辞書は<b>既存の <code>冒頭スロット.txt</code> / <code>終盤スロット.txt</code> と同じファイル</b>から読み、中身を自動判別します。<code>#AXIS</code>／<code>#TEXT</code> を含む<b>骨格辞書形式</b>が入っていた場合はこちらを優先し、物語エンジン・決着機構・犠牲・確定度など独立した軸から<b>物語骨格カード</b>を1枚抽選して「冒頭は、〜」「終盤は、〜」を合成します。旧スロット辞書のままなら自動で従来のスロット辞書合成にフォールバックするので、<b>txtの中身を書き換えるだけで方式が切り替わり、ファイルの追加は不要</b>です。単語ではなく<b>物語機能</b>を分散させることで、「日常→異変発見→調査・逃走」「能力ルール対決→条件反転→犠牲」への収束を防ぎます。直近の生成履歴で出過ぎた軸の重みは自動的に下がり、直近カードと物語機能が近い組合せは引き直されます（意味的重複のリジェクション）。履歴はブラウザの localStorage に保存され、ページをまたいで偏りが補正されます。生成した行の直後には抽選カードの中身を<code>［エンジン=…｜…｜犠牲=…］</code>の<b>構造タグとしてプロンプト本体に同梱</b>し、執筆AIが物語機能から逃げられないようにします。特に犠牲=死亡するは、ぼかさず<b>死亡エンドとして直接描くよう指示文で強制</b>します。</li>
         <li><b>冒頭.txt / 終盤.txt の扱い</b>：この2ファイルは、スロット辞書の語彙を採集する素材であり、マルコフ合成のコーパスです。<b>スロット合成時の既存行そのまま採用率（％）</b>は既定0で、0のときは行をそのまま1行として使うことはありません。スロット合成の結果がこの2ファイルの行と一致した場合、一致を理由に引き直さずそのまま採用します。</li>
         <li><b>フロー指示文</b>：スロット辞書で組み立てた1行の直後には「↑ これが冒頭の流れ。ここで出した要素や言及は、物語のどこかで必ず意味を持つ伏線として張っておけ。」（終盤は「↑ これが終盤の流れ。この終盤の着地を、物語のどこかで既に張った伏線を拾い上げる形で実現しろ。」）を置きます。マルコフ連鎖で組み立てた1行の直後には、文が破綻していても意図を補完して強引に解釈させる指示を含めた文を置きます。<b>冒頭／終盤のスロット辞書合成</b>をOFFにした場合、辞書が取得できない場合、試行回数内に合格文が出ない場合は、マルコフ連鎖で1行を組み立てます。</li>
         <li><b>ブロックランダム順モード</b>（デフォルトOFF）をONにすると、プロンプトの各ブロック（採用キャラ資料群・関係ルール・SS.txt・共通.txt・各マルコフ＋区切り・最後.txt・キャラテンプレ・冒頭／終盤／テーマ／トーン等）を毎回ランダムな順番に並べ替えます。<b>「視点提示 → 文字数指定」の2つだけはシャッフルされず、常に最後の固定位置</b>（一人称指定行は視点提示の一部として同じく固定）です。「マルコフ文＋これは資料です」等のペアは順序のまま維持されます。</li>
@@ -1489,6 +1490,453 @@ if (typeof module !== 'undefined' && module.exports) module.exports = NOVEL_DATA
 });
 </script>
 <script>
+// ==== SKELETON_ENGINE_BEGIN ====
+/*
+ * 骨格エンジン（構造層）
+ * 冒頭骨格.txt / 終盤骨格.txt を解釈し、
+ * 「物語骨格カード（軸の組合せ）→ 文章化」の二層生成を行う。
+ *
+ * 目的（シナリオ自動生成_冒頭終盤_多様性設計仕様書 準拠）:
+ *  - 冒頭が「日常→異変発見→調査・逃走」へ、終盤が「能力ルール対決→
+ *    条件反転→犠牲・死亡→記録や名前で決着」へ収束するのを防ぐ
+ *  - 物語エンジン・決着機構・犠牲・確定度などを独立した軸として管理し、
+ *    表現のバリエーションではなく物語機能を分散させる（§5・§9・§11）
+ *  - 直近履歴で出過ぎた軸値の重みを動的に下げる（§17 反偏り機構）
+ *  - 直近カードと物語機能ベクトルが近い組合せは引き直す（§18・§25）
+ *  - 履歴は localStorage に永続化し、ページをまたいで偏りを補正する
+ *    （localStorage が使えない環境ではメモリ内のみで機能する）
+ */
+var SkeletonEngine = (function () {
+  'use strict';
+
+  var LS = null;
+  try {
+    if (typeof window !== 'undefined' && window.localStorage) LS = window.localStorage;
+  } catch (e) { LS = null; }
+
+  // ============================================================
+  // 1. 行パース
+  // ------------------------------------------------------------
+  // 制御トークン: 重みn / @key=value(|OR) / !key=value(|OR) /
+  //               ^key=value（排他グループ） / @tag（裸タグ）
+  // ============================================================
+  function consumeControl(t, meta) {
+    var wm = /^重み(\d+)$/.exec(t);
+    if (wm) { meta.weight = Math.max(1, parseInt(wm[1], 10)); return true; }
+    if (t.charAt(0) === '^') {
+      var kv = t.slice(1).split('=');
+      if (kv.length === 2) meta.mutex[kv[0]] = kv[1];
+      return true;
+    }
+    if (t.charAt(0) === '!') {
+      var kv2 = t.slice(1).split('=');
+      if (kv2.length === 2) meta.conds.push({ key: kv2[0], vals: kv2[1].split('|'), deny: true });
+      return true;
+    }
+    if (t.charAt(0) === '@') {
+      var body = t.slice(1);
+      var eq = body.indexOf('=');
+      if (eq !== -1) {
+        meta.conds.push({ key: body.slice(0, eq), vals: body.slice(eq + 1).split('|'), deny: false });
+      } else {
+        meta.tags.push(body);
+      }
+      return true;
+    }
+    return false;
+  }
+
+  function newMeta() {
+    return { conds: [], tags: [], mutex: {}, weight: 1 };
+  }
+
+  function parseEntryLine(line) {
+    var tokens = line.split(/\s+/);
+    var meta = newMeta();
+    var texts = [];
+    for (var i = 0; i < tokens.length; i++) {
+      var t = tokens[i];
+      if (!t) continue;
+      if (!consumeControl(t, meta)) texts.push(t);
+    }
+    meta.text = texts.join(' ').trim();
+    return meta;
+  }
+
+  function parseFrameBody(line) {
+    var re = /\{([^{}]+)\}/g;
+    var parts = [];
+    var last = 0;
+    var m;
+    while ((m = re.exec(line)) !== null) {
+      if (m.index > last) parts.push({ lit: line.slice(last, m.index) });
+      var spec = m[1];
+      var opt = false;
+      if (/\?$/.test(spec)) { opt = true; spec = spec.slice(0, -1); }
+      var segs = spec.split('@');
+      var name = segs.shift();
+      var need = segs;
+      var segs2 = name.split('!');
+      name = segs2[0];
+      var deny = segs2.slice(1);
+      parts.push({ slot: name, optional: opt, need: need, deny: deny });
+      last = m.index + m[0].length;
+    }
+    if (last < line.length) parts.push({ lit: line.slice(last) });
+    return parts;
+  }
+
+  function parseFrameLine(line) {
+    var tokens = line.split(/\s+/);
+    var meta = newMeta();
+    var i = 0;
+    for (; i < tokens.length; i++) {
+      var t = tokens[i];
+      if (!t) continue;
+      if (!consumeControl(t, meta)) break;
+    }
+    meta.body = tokens.slice(i).join(' ').trim();
+    meta.parts = meta.body ? parseFrameBody(meta.body) : [];
+    return meta;
+  }
+
+  function parseDict(text) {
+    var lines = String(text || '').replace(/^\uFEFF/, '').split(/\r?\n/);
+    var dict = { axes: {}, axisOrder: [], slots: {}, slotOrder: [], frames: [], prefix: '', suffix: '' };
+    var mode = null;   // 'entry' | 'frame' | null
+    var cur = null;    // 'axis' | 'slot'
+    for (var i = 0; i < lines.length; i++) {
+      var line = lines[i].replace(/^\uFEFF/, '').trim();
+      if (!line) continue;
+      if (line.charAt(0) === ';' || line.indexOf('//') === 0) continue;
+
+      var g = /^#(PREFIX|SUFFIX)\s*(.*)$/.exec(line);
+      if (g) {
+        if (g[1] === 'PREFIX') dict.prefix = g[2];
+        else dict.suffix = g[2];
+        mode = null;
+        continue;
+      }
+      var h = /^#(AXIS|SLOT|TEXT)\s*(.*)$/.exec(line);
+      if (h) {
+        if (h[1] === 'AXIS') {
+          cur = h[2].trim() || ('axis' + i);
+          if (!dict.axes[cur]) { dict.axes[cur] = []; dict.axisOrder.push(cur); }
+          mode = 'entry';
+        } else if (h[1] === 'SLOT') {
+          cur = h[2].trim() || ('slot' + i);
+          if (!dict.slots[cur]) { dict.slots[cur] = []; dict.slotOrder.push(cur); }
+          mode = 'entry';
+        } else {
+          mode = 'frame';
+        }
+        continue;
+      }
+      if (mode === 'entry') {
+        var e = parseEntryLine(line);
+        if (!e.text) continue;
+        if (dict.axes[cur]) dict.axes[cur].push(e);
+        else if (dict.slots[cur]) dict.slots[cur].push(e);
+      } else if (mode === 'frame') {
+        var f = parseFrameLine(line);
+        if (f.body) dict.frames.push(f);
+      }
+    }
+    return dict;
+  }
+
+  // ============================================================
+  // 2. カード条件の判定
+  // ============================================================
+  function cardValue(card, key) {
+    if (card.axes[key] != null) return card.axes[key];
+    if (card.mutex[key] != null) return card.mutex[key];
+    return null;
+  }
+
+  function condsPass(conds, card) {
+    if (!conds || !conds.length) return true;
+    for (var i = 0; i < conds.length; i++) {
+      var c = conds[i];
+      var cur = cardValue(card, c.key);
+      if (c.deny) {
+        if (cur != null && c.vals.indexOf(cur) !== -1) return false;
+      } else {
+        if (cur == null || c.vals.indexOf(cur) === -1) return false;
+      }
+    }
+    return true;
+  }
+
+  function mutexConflict(entryMutex, card) {
+    for (var k in entryMutex) {
+      if (card.mutex[k] != null && card.mutex[k] !== entryMutex[k]) return true;
+    }
+    return false;
+  }
+
+  // ============================================================
+  // 3. 生成履歴（永続化）
+  // ============================================================
+  var MEM = {};
+  function histKey(kind) { return 'skel_hist_' + kind; }
+
+  function loadHistory(kind) {
+    if (LS) {
+      try {
+        var raw = LS.getItem(histKey(kind));
+        if (raw) {
+          var h = JSON.parse(raw);
+          if (h && h.cards) return h;
+        }
+      } catch (e) { /* 読めない環境ではメモリへ */ }
+    }
+    return MEM[kind] || { cards: [], texts: [] };
+  }
+
+  function saveHistory(kind, h) {
+    MEM[kind] = h;
+    if (LS) {
+      try { LS.setItem(histKey(kind), JSON.stringify(h)); } catch (e) { /* 保存できなくても動作は続行 */ }
+    }
+  }
+
+  function recordHistory(kind, card, body) {
+    var h = loadHistory(kind);
+    h.cards.push({ a: card.axes });
+    h.texts.push(body);
+    if (h.cards.length > 200) h.cards = h.cards.slice(-200);
+    if (h.texts.length > 200) h.texts = h.texts.slice(-200);
+    saveHistory(kind, h);
+  }
+
+  function resetHistory(kind) {
+    saveHistory(kind, { cards: [], texts: [] });
+  }
+
+  // ============================================================
+  // 4. 動的重み補正（§17）
+  //    直近100カードでの出現率が初期比率を上回る軸値の重みを下げ、
+  //    下回る（または皆出）軸値の重みを上げる
+  // ============================================================
+  function adjustWeights(entries, axis, hist) {
+    var i, j;
+    for (i = 0; i < entries.length; i++) entries[i]._w = entries[i].weight;
+    if (!hist || !hist.cards || hist.cards.length < 10) return;
+    var recent = hist.cards.slice(-100);
+    var n = recent.length;
+    var sumW = 0;
+    for (i = 0; i < entries.length; i++) sumW += entries[i].weight;
+    if (sumW <= 0) return;
+    for (i = 0; i < entries.length; i++) {
+      var e = entries[i];
+      var obs = 0;
+      for (j = 0; j < n; j++) {
+        var a = recent[j].a || {};
+        if (a[axis] === e.text) obs++;
+      }
+      obs = obs / n;
+      var target = e.weight / sumW;
+      var w = e.weight;
+      if (obs < 0.0001) {
+        w = w * (1 + Math.min(1, target * 2));
+      } else {
+        w = w * Math.pow(target / obs, 0.7);
+      }
+      e._w = Math.max(e.weight * 0.15, Math.min(e.weight * 4, w));
+    }
+  }
+
+  function weightOf(e) { return e._w != null ? e._w : e.weight; }
+
+  function weightedPick(entries) {
+    var total = 0;
+    var i;
+    for (i = 0; i < entries.length; i++) total += weightOf(entries[i]);
+    var r = Math.random() * total;
+    for (i = 0; i < entries.length; i++) {
+      r -= weightOf(entries[i]);
+      if (r <= 0) return entries[i];
+    }
+    return entries[entries.length - 1];
+  }
+
+  // ============================================================
+  // 5. 骨格カードの抽選
+  // ============================================================
+  function drawCard(dict, hist) {
+    var card = { axes: {}, mutex: {} };
+    for (var i = 0; i < dict.axisOrder.length; i++) {
+      var axis = dict.axisOrder[i];
+      var pool = dict.axes[axis];
+      var cand = [];
+      for (var j = 0; j < pool.length; j++) {
+        var e = pool[j];
+        if (!condsPass(e.conds, card)) continue;
+        if (mutexConflict(e.mutex, card)) continue;
+        cand.push(e);
+      }
+      if (!cand.length) continue;
+      adjustWeights(cand, axis, hist);
+      var pick = weightedPick(cand);
+      card.axes[axis] = pick.text;
+      for (var k in pick.mutex) card.mutex[k] = pick.mutex[k];
+    }
+    return card;
+  }
+
+  // ============================================================
+  // 6. 意味的重複のリジェクション（§18・§25）
+  //    直近12カードと軸値の一致率が高い組合せは破棄して引き直す
+  // ============================================================
+  function tooSimilar(card, hist) {
+    var recent = hist.cards.slice(-12);
+    for (var i = 0; i < recent.length; i++) {
+      var a = recent[i].a || {};
+      var common = 0;
+      var equal = 0;
+      for (var k in card.axes) {
+        if (a[k] != null) {
+          common++;
+          if (a[k] === card.axes[k]) equal++;
+        }
+      }
+      if (common > 0 && equal / common >= 0.6) return true;
+    }
+    return false;
+  }
+
+  // ============================================================
+  // 7. 文章化（第2層）
+  // ============================================================
+  function realize(dict, card, minChars, maxChars, hist, tries) {
+    var frames = [];
+    for (var i = 0; i < dict.frames.length; i++) {
+      if (condsPass(dict.frames[i].conds, card)) frames.push(dict.frames[i]);
+    }
+    if (!frames.length) return '';
+    for (var t = 0; t < tries; t++) {
+      var frame = weightedPick(frames);
+      var out = '';
+      var ok = true;
+      var usedEntries = [];
+      for (var p = 0; p < frame.parts.length; p++) {
+        var part = frame.parts[p];
+        if (part.lit !== undefined) { out += part.lit; continue; }
+        var name = part.slot;
+        if (name.charAt(0) === '#') {
+          var v = card.axes[name.slice(1)];
+          if (v == null) {
+            if (part.optional) continue;
+            ok = false;
+            break;
+          }
+          out += v;
+          continue;
+        }
+        var pool = dict.slots[name];
+        if (!pool || !pool.length) {
+          if (part.optional) continue;
+          ok = false;
+          break;
+        }
+        var cand = [];
+        for (var j = 0; j < pool.length; j++) {
+          var e = pool[j];
+          var pass = true;
+          var d, nd;
+          for (d = 0; d < part.deny.length; d++) {
+            if (e.tags.indexOf(part.deny[d]) !== -1) { pass = false; break; }
+          }
+          if (!pass) continue;
+          for (nd = 0; nd < part.need.length; nd++) {
+            if (e.tags.indexOf(part.need[nd]) === -1) { pass = false; break; }
+          }
+          if (!pass) continue;
+          if (!condsPass(e.conds, card)) continue;
+          if (mutexConflict(e.mutex, card)) continue;
+          var dup = false;
+          for (var u = 0; u < usedEntries.length; u++) {
+            if (usedEntries[u] === e) { dup = true; break; }
+            var um = usedEntries[u].mutex;
+            for (var k in um) {
+              if (e.mutex[k] != null && e.mutex[k] !== um[k]) { dup = true; break; }
+            }
+            if (dup) break;
+          }
+          if (dup) continue;
+          cand.push(e);
+        }
+        if (!cand.length) {
+          if (part.optional) continue;
+          ok = false;
+          break;
+        }
+        var pick = weightedPick(cand);
+        usedEntries.push(pick);
+        out += pick.text;
+      }
+      if (!ok) continue;
+      var body = out.replace(/\s+/g, '');
+      if (!body) continue;
+      if (body.length < minChars || body.length > maxChars) continue;
+      if (hist && hist.texts && hist.texts.indexOf(body) !== -1) continue;
+      return body;
+    }
+    return '';
+  }
+
+  // ============================================================
+  // 8. 総合入口
+  // ============================================================
+  function generate(dict, opts) {
+    opts = opts || {};
+    var kind = opts.kind || '冒頭';
+    var minChars = opts.minChars != null ? opts.minChars : 16;
+    var maxChars = opts.maxChars != null ? opts.maxChars : 140;
+    var tries = opts.tries || 120;
+    var hist = loadHistory(kind);
+    for (var t = 0; t < (opts.cardTries || 60); t++) {
+      var card = drawCard(dict, hist);
+      if (tooSimilar(card, hist)) continue;
+      var body = realize(dict, card, minChars, maxChars, hist, tries);
+      if (!body) continue;
+      recordHistory(kind, card, body);
+      return { text: dict.prefix + body + dict.suffix, body: body, axes: card.axes, mutex: card.mutex };
+    }
+    // 履歴との重複判定を緩めて最終の1回だけ作る（空振りで注入ごと消えるのを防ぐ）
+    var card2 = drawCard(dict, hist);
+    var body2 = realize(dict, card2, minChars, maxChars, null, tries);
+    if (body2) {
+      recordHistory(kind, card2, body2);
+      return { text: dict.prefix + body2 + dict.suffix, body: body2, axes: card2.axes, mutex: card2.mutex };
+    }
+    return '';
+  }
+
+  function stats(dict) {
+    var s = { axes: {}, slots: {}, frames: dict.frames.length };
+    var i;
+    for (i = 0; i < dict.axisOrder.length; i++) s.axes[dict.axisOrder[i]] = dict.axes[dict.axisOrder[i]].length;
+    for (i = 0; i < dict.slotOrder.length; i++) s.slots[dict.slotOrder[i]] = dict.slots[dict.slotOrder[i]].length;
+    return s;
+  }
+
+  return {
+    parseDict: parseDict,
+    generate: generate,
+    resetHistory: resetHistory,
+    loadHistory: loadHistory,
+    stats: stats
+  };
+})();
+
+// 辞書はSS.htmlへ内蔵しない。必ずスロット（冒頭骨格.txt / 終盤骨格.txt：
+// GitHub参照 / ローカルファイル / テキスト直接入力）から読み込む。
+// 辞書の編集はそのtxtを直すだけで反映される。
+// ==== SKELETON_ENGINE_END ====
+</script>
+<script>
 /*
  * 小説生成プロンプト エンジン
  * 「生成py_組み込み済み.py」のロジックをJavaScriptへ移植したもの。
@@ -1780,10 +2228,12 @@ var NovelGen = (function () {
   // ============================================================
   var FLOW_NOTE = {
     '冒頭': {
+      skel:   '↑\nこれが冒頭の流れ。文の直後の［ ］は、この冒頭に課された物語機能の指定（骨格カード）である。タグの全項目を厳守して書き、どれも外さないこと。特に犠牲・喪失・トラブルの指定は勝手な回避・軽減・後出しの撤回を禁止する。ここで出した要素や言及は、物語のどこかで必ず意味を持つ伏線として張っておけ。',
       slot:   '↑\nこれが冒頭の流れ。ここで出した要素や言及は、物語のどこかで必ず意味を持つ伏線として張っておけ。',
       markov: '↑\nこれが冒頭の流れ。文が破綻していても、その意図を補完して強引に解釈し、ここで出した要素や言及を物語のどこかで必ず意味を持つ伏線として張っておけ。'
     },
     '終盤': {
+      skel:   '↑\nこれが終盤の流れ。文の直後の［ ］は、この結末に課された物語機能の指定（骨格カード）である。タグの全項目を厳守して書き、どれも外さないこと。特に犠牲が「死亡する」の場合は、指定された死因のまま必ず死亡エンドとして直接描け。死亡のぼかし・生存へのすり替え・直前の回避は禁止する。この終盤の着地を、物語のどこかで既に張った伏線を拾い上げる形で実現しろ。',
       slot:   '↑\nこれが終盤の流れ。この終盤の着地を、物語のどこかで既に張った伏線を拾い上げる形で実現しろ。',
       markov: '↑\nこれが終盤の流れ。文が破綻していても、その意図を補完して強引に解釈し、この終盤の着地を、物語のどこかで既に張った伏線を拾い上げる形で実現しろ。'
     }
@@ -1851,6 +2301,67 @@ var NovelGen = (function () {
     line = line.replace(/\r/g, '').replace(/\n/g, ' ').trim();
     if (!line || line.length > limit) return '';
     return line;
+  }
+
+  // ============================================================
+  // ★ 冒頭／終盤フロー1行（構造層：物語骨格カード → 文章化）
+  // ------------------------------------------------------------
+  //   辞書は既存の 冒頭スロット.txt / 終盤スロット.txt と同じファイルから
+  //   読み込み、中身を自動判別する。#AXIS／#TEXT を含む骨格辞書形式のときは
+  //   その軸（物語エンジン・決着機構・犠牲・確定度など）から骨格カードを
+  //   1枚抽選してカードに沿って1文を合成する。旧スロット辞書形式のときは
+  //   null を返して従来のスロット辞書合成に任せる（別ファイルは不要）。
+  //   「日常→異変発見→調査・逃走」「能力ルール対決→条件反転→犠牲」への
+  //   収束を防ぐための構造層。直近の生成履歴で出過ぎた軸値は重みが下がり、
+  //   直近カードと物語機能ベクトルが近い組合せは引き直される。
+  //   履歴は localStorage に保存され、ページをまたいで偏りが補正される。
+  //   生成文の直後には、抽選された骨格カードの中身を
+  //   ［エンジン=…｜…｜犠牲=…］形式の構造タグ行として同じブロックに同梱する。
+  //   プロンプトを受ける執筆AIは物語機能の指定から逃げられなくなり、
+  //   特に犠牲=死亡するを勝手に回避できなくなる。
+  //   失敗した場合は従来のスロット辞書 → マルコフへフォールバックする。
+  // ============================================================
+  var SKEL_DICT_CACHE = {};
+  function getSkeletonDict(key, text) {
+    if (!text) return null;
+    if (typeof SkeletonEngine === 'undefined' || !SkeletonEngine) return null;
+    var hit = SKEL_DICT_CACHE[key];
+    if (hit && hit.src === text) return hit.dict;
+    var dict = null;
+    try { dict = SkeletonEngine.parseDict(text); } catch (e) { dict = null; }
+    // #TEXT（フレーム）が無い＝骨格辞書形式ではない（旧スロット辞書など）→ null
+    if (!dict || !dict.frames || !dict.frames.length) return null;
+    SKEL_DICT_CACHE[key] = { src: text, dict: dict };
+    return dict;
+  }
+
+  function generateSkeletonFlowLine(kind, files, charLimit, P) {
+    if (numOr(P.useSkeletonEngine, 1) !== 1) return '';
+    if (typeof SkeletonEngine === 'undefined' || !SkeletonEngine) return '';
+    var limit = Math.max(30, Math.floor(charLimit));
+    var dictText = kind === '冒頭' ? files.openingSlot : files.endingSlot;
+    var dict = getSkeletonDict(kind, normalizeFlowText(dictText || ''));
+    if (!dict) return '';
+    var result = '';
+    try {
+      result = SkeletonEngine.generate(dict, {
+        kind: kind,
+        minChars: 18,
+        maxChars: Math.max(20, limit - 10),
+        tries: 120,
+        cardTries: 60
+      });
+    } catch (e) { result = ''; }
+    if (!result || !result.text) return '';
+    var line = result.text.replace(/\r/g, '').replace(/\n/g, ' ').trim();
+    if (!line || line.length > limit) return '';
+    // 構造タグ行を組み立てて同梱する（執筆AIが骨格を守る強制力）
+    var tags = [];
+    var axes = result.axes || {};
+    for (var k in axes) {
+      if (Object.prototype.hasOwnProperty.call(axes, k) && axes[k]) tags.push(k + '=' + axes[k]);
+    }
+    return tags.length ? line + '\n［' + tags.join('｜') + '］' : line;
   }
 
   function generateMarkovText(text, order, lineCount, charLimit, P, cacheKey) {
@@ -2286,7 +2797,12 @@ var NovelGen = (function () {
       if (remO > 0) {
         var op = '';
         var opFromSlot = false;
-        if (Math.random() * 100 < numOr(P.openingRate, 100)) {
+        var opFromSkel = false;
+        if (Math.random() * 100 < numOr(P.skeletonRate, 100)) {
+          op = generateSkeletonFlowLine('冒頭', files, Math.min(160, remO), P);
+          opFromSkel = !!op;
+        }
+        if (!op && Math.random() * 100 < numOr(P.openingRate, 100)) {
           op = generateSlotFlowLine('冒頭', files, Math.min(160, remO), P);
           opFromSlot = !!op;
           if (!op && files.opening) op = generateOpeningOneLiner(files.opening, Math.min(160, remO), P);
@@ -2297,7 +2813,7 @@ var NovelGen = (function () {
         if (!op) op = generateFlowFallbackLine('冒頭は、', files.markov, Math.min(160, remO), P, '__one_opening_fb');
         if (op) {
           if (!addBase(op)) return null;
-          if (!addBase(opFromSlot ? FLOW_NOTE['冒頭'].slot : FLOW_NOTE['冒頭'].markov)) return null;
+          if (!addBase(opFromSkel ? FLOW_NOTE['冒頭'].skel : (opFromSlot ? FLOW_NOTE['冒頭'].slot : FLOW_NOTE['冒頭'].markov))) return null;
           sealBase();
         }
       }
@@ -2311,7 +2827,12 @@ var NovelGen = (function () {
       if (remE > 0) {
         var en = '';
         var enFromSlot = false;
-        if (Math.random() * 100 < numOr(P.endingRate, 100)) {
+        var enFromSkel = false;
+        if (Math.random() * 100 < numOr(P.skeletonRate, 100)) {
+          en = generateSkeletonFlowLine('終盤', files, Math.min(160, remE), P);
+          enFromSkel = !!en;
+        }
+        if (!en && Math.random() * 100 < numOr(P.endingRate, 100)) {
           en = generateSlotFlowLine('終盤', files, Math.min(160, remE), P);
           enFromSlot = !!en;
           if (!en && files.ending) en = generateEndingOneLiner(files.ending, Math.min(160, remE), P);
@@ -2322,7 +2843,7 @@ var NovelGen = (function () {
         if (!en) en = generateFlowFallbackLine('終盤は、', files.markov, Math.min(160, remE), P, '__one_ending_fb');
         if (en) {
           if (!addBase(en)) return null;
-          if (!addBase(enFromSlot ? FLOW_NOTE['終盤'].slot : FLOW_NOTE['終盤'].markov)) return null;
+          if (!addBase(enFromSkel ? FLOW_NOTE['終盤'].skel : (enFromSlot ? FLOW_NOTE['終盤'].slot : FLOW_NOTE['終盤'].markov))) return null;
           sealBase();
         }
       }
@@ -2743,7 +3264,12 @@ var NovelGen = (function () {
       if (remO > 0) {
         var op = '';
         var opFromSlot = false;
-        if (Math.random() * 100 < numOr(P.openingRate, 100)) {
+        var opFromSkel = false;
+        if (Math.random() * 100 < numOr(P.skeletonRate, 100)) {
+          op = generateSkeletonFlowLine('冒頭', files, Math.min(160, remO), P);
+          opFromSkel = !!op;
+        }
+        if (!op && Math.random() * 100 < numOr(P.openingRate, 100)) {
           op = generateSlotFlowLine('冒頭', files, Math.min(160, remO), P);
           opFromSlot = !!op;
           if (!op && files.opening) op = generateOpeningOneLiner(files.opening, Math.min(160, remO), P);
@@ -2754,7 +3280,7 @@ var NovelGen = (function () {
         if (!op) op = generateFlowFallbackLine('冒頭は、', files.markov, Math.min(160, remO), P, '__one_opening_fb');
         if (op) {
           if (!addToContents(op)) return null;
-          if (!addToContents(opFromSlot ? FLOW_NOTE['冒頭'].slot : FLOW_NOTE['冒頭'].markov)) return null;
+          if (!addToContents(opFromSkel ? FLOW_NOTE['冒頭'].skel : (opFromSlot ? FLOW_NOTE['冒頭'].slot : FLOW_NOTE['冒頭'].markov))) return null;
           sealBlock();
         }
       }
@@ -2768,7 +3294,12 @@ var NovelGen = (function () {
       if (remE > 0) {
         var en = '';
         var enFromSlot = false;
-        if (Math.random() * 100 < numOr(P.endingRate, 100)) {
+        var enFromSkel = false;
+        if (Math.random() * 100 < numOr(P.skeletonRate, 100)) {
+          en = generateSkeletonFlowLine('終盤', files, Math.min(160, remE), P);
+          enFromSkel = !!en;
+        }
+        if (!en && Math.random() * 100 < numOr(P.endingRate, 100)) {
           en = generateSlotFlowLine('終盤', files, Math.min(160, remE), P);
           enFromSlot = !!en;
           if (!en && files.ending) en = generateEndingOneLiner(files.ending, Math.min(160, remE), P);
@@ -2779,7 +3310,7 @@ var NovelGen = (function () {
         if (!en) en = generateFlowFallbackLine('終盤は、', files.markov, Math.min(160, remE), P, '__one_ending_fb');
         if (en) {
           if (!addToContents(en)) return null;
-          if (!addToContents(enFromSlot ? FLOW_NOTE['終盤'].slot : FLOW_NOTE['終盤'].markov)) return null;
+          if (!addToContents(enFromSkel ? FLOW_NOTE['終盤'].skel : (enFromSlot ? FLOW_NOTE['終盤'].slot : FLOW_NOTE['終盤'].markov))) return null;
           sealBlock();
         }
       }
@@ -3637,6 +4168,8 @@ NovelGen.setNovelData(NOVEL_DATA);
     useMarkovMode: 1,         // 1=ON / 0=OFF
     heroMode: -1,             // -1=ランダム / 0=視点なし / 1=必ず視点
     useLastMarkovLineMode: 1, // テーマ（最後の1行マルコフ） 1=ON / 0=OFF
+    useSkeletonEngine: 1,     // 冒頭／終盤の1行を 冒頭骨格.txt／終盤骨格.txt の骨格カード（構造層）で作る 1=ON / 0=OFF（OFFまたは失敗時はスロット辞書→マルコフ）
+    skeletonRate: 100,        // 骨格カード生成を試みる率（％）。外れた場合・失敗時は従来のスロット辞書→マルコフへフォールバック
     useSlotEngine: 1,         // 冒頭／終盤の1行を 冒頭スロット.txt／終盤スロット.txt の直積合成で作る 1=ON / 0=OFF（OFFまたは合成失敗時はマルコフ）
     slotVerbatimRate: 0,      // スロット合成時の「既存行そのまま採用率」（％）0=使わない。上げた分だけ 冒頭.txt／終盤.txt の行をそのまま1行として使う
     slotTries: 200,           // スロット合成の試行回数（タグ・排他グループで不合格になった組み合わせの引き直し上限）
@@ -3676,6 +4209,8 @@ NovelGen.setNovelData(NOVEL_DATA);
     { key: 'heroMode', label: '視点モード', type: 'select',
       options: [[-1, '-1: ランダム（4/5で視点あり）'], [0, '0: 視点なし'], [1, '1: 必ず視点']] },
     { key: 'useLastMarkovLineMode', label: 'テーマ提示（最後の1行）', type: 'select', options: [[1, '1: ON'], [0, '0: OFF']] },
+    { key: 'useSkeletonEngine', label: '冒頭／終盤の骨格カード生成（スロットtxt内の骨格辞書／構造層）', type: 'select', options: [[1, '1: ON'], [0, '0: OFF']] },
+    { key: 'skeletonRate', label: '骨格カード生成レート（％）外れ・失敗時はスロット辞書→マルコフ', type: 'number', min: 0, max: 100 },
     { key: 'useSlotEngine', label: '冒頭／終盤のスロット辞書合成（冒頭スロット.txt・終盤スロット.txt）', type: 'select', options: [[1, '1: ON'], [0, '0: OFF']] },
     { key: 'slotVerbatimRate', label: 'スロット合成時の既存行そのまま採用率（％）0=使わない', type: 'number', min: 0, max: 100 },
     { key: 'slotTries', label: 'スロット合成の試行回数', type: 'number', min: 1, max: 1000 },
