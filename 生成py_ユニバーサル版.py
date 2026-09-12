@@ -572,6 +572,18 @@ def _skel_consume_control(token: str, meta: dict) -> bool:
     if wm:
         meta["weight"] = max(1, int(wm.group(1)))
         return True
+    # 文=値 / 句=値 … その軸値をそのまま固定文字列として展開する
+    if len(token) > 2 and token[0] in ("文", "句") and token[1] == "=":
+        meta["forms"]["__lit"] = True
+        return True
+    # 文{…} / 句{…} … 軸値の文章化テンプレート（軸値そのものは表示されない）
+    #   文{…} = 述語を含む文、句{…} = 述語を含まない名詞句。
+    #   フレーム側の {#軸名} は、テンプレートがあればそれを、無ければ軸値の文字列を返す。
+    #   同じ種類のテンプレートを複数書くと先頭から試し、語彙が引けたものを使う。
+    if len(token) > 3 and token[0] in ("文", "句") and token[1] == "{" and token[-1] == "}":
+        kind = token[0]
+        meta["forms"].setdefault(kind, []).append(_skel_parse_template_body(token[2:-1]))
+        return True
     if token[0] == "^":
         kv = token[1:].split("=", 1)
         if len(kv) == 2:
@@ -594,7 +606,7 @@ def _skel_consume_control(token: str, meta: dict) -> bool:
 
 
 def _skel_new_meta() -> dict:
-    return {"conds": [], "tags": [], "mutex": {}, "weight": 1}
+    return {"conds": [], "tags": [], "mutex": {}, "weight": 1, "forms": {}}
 
 
 def _skel_parse_entry_line(line: str) -> dict:
@@ -610,26 +622,77 @@ def _skel_parse_entry_line(line: str) -> dict:
     return meta
 
 
-def _skel_parse_frame_body(line: str) -> list:
+def _skel_make_part(spec: str) -> dict:
+    """{ … } の中身（スロット指定）を1つの部品にする"""
+    opt = False
+    kind = None
+    eq = spec.find("=")
+    if eq != -1 and spec.startswith("#"):
+        kv = spec[eq + 1:]
+        if kv in ("文", "句"):
+            kind = kv
+            spec = spec[:eq]
+    if spec.endswith("?"):
+        opt = True
+        spec = spec[:-1]
+    segs = spec.split("@")
+    name = segs.pop(0)
+    need = segs
+    segs2 = name.split("!")
+    name = segs2[0]
+    deny = segs2[1:]
+    return {"slot": name, "optional": opt, "need": need, "deny": deny, "kind": kind}
+
+
+def _skel_parse_template_body(body: str) -> list:
+    """軸値テンプレート（文{…}／句{…}）の中身。部品は + で区切る。
+       波括弧を隣接させて書くと外側の括弧と取り違えるため、区切りを + にしている。
+       = で始めるとその後ろはそのまま出す固定文字列になる。"""
     parts = []
-    last = 0
-    for m in re.finditer(r"\{([^{}]+)\}", line):
-        if m.start() > last:
-            parts.append({"lit": line[last:m.start()]})
-        spec = m.group(1)
-        opt = spec.endswith("?")
-        if opt:
-            spec = spec[:-1]
-        segs = spec.split("@")
-        name = segs.pop(0)
-        need = segs
-        segs2 = name.split("!")
-        name = segs2[0]
-        deny = segs2[1:]
-        parts.append({"slot": name, "optional": opt, "need": need, "deny": deny})
-        last = m.end()
-    if last < len(line):
-        parts.append({"lit": line[last:]})
+    for x in str(body).split("+"):
+        if not x:
+            parts.append({"lit": ""})
+            continue
+        if x[0] == "{" and x[-1] == "}" and len(x) > 2:
+            parts.append(_skel_make_part(x[1:-1]))
+            continue
+        if x[0] == "#":
+            parts.append(_skel_make_part(x))
+            continue
+        if x[0] == "=":
+            parts.append({"lit": x[1:]})
+            continue
+        parts.append(_skel_make_part(x))
+    return parts
+
+
+def _skel_parse_frame_body(line: str) -> list:
+    """フレーム本体。{ … } を1文字ずつ走査して切り出す。"""
+    parts = []
+    buf = ""
+    i = 0
+    while i < len(line):
+        c = line[i]
+        if c != "{":
+            buf += c
+            i += 1
+            continue
+        j = i + 1
+        spec = ""
+        while j < len(line) and line[j] != "}":
+            spec += line[j]
+            j += 1
+        if j >= len(line):
+            buf += c
+            i += 1
+            continue
+        if buf:
+            parts.append({"lit": buf})
+            buf = ""
+        parts.append(_skel_make_part(spec))
+        i = j + 1
+    if buf:
+        parts.append({"lit": buf})
     return parts
 
 
@@ -651,7 +714,7 @@ def _skel_parse_frame_line(line: str) -> dict:
 
 def skel_parse_dict(text: str) -> dict:
     lines = text.replace("\ufeff", "").replace("\r\n", "\n").replace("\r", "\n").split("\n")
-    d = {"axes": {}, "axisOrder": [], "slots": {}, "slotOrder": [], "frames": [], "prefix": "", "suffix": ""}
+    d = {"axes": {}, "axisOrder": [], "slots": {}, "slotOrder": [], "frames": [], "prefix": "", "suffix": "", "keys": []}
     mode = None
     cur = None
     for line in lines:
@@ -664,6 +727,11 @@ def skel_parse_dict(text: str) -> dict:
                 d["prefix"] = g.group(2)
             else:
                 d["suffix"] = g.group(2)
+            mode = None
+            continue
+        kk = re.match(r"^#KEY\s+(.*)$", line)
+        if kk:
+            d["keys"] = [x for x in kk.group(1).split() if x]
             mode = None
             continue
         h = re.match(r"^#(AXIS|SLOT|TEXT)\s*(.*)$", line)
@@ -769,8 +837,97 @@ def _skel_weighted_pick(entries: list):
     return entries[-1]
 
 
+def _skel_render_parts(d: dict, card: dict, parts: list, used: list, depth: int) -> str | None:
+    """部品列を文章化する。語彙が引けなければ None を返し、呼び出し側で別のテンプレートを試す。"""
+    depth = depth or 0
+    out = ""
+    for p in parts:
+        if "lit" in p:
+            out += p["lit"]
+            continue
+        name = p["slot"]
+        if name.startswith("#"):
+            an = name[1:]
+            v = card["axes"].get(an)
+            if v is None:
+                if p["optional"]:
+                    continue
+                return None
+            forms = (card.get("axisForms") or {}).get(an)
+            want = p.get("kind") or "文"
+            lst = None
+            if forms and not forms.get("__lit"):
+                lst = forms.get(want) or forms.get("句" if want == "文" else "文") or None
+            if lst and depth < 4:
+                sub = None
+                for f in lst:
+                    before = len(used)
+                    r2 = _skel_render_parts(d, card, f, used, depth + 1)
+                    if r2 is not None:
+                        sub = r2
+                        break
+                    del used[before:]   # 失敗したテンプレートの語彙は巻き戻す
+                if sub is None:
+                    if p["optional"]:
+                        continue
+                    return None
+                out += sub
+                continue
+            out += v
+            continue
+        pool = d["slots"].get(name, [])
+        if not pool:
+            if p["optional"]:
+                continue
+            return None
+        # 裸タグに埋め込まれた #軸名 をカードの値へ解決する
+        need = []
+        for tg in p.get("need", []):
+            if tg.startswith("#"):
+                tv = card["axes"].get(tg[1:])
+                if tv is None:
+                    return None
+                need.append(tv)
+            else:
+                need.append(tg)
+        cand = []
+        for e in pool:
+            if any(t in e["tags"] for t in p.get("deny", [])):
+                continue
+            if any(t not in e["tags"] for t in need):
+                continue
+            if not _skel_conds_pass(e.get("conds", []), card):
+                continue
+            if any(card.get("mutex", {}).get(k) is not None and card["mutex"][k] != v
+                   for k, v in e.get("mutex", {}).items()):
+                continue
+            dup = False
+            for u in used:
+                if u is e:
+                    dup = True
+                    break
+                um = u.get("mutex", {})
+                for k, v in um.items():
+                    if e.get("mutex", {}).get(k) is not None and e["mutex"][k] != v:
+                        dup = True
+                        break
+                if dup:
+                    break
+            if dup:
+                continue
+            cand.append(e)
+        if not cand:
+            if p["optional"]:
+                continue
+            return None
+        pick = _skel_weighted_pick(cand)
+        used.append(pick)
+        out += pick["text"]
+    return out
+
+
 def _skel_draw_card(d: dict, hist: dict) -> dict:
-    card = {"axes": {}, "mutex": {}}
+    card = {"axes": {}, "mutex": {}, "axisForms": {}}
     for axis in d["axisOrder"]:
         pool = d["axes"].get(axis, [])
         cand = [e for e in pool if _skel_conds_pass(e.get("conds", []), card) and not any(card.get("mutex", {}).get(k) is not None and card["mutex"][k] != v for k, v in e.get("mutex", {}).items())]
@@ -780,20 +937,49 @@ def _skel_draw_card(d: dict, hist: dict) -> dict:
         pick = _skel_weighted_pick(cand)
         if pick:
             card["axes"][axis] = pick["text"]
+            if pick.get("forms"):
+                card["axisForms"][axis] = pick["forms"]
             for k, v in pick.get("mutex", {}).items():
                 card["mutex"][k] = v
     return card
 
 
-def _skel_too_similar(card: dict, hist: dict) -> bool:
+def _skel_too_similar(card: dict, hist: dict, keys: list | None = None) -> bool:
+    """keys が指定されていれば、その軸だけを比べて意味的重複を判定する。"""
     recent = hist.get("cards", [])[-12:]
+    ks = keys if keys else None
     for c in recent:
         a = c.get("a", {})
-        common = sum(1 for k in card["axes"] if k in a)
-        equal = sum(1 for k in card["axes"] if k in a and a[k] == card["axes"][k])
+        if ks:
+            common = sum(1 for k in ks if k in card["axes"] and k in a)
+            equal = sum(1 for k in ks if k in card["axes"] and k in a and a[k] == card["axes"][k])
+        else:
+            common = sum(1 for k in card["axes"] if k in a)
+            equal = sum(1 for k in card["axes"] if k in a and a[k] == card["axes"][k])
         if common > 0 and equal / common >= 0.6:
             return True
     return False
+
+
+def _skel_realize(d: dict, card: dict, min_chars: int, max_chars: int, hist: dict, tries: int, dedup: bool) -> str:
+    """カードをフレームに流し込んで本文を作る。条件に合う本文が無ければ空文字。"""
+    frames = [f for f in d["frames"] if _skel_conds_pass(f.get("conds", []), card)]
+    if not frames:
+        return ""
+    for _ in range(tries):
+        frame = _skel_weighted_pick(frames)
+        if not frame:
+            continue
+        out = _skel_render_parts(d, card, frame.get("parts", []), [], 0)
+        if out is None:
+            continue
+        body = re.sub(r"\s+", "", out)
+        if not body or len(body) < min_chars or len(body) > max_chars:
+            continue
+        if dedup and body in (hist.get("texts") or []):
+            continue
+        return body
+    return ""
 
 
 def skel_generate(d: dict, opts: dict) -> dict | str:
@@ -803,117 +989,93 @@ def skel_generate(d: dict, opts: dict) -> dict | str:
     tries = opts.get("tries", 120)
     card_tries = opts.get("cardTries", 60)
     hist = _skel_load_history(kind)
+    keys = d.get("keys") or None
     for _ in range(card_tries):
         card = _skel_draw_card(d, hist)
-        if _skel_too_similar(card, hist):
+        if _skel_too_similar(card, hist, keys):
             continue
-        # Realize
-        frames = [f for f in d["frames"] if _skel_conds_pass(f.get("conds", []), card)]
-        if not frames:
+        body = _skel_realize(d, card, min_chars, max_chars, hist, tries, True)
+        if not body:
             continue
-        for _ in range(tries):
-            frame = _skel_weighted_pick(frames)
-            out = ""
-            ok = True
-            used = []
-            for p in frame.get("parts", []):
-                if "lit" in p:
-                    out += p["lit"]
-                    continue
-                name = p["slot"]
-                if name.startswith("#"):
-                    v = card["axes"].get(name[1:])
-                    if v is None:
-                        if p["optional"]:
-                            continue
-                        ok = False
-                        break
-                    out += v
-                    continue
-                pool = d["slots"].get(name, [])
-                if not pool:
-                    if p["optional"]:
-                        continue
-                    ok = False
-                    break
-                cand = [e for e in pool
-                        if all(_slot_entry_has_tag(e, t) for t in p.get("need", []))
-                        and not any(_slot_entry_has_tag(e, t) for t in p.get("deny", []))
-                        and _skel_conds_pass(e.get("conds", []), card)]
-                if not cand:
-                    if p["optional"]:
-                        continue
-                    ok = False
-                    break
-                pick = _skel_weighted_pick(cand)
-                if pick:
-                    used.append(pick)
-                    out += pick["text"]
-            if not ok:
-                continue
-            body = re.sub(r"\s+", "", out)
-            if not body or len(body) < min_chars or len(body) > max_chars:
-                continue
-            if body in (hist.get("texts") or []):
-                continue
-            _skel_record(kind, card, body)
-            return {"text": (d.get("prefix", "") or "") + body + (d.get("suffix", "") or ""),
-                    "body": body, "axes": card.get("axes", {}), "mutex": card.get("mutex", {})}
-    # Fallback without dedup check
-    card2 = _skel_draw_card(d, hist)
-    frames2 = [f for f in d["frames"] if _skel_conds_pass(f.get("conds", []), card2)]
-    if not frames2:
-        return ""
-    for _ in range(tries):
-        frame = _skel_weighted_pick(frames2)
-        out = ""
-        ok = True
-        for p in frame.get("parts", []):
-            if "lit" in p:
-                out += p["lit"]
-                continue
-            name = p["slot"]
-            if name.startswith("#"):
-                v = card2["axes"].get(name[1:])
-                if v is None:
-                    if p["optional"]:
-                        continue
-                    ok = False
-                    break
-                out += v
-                continue
-            pool = d["slots"].get(name, [])
-            if not pool:
-                if p["optional"]:
-                    continue
-                ok = False
-                break
-            cand = [e for e in pool
-                    if all(_slot_entry_has_tag(e, t) for t in p.get("need", []))
-                    and not any(_slot_entry_has_tag(e, t) for t in p.get("deny", []))
-                    and _skel_conds_pass(e.get("conds", []), card2)]
-            if not cand:
-                if p["optional"]:
-                    continue
-                ok = False
-                break
-            pick = _skel_weighted_pick(cand)
-            if pick:
-                out += pick["text"]
-        if not ok:
-            continue
-        body = re.sub(r"\s+", "", out)
-        if not body or len(body) < min_chars or len(body) > max_chars:
-            continue
-        _skel_record(kind, card2, body)
+        _skel_record(kind, card, body)
         return {"text": (d.get("prefix", "") or "") + body + (d.get("suffix", "") or ""),
-                "body": body, "axes": card2.get("axes", {}), "mutex": card2.get("mutex", {})}
-    return ""
+                "body": body, "axes": card.get("axes", {}), "mutex": card.get("mutex", {})}
+    # 重複チェックを外したフォールバック
+    card2 = _skel_draw_card(d, hist)
+    body2 = _skel_realize(d, card2, min_chars, max_chars, hist, tries, False)
+    if not body2:
+        return ""
+    _skel_record(kind, card2, body2)
+    return {"text": (d.get("prefix", "") or "") + body2 + (d.get("suffix", "") or ""),
+            "body": body2, "axes": card2.get("axes", {}), "mutex": card2.get("mutex", {})}
 
 
 # ============================================================
-# マークダウン破壊
+# 構造タグ
+#   タグの読み手は、この辞書と生成の仕組みを何も知らない執筆AIである。
+#   渡すのは物語の条件だけにする。文をどの部品で組み立てたかを表す軸は
+#   書き手の判断材料にならないため出さない。
 # ============================================================
+
+# 文を組み立てるための軸。値そのものは文中に現れない。
+_SKEL_INTERNAL_AXES = {
+    "文法クラス", "壊れ方", "被り対象", "合成問題",
+    "目的の文型", "目的動詞", "目的軸",
+    "異変の文型", "逸脱", "異変軸",
+    "事件の文型", "進行中の用件", "経過の時点", "事件軸",
+    "制度軸", "行政の話題", "行政の書式",
+}
+
+# 物語の内容を持つ軸と、タグに出すときの呼び名。
+# 値は軸値そのものではなく、文中に現れた語句をそのまま出す。
+_SKEL_NARRATIVE = [
+    {"axis": "壊れ方", "label": "問題", "cut": ["発生時点", "発生場所"]},
+    {"axis": "逸脱", "label": "異変", "cut": []},
+    {"axis": "目的動詞", "label": "目的", "cut": []},
+]
+
+
+def _skel_narrative_phrase(body: str, key: str, axes: dict, cut: list) -> str:
+    """body のうち、key を含む最小の連続部分を取り出す。
+       遡りは読点と括弧で止め、cut に挙げた軸の値は問題そのものではないので落とす。"""
+    i = body.find(key)
+    if i < 0:
+        return ""
+    e = i + len(key)
+    if body[e:e + 5] == "という事態":
+        e += 5
+    st = i
+    while st > 0 and body[st - 1] not in "、。「」":
+        st -= 1
+    txt = body[st:e]
+    for name in cut:
+        v = axes.get(name)
+        if not v:
+            continue
+        at = txt.find(v)
+        if at >= 0:
+            txt = txt[at + len(v):]
+    return re.sub(r"^(そこへ|そのまま)", "", txt)
+
+
+def skel_narrative_tags(result: dict) -> list:
+    """執筆AIに渡す構造タグの配列を返す。"""
+    tags = []
+    axes = (result or {}).get("axes") or {}
+    body = (result or {}).get("body") or ""
+    for k, v in axes.items():
+        if not v or k in _SKEL_INTERNAL_AXES:
+            continue
+        tags.append(f"{k}={v}")
+    for n in _SKEL_NARRATIVE:
+        key = axes.get(n["axis"])
+        if not key:
+            continue
+        txt = _skel_narrative_phrase(body, key, axes, n["cut"])
+        if txt:
+            tags.append(f"{n['label']}={txt}")
+    return tags
+
 
 def strip_markdown(text: str) -> str:
     if not text:
@@ -1202,8 +1364,8 @@ def generate_skeleton_flow_line(kind: str, files: dict, char_limit: int) -> tupl
     line = result["text"].replace("\r", "").replace("\n", " ").strip()
     if not line or len(line) > limit:
         return "", ""
-    # 構造タグ行を同梱
-    tags = [f"{k}={v}" for k, v in (result.get("axes") or {}).items() if v]
+    # 構造タグ行を同梱。出すのは物語の条件だけ。文の組み立てを表す軸は含めない。
+    tags = skel_narrative_tags(result)
     if tags:
         return line + "\n［" + "｜".join(tags) + "］", "skel"
     return line, "skel"
