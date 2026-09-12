@@ -315,7 +315,7 @@ footer { text-align: center; color: #5b6378; font-size: 11px; padding: 24px 0 40
         <li>資料オンリーモード（-1／3）では、9資料のキャラ計29名に対して優先度をランダム設定し、上から所属する資料（二次創作・超加速・ラボ組・学校組・ホスト組・ツン・渡辺さん・ハイン・でぃ）のtxtを追加していき、文字数上限に収まる順番までをプロンプト先頭へ追加します。<b>視点キャラ固定時は固定キャラの所属txtが採用されていることを確認し、不採用ならリトライします</b>（例：ブーン固定なのに二次創作.txt不採用、という破綻は起きません。優先度の順序自体は改変しません）。</li>
         <li><b>一人称視点指定（全モード共通）</b>：<b>一人称視点指定レート（％・既定50）</b>の確率で、末尾固定ブロックの <code>今回の視点は[ ～ ]です</code> の直後に<b>空行を挟まず</b> <code>一人称視点の形式で書くこと</code> を追加します（トーンブロックの後・<code>文字数は～文字</code> の前の固定位置）。ヒットした回は視点なしレート・視点モード0を無視して必ず視点行を出します（続き.txtによる視点抑止中を除く）。資料オンリーモードの設定値（-1／2／3およびランダム）に関係なく全モードで動作します。</li>
         <li><b>冒頭／終盤のスロット辞書合成</b>（既定ON）：<code>冒頭スロット.txt</code> / <code>終盤スロット.txt</code> は意味スロット辞書です。品詞・意味役割ごとに分類された語彙プール（スロット）と、スロットの並び順と接続を固定した文型（フレーム）を直積して「冒頭は、〜ことになる。」「終盤は、〜ことになる。」の1文を組み立てます。フレームが助詞と接続を保持するため、出力は文法的に正しい日本語になります。語彙行の <code>@タグ</code> でフレーム側から候補を絞り込み、<code>^グループ=値</code> の排他指定で意味的に衝突する組み合わせを引き直します。パターン数は文型数と各スロットの語彙数の積で決まるため、<code>#SLOT</code> に語彙を1行足すだけで掛け算に増えます。辞書はリポジトリ上で編集するだけで反映されます。</li>
-        <li><b>冒頭／終盤の骨格カード生成（構造層・既定ON）</b>：辞書は<b>既存の <code>冒頭スロット.txt</code> / <code>終盤スロット.txt</code> と同じファイル</b>から読み、中身を自動判別します。<code>#AXIS</code>／<code>#TEXT</code> を含む<b>骨格辞書形式</b>が入っていた場合はこちらを優先し、冒頭の型・決着機構・犠牲・決着の確定度など独立した軸から<b>物語骨格カード</b>を1枚抽選して「冒頭は、〜」「終盤は、〜」を合成します。旧スロット辞書のままなら自動で従来のスロット辞書合成にフォールバックするので、<b>txtの中身を書き換えるだけで方式が切り替わり、ファイルの追加は不要</b>です。単語ではなく<b>物語機能</b>を分散させることで、「日常→異変発見→調査・逃走」「能力ルール対決→条件反転→犠牲」への収束を防ぎます。直近の生成履歴で出過ぎた軸の重みは自動的に下がり、直近カードと物語機能が近い組合せは引き直されます（意味的重複のリジェクション）。履歴はブラウザの localStorage に保存され、ページをまたいで偏りが補正されます。生成した行の直後には抽選カードの中身を<code>［冒頭の型=…｜…｜犠牲=…］</code>（終盤は<code>［終盤の形式=…｜決着機構=…｜…］</code>）の<b>構造タグとしてプロンプト本体に同梱</b>し、執筆AIが物語機能から逃げられないようにします。特に犠牲=死亡するは、ぼかさず<b>死亡エンドとして直接描くよう指示文で強制</b>します。</li>
+        <li><b>冒頭／終盤の骨格カード生成（構造層・既定ON）</b>：辞書は<b>既存の <code>冒頭スロット.txt</code> / <code>終盤スロット.txt</code> と同じファイル</b>から読み、中身を自動判別します。<code>#AXIS</code>／<code>#TEXT</code> を含む<b>骨格辞書形式</b>が入っていた場合はこちらを優先し、冒頭の型・決着機構・犠牲・決着の確定度など独立した軸から<b>物語骨格カード</b>を1枚抽選して「冒頭は、〜」「終盤は、〜」を合成します。旧スロット辞書のままなら自動で従来のスロット辞書合成にフォールバックするので、<b>txtの中身を書き換えるだけで方式が切り替わり、ファイルの追加は不要</b>です。辞書の軸値には <code>文{…}</code>／<code>句{…}</code> の文章化テンプレートを書けます。部品は <code>+</code> で区切り、<code>#軸名</code> で軸値を、<code>=文字列</code> で固定文字列を、<code>スロット名@#軸名</code> で他の軸の値をタグにした語彙絞り込みを表します。これにより「何が×どう壊れるか×いつ×どこで」のように軸を直交させて問題を合成でき、語彙を1行足すたびに掛け算で組合せが増えます。文法の一致は語彙と軸に付けた条件で担保します。<code>#KEY</code> 行では、意味的重複のリジェクションで比べる軸だけを指定できます。単語ではなく<b>物語機能</b>を分散させることで、「日常→異変発見→調査・逃走」「能力ルール対決→条件反転→犠牲」への収束を防ぎます。直近の生成履歴で出過ぎた軸の重みは自動的に下がり、直近カードと物語機能が近い組合せは引き直されます（意味的重複のリジェクション）。履歴はブラウザの localStorage に保存され、ページをまたいで偏りが補正されます。生成した行の直後には抽選カードの中身を<code>［冒頭の型=…｜…｜犠牲=…］</code>（終盤は<code>［終盤の形式=…｜決着機構=…｜…］</code>）の<b>構造タグとしてプロンプト本体に同梱</b>し、執筆AIが物語機能から逃げられないようにします。特に犠牲=死亡するは、ぼかさず<b>死亡エンドとして直接描くよう指示文で強制</b>します。</li>
         <li><b>フロー指示文</b>：スロット辞書で組み立てた1行の直後には「↑ これが冒頭の流れ。ここで出した要素や言及は、物語のどこかで必ず意味を持つ伏線として張っておけ。」（終盤は「↑ これが終盤の流れ。この終盤の着地を、物語のどこかで既に張った伏線を拾い上げる形で実現しろ。」）を置きます。マルコフ連鎖で組み立てた1行の直後には、文が破綻していても意図を補完して強引に解釈させる指示を含めた文を置きます。<b>冒頭／終盤のスロット辞書合成</b>をOFFにした場合、辞書が取得できない場合、試行回数内に合格文が出ない場合は、マルコフ連鎖で1行を組み立てます。</li>
         <li><b>ブロックランダム順モード</b>（デフォルトOFF）をONにすると、プロンプトの各ブロック（採用キャラ資料群・関係ルール・SS.txt・共通.txt・各マルコフ＋区切り・最後.txt・キャラテンプレ・冒頭／終盤／テーマ／トーン等）を毎回ランダムな順番に並べ替えます。<b>「視点提示 → 文字数指定」の2つだけはシャッフルされず、常に最後の固定位置</b>（一人称指定行は視点提示の一部として同じく固定）です。「マルコフ文＋これは資料です」等のペアは順序のまま維持されます。</li>
         <li>採用した各キャラ資料txtの内部では、そのtxtの代表AAで始まる人物ブロックを毎回ランダムな順に並べ替えます（★欲の位置はファイルごとに違うため使いません）。グループ概要・世界設定など人物以外の見出し以降は末尾に残します。</li>
@@ -1522,6 +1522,27 @@ var SkeletonEngine = (function () {
   function consumeControl(t, meta) {
     var wm = /^重み(\d+)$/.exec(t);
     if (wm) { meta.weight = Math.max(1, parseInt(wm[1], 10)); return true; }
+    // 文{…} / 句{…} … 軸値の文章化テンプレート（軸値そのものは表示されない）
+    //   文{…} = 述語を含む文として展開する
+    //   句{…} = 述語を含まない名詞句として展開する
+    //   フレーム側の {#軸名} は、テンプレートがあればそれを、無ければ軸値の文字列を返す。
+    //   中身は正規表現でなく文字走査で切り出す。{A}{B} のように波括弧が
+    //   隣接するテンプレートで、内側の { を末尾の } と取り違えないため。
+    if (t.length > 2 && (t.charAt(0) === '文' || t.charAt(0) === '句') && t.charAt(1) === '=') {
+      // 文=値 / 句=値 … その軸値をそのまま固定文字列として展開する
+      meta.forms = meta.forms || {};
+      meta.forms.__lit = true;
+      return true;
+    }
+    if (t.length > 3 && (t.charAt(0) === '文' || t.charAt(0) === '句') &&
+        t.charAt(1) === '{' && t.charAt(t.length - 1) === '}') {
+      meta.forms = meta.forms || {};
+      // 同じ種類のテンプレートを複数書ける。先頭から試し、語彙が引けたものを使う
+      // （壊れ方の文法クラスに合わせて被り名詞のプールを選び分ける）
+      var kind = t.charAt(0);
+      (meta.forms[kind] = meta.forms[kind] || []).push(parseTemplateBody(t.slice(2, t.length - 1)));
+      return true;
+    }
     if (t.charAt(0) === '^') {
       var kv = t.slice(1).split('=');
       if (kv.length === 2) meta.mutex[kv[0]] = kv[1];
@@ -1546,7 +1567,7 @@ var SkeletonEngine = (function () {
   }
 
   function newMeta() {
-    return { conds: [], tags: [], mutex: {}, weight: 1 };
+    return { conds: [], tags: [], mutex: {}, weight: 1, forms: {} };
   }
 
   function parseEntryLine(line) {
@@ -1562,26 +1583,72 @@ var SkeletonEngine = (function () {
     return meta;
   }
 
-  function parseFrameBody(line) {
-    var re = /\{([^{}]+)\}/g;
-    var parts = [];
-    var last = 0;
-    var m;
-    while ((m = re.exec(line)) !== null) {
-      if (m.index > last) parts.push({ lit: line.slice(last, m.index) });
-      var spec = m[1];
-      var opt = false;
-      if (/\?$/.test(spec)) { opt = true; spec = spec.slice(0, -1); }
-      var segs = spec.split('@');
-      var name = segs.shift();
-      var need = segs;
-      var segs2 = name.split('!');
-      name = segs2[0];
-      var deny = segs2.slice(1);
-      parts.push({ slot: name, optional: opt, need: need, deny: deny });
-      last = m.index + m[0].length;
+  // { … } の中身（スロット指定）を1つの部品にする
+  function makePart(spec) {
+    var opt = false;
+    var kind = null;
+    var eq = spec.indexOf('=');
+    if (eq !== -1 && /^#/.test(spec)) {
+      var kv = spec.slice(eq + 1);
+      if (kv === '文' || kv === '句') { kind = kv; spec = spec.slice(0, eq); }
     }
-    if (last < line.length) parts.push({ lit: line.slice(last) });
+    if (/\?$/.test(spec)) { opt = true; spec = spec.slice(0, -1); }
+    var segs = spec.split('@');
+    var name = segs.shift();
+    var need = segs;
+    var segs2 = name.split('!');
+    name = segs2[0];
+    var deny = segs2.slice(1);
+    return { slot: name, optional: opt, need: need, deny: deny, kind: kind };
+  }
+
+  // 軸値テンプレート（文{…}／句{…}）の中身。部品は + で区切る。
+  //   文{発生時点?+被り名詞A@#被り対象+の+#壊れ方}
+  //   波括弧を隣接させて書くと外側の括弧と取り違えるため、区切りを + にしている。
+  //   + で始めると先頭が、+ で終えると末尾がリテラル（空部品）になる。
+  function parseTemplateBody(body) {
+    var raw = String(body).split('+');
+    var parts = [];
+    for (var i = 0; i < raw.length; i++) {
+      var x = raw[i];
+      if (!x) { parts.push({ lit: '' }); continue; }
+      if (x.charAt(0) === '{' && x.charAt(x.length - 1) === '}' && x.length > 2) {
+        parts.push(makePart(x.slice(1, -1)));
+        continue;
+      }
+      if (x.charAt(0) === '#') {           // 軸参照（軸値の文字列、または軸値のテンプレート）
+        parts.push(makePart(x));           // #発生時点? のように ? も付けられる
+        continue;
+      }
+      if (x.charAt(0) === '=') {           // = の後ろはそのまま出す固定文字列
+        parts.push({ lit: x.slice(1) });
+        continue;
+      }
+      parts.push(makePart(x));
+    }
+    return parts;
+  }
+
+  // フレーム本体。{ … } を1文字ずつ走査して切り出す。
+  function parseFrameBody(line) {
+    var parts = [];
+    var buf = '';
+    var i = 0;
+    function flush() {
+      if (buf) { parts.push({ lit: buf }); buf = ''; }
+    }
+    while (i < line.length) {
+      var c = line.charAt(i);
+      if (c !== '{') { buf += c; i++; continue; }
+      var j = i + 1;
+      var spec = '';
+      while (j < line.length && line.charAt(j) !== '}') { spec += line.charAt(j); j++; }
+      if (j >= line.length) { buf += c; i++; continue; }   // 閉じ括弧が無い場合はリテラル
+      flush();
+      parts.push(makePart(spec));
+      i = j + 1;
+    }
+    flush();
     return parts;
   }
 
@@ -1601,7 +1668,7 @@ var SkeletonEngine = (function () {
 
   function parseDict(text) {
     var lines = String(text || '').replace(/^\uFEFF/, '').split(/\r?\n/);
-    var dict = { axes: {}, axisOrder: [], slots: {}, slotOrder: [], frames: [], prefix: '', suffix: '' };
+    var dict = { axes: {}, axisOrder: [], slots: {}, slotOrder: [], frames: [], prefix: '', suffix: '', keys: [] };
     var mode = null;   // 'entry' | 'frame' | null
     var cur = null;    // 'axis' | 'slot'
     for (var i = 0; i < lines.length; i++) {
@@ -1613,6 +1680,14 @@ var SkeletonEngine = (function () {
       if (g) {
         if (g[1] === 'PREFIX') dict.prefix = g[2];
         else dict.suffix = g[2];
+        mode = null;
+        continue;
+      }
+      // #KEY 軸名1 軸名2 … … 意味的重複リジェクションで比べる軸だけを指定する。
+      //   指定が無い辞書では全軸を比べる（終盤骨格などの既存辞書はそのまま動く）。
+      var kk = /^#KEY\s+(.*)$/.exec(line);
+      if (kk) {
+        dict.keys = kk[1].split(/\s+/).filter(function (x) { return !!x; });
         mode = null;
         continue;
       }
@@ -1764,7 +1839,7 @@ var SkeletonEngine = (function () {
   // 5. 骨格カードの抽選
   // ============================================================
   function drawCard(dict, hist) {
-    var card = { axes: {}, mutex: {} };
+    var card = { axes: {}, mutex: {}, axisForms: {} };
     for (var i = 0; i < dict.axisOrder.length; i++) {
       var axis = dict.axisOrder[i];
       var pool = dict.axes[axis];
@@ -1779,6 +1854,10 @@ var SkeletonEngine = (function () {
       adjustWeights(cand, axis, hist);
       var pick = weightedPick(cand);
       card.axes[axis] = pick.text;
+      if (pick.forms && ((pick.forms['文'] && pick.forms['文'].length) ||
+                         (pick.forms['句'] && pick.forms['句'].length))) {
+        card.axisForms[axis] = pick.forms;
+      }
       for (var k in pick.mutex) card.mutex[k] = pick.mutex[k];
     }
     return card;
@@ -1787,14 +1866,17 @@ var SkeletonEngine = (function () {
   // ============================================================
   // 6. 意味的重複のリジェクション（§18・§25）
   //    直近12カードと軸値の一致率が高い組合せは破棄して引き直す
+  //    比べる軸は辞書の #KEY で指定されたもの（指定が無ければ全軸）
   // ============================================================
-  function tooSimilar(card, hist) {
+  function tooSimilar(card, hist, keys) {
     var recent = hist.cards.slice(-12);
+    var ks = (keys && keys.length) ? keys : null;
     for (var i = 0; i < recent.length; i++) {
       var a = recent[i].a || {};
       var common = 0;
       var equal = 0;
       for (var k in card.axes) {
+        if (ks && ks.indexOf(k) === -1) continue;
         if (a[k] != null) {
           common++;
           if (a[k] === card.axes[k]) equal++;
@@ -1808,6 +1890,107 @@ var SkeletonEngine = (function () {
   // ============================================================
   // 7. 文章化（第2層）
   // ============================================================
+  // 部品列の描画。フレーム本体と軸値テンプレート（文{…}／句{…}）の両方で使う。
+  //   {#軸名}      … 軸値を返す。その軸値に 文{…}／句{…} のテンプレートがあれば
+  //                   テンプレートを再帰的に展開して返す（合成問題の文章化に使う）
+  //   {スロット名@#軸名} … 裸タグの位置に #軸名 を書くと、カードのその軸の値を
+  //                   タグとして解決してから語彙を絞り込む
+  //                   （被り名詞を被り対象に合わせて選ぶ、等に使う）
+  function renderParts(dict, card, parts, usedEntries, depth) {
+    depth = depth || 0;
+    var out = '';
+    for (var p = 0; p < parts.length; p++) {
+      var part = parts[p];
+      if (part.lit !== undefined) { out += part.lit; continue; }
+      var name = part.slot;
+      if (name.charAt(0) === '#') {
+        var an = name.slice(1);
+        var v = card.axes[an];
+        if (v == null) {
+          if (part.optional) continue;
+          return null;
+        }
+        var forms = card.axisForms ? card.axisForms[an] : null;
+        // {#軸名=句} と書くと名詞句テンプレートを、それ以外は文テンプレートを使う。
+        // どちらも無ければ軸値の文字列をそのまま返す。
+        var wantKind = part.kind || '文';
+        var list = null;
+        if (forms && !forms.__lit) {
+          list = forms[wantKind] || forms[wantKind === '文' ? '句' : '文'] || null;
+        }
+        if (list && list.length && depth < 4) {
+          var sub = null;
+          for (var fi = 0; fi < list.length; fi++) {
+            var before = usedEntries.length;
+            var r2 = renderParts(dict, card, list[fi], usedEntries, depth + 1);
+            if (r2 != null) { sub = r2; break; }
+            usedEntries.length = before;   // 失敗したテンプレートの語彙は巻き戻す
+          }
+          if (sub == null) {
+            if (part.optional) continue;
+            return null;
+          }
+          out += sub;
+          continue;
+        }
+        out += v;
+        continue;
+      }
+      var pool = dict.slots[name];
+      if (!pool || !pool.length) {
+        if (part.optional) continue;
+        return null;
+      }
+      // 裸タグに埋め込まれた #軸名 をカードの値へ解決する
+      var need = [];
+      for (var q = 0; q < part.need.length; q++) {
+        var tg = part.need[q];
+        if (tg.charAt(0) === '#') {
+          var tv = card.axes[tg.slice(1)];
+          if (tv == null) return null;
+          need.push(tv);
+        } else {
+          need.push(tg);
+        }
+      }
+      var cand = [];
+      for (var j = 0; j < pool.length; j++) {
+        var e = pool[j];
+        var pass = true;
+        var d, nd;
+        for (d = 0; d < part.deny.length; d++) {
+          if (e.tags.indexOf(part.deny[d]) !== -1) { pass = false; break; }
+        }
+        if (!pass) continue;
+        for (nd = 0; nd < need.length; nd++) {
+          if (e.tags.indexOf(need[nd]) === -1) { pass = false; break; }
+        }
+        if (!pass) continue;
+        if (!condsPass(e.conds, card)) continue;
+        if (mutexConflict(e.mutex, card)) continue;
+        var dup = false;
+        for (var u = 0; u < usedEntries.length; u++) {
+          if (usedEntries[u] === e) { dup = true; break; }
+          var um = usedEntries[u].mutex;
+          for (var k in um) {
+            if (e.mutex[k] != null && e.mutex[k] !== um[k]) { dup = true; break; }
+          }
+          if (dup) break;
+        }
+        if (dup) continue;
+        cand.push(e);
+      }
+      if (!cand.length) {
+        if (part.optional) continue;
+        return null;
+      }
+      var pick = weightedPick(cand);
+      usedEntries.push(pick);
+      out += pick.text;
+    }
+    return out;
+  }
+
   function realize(dict, card, minChars, maxChars, hist, tries) {
     var frames = [];
     for (var i = 0; i < dict.frames.length; i++) {
@@ -1816,67 +1999,9 @@ var SkeletonEngine = (function () {
     if (!frames.length) return '';
     for (var t = 0; t < tries; t++) {
       var frame = weightedPick(frames);
-      var out = '';
-      var ok = true;
-      var usedEntries = [];
-      for (var p = 0; p < frame.parts.length; p++) {
-        var part = frame.parts[p];
-        if (part.lit !== undefined) { out += part.lit; continue; }
-        var name = part.slot;
-        if (name.charAt(0) === '#') {
-          var v = card.axes[name.slice(1)];
-          if (v == null) {
-            if (part.optional) continue;
-            ok = false;
-            break;
-          }
-          out += v;
-          continue;
-        }
-        var pool = dict.slots[name];
-        if (!pool || !pool.length) {
-          if (part.optional) continue;
-          ok = false;
-          break;
-        }
-        var cand = [];
-        for (var j = 0; j < pool.length; j++) {
-          var e = pool[j];
-          var pass = true;
-          var d, nd;
-          for (d = 0; d < part.deny.length; d++) {
-            if (e.tags.indexOf(part.deny[d]) !== -1) { pass = false; break; }
-          }
-          if (!pass) continue;
-          for (nd = 0; nd < part.need.length; nd++) {
-            if (e.tags.indexOf(part.need[nd]) === -1) { pass = false; break; }
-          }
-          if (!pass) continue;
-          if (!condsPass(e.conds, card)) continue;
-          if (mutexConflict(e.mutex, card)) continue;
-          var dup = false;
-          for (var u = 0; u < usedEntries.length; u++) {
-            if (usedEntries[u] === e) { dup = true; break; }
-            var um = usedEntries[u].mutex;
-            for (var k in um) {
-              if (e.mutex[k] != null && e.mutex[k] !== um[k]) { dup = true; break; }
-            }
-            if (dup) break;
-          }
-          if (dup) continue;
-          cand.push(e);
-        }
-        if (!cand.length) {
-          if (part.optional) continue;
-          ok = false;
-          break;
-        }
-        var pick = weightedPick(cand);
-        usedEntries.push(pick);
-        out += pick.text;
-      }
-      if (!ok) continue;
-      var body = out.replace(/\s+/g, '');
+      var res = renderParts(dict, card, frame.parts, [], 0);
+      if (res == null) continue;
+      var body = res.replace(/\s+/g, '');
       if (!body) continue;
       if (body.length < minChars || body.length > maxChars) continue;
       if (hist && hist.texts && hist.texts.indexOf(body) !== -1) continue;
@@ -1897,7 +2022,7 @@ var SkeletonEngine = (function () {
     var hist = loadHistory(kind);
     for (var t = 0; t < (opts.cardTries || 60); t++) {
       var card = drawCard(dict, hist);
-      if (tooSimilar(card, hist)) continue;
+      if (tooSimilar(card, hist, dict.keys)) continue;
       var body = realize(dict, card, minChars, maxChars, hist, tries);
       if (!body) continue;
       recordHistory(kind, card, body);
@@ -1921,12 +2046,78 @@ var SkeletonEngine = (function () {
     return s;
   }
 
+  // ============================================================
+  // 構造タグ
+  //   タグの読み手は、この辞書と生成の仕組みを何も知らない執筆AIである。
+  //   渡すのは物語の条件だけにする。文をどの部品で組み立てたかを表す軸は
+  //   書き手の判断材料にならないため出さない。
+  // ============================================================
+
+  // 文を組み立てるための軸。値そのものは文中に現れない。
+  var INTERNAL_AXES = {
+    '文法クラス': 1, '壊れ方': 1, '被り対象': 1, '合成問題': 1,
+    '目的の文型': 1, '目的動詞': 1, '目的軸': 1,
+    '異変の文型': 1, '逸脱': 1, '異変軸': 1,
+    '事件の文型': 1, '進行中の用件': 1, '経過の時点': 1, '事件軸': 1,
+    '制度軸': 1, '行政の話題': 1, '行政の書式': 1
+  };
+
+  // 物語の内容を持つ軸と、タグに出すときの呼び名。
+  // 値は軸値そのものではなく、文中に現れた語句をそのまま出す。
+  var NARRATIVE = [
+    { axis: '壊れ方', label: '問題', cut: ['発生時点', '発生場所'] },
+    { axis: '逸脱', label: '異変', cut: [] },
+    { axis: '目的動詞', label: '目的', cut: [] }
+  ];
+
+  // body のうち、key を含む最小の連続部分を取り出す。
+  // 遡りは読点と括弧で止め、cut に挙げた軸の値は問題そのものではないので落とす。
+  function narrativePhrase(body, key, axes, cut) {
+    var s = body.indexOf(key);
+    if (s < 0) return '';
+    var e = s + key.length;
+    if (body.substr(e, 5) === 'という事態') e += 5;
+    var st = s;
+    while (st > 0 && '、。「」'.indexOf(body.charAt(st - 1)) < 0) st--;
+    var txt = body.slice(st, e);
+    for (var i = 0; i < cut.length; i++) {
+      var v = axes[cut[i]];
+      if (!v) continue;
+      var at = txt.indexOf(v);
+      if (at >= 0) txt = txt.slice(at + v.length);
+    }
+    return txt.replace(/^(そこへ|そのまま)/, '');
+  }
+
+  // 執筆AIに渡す構造タグの配列を返す。
+  function narrativeTags(result) {
+    var tags = [];
+    var axes = (result && result.axes) || {};
+    var body = (result && result.body) || '';
+    var k, i;
+    for (k in axes) {
+      if (!Object.prototype.hasOwnProperty.call(axes, k)) continue;
+      if (!axes[k]) continue;
+      if (INTERNAL_AXES[k]) continue;
+      tags.push(k + '=' + axes[k]);
+    }
+    for (i = 0; i < NARRATIVE.length; i++) {
+      var n = NARRATIVE[i];
+      var key = axes[n.axis];
+      if (!key) continue;
+      var txt = narrativePhrase(body, key, axes, n.cut);
+      if (txt) tags.push(n.label + '=' + txt);
+    }
+    return tags;
+  }
+
   return {
     parseDict: parseDict,
     generate: generate,
     resetHistory: resetHistory,
     loadHistory: loadHistory,
-    stats: stats
+    stats: stats,
+    narrativeTags: narrativeTags
   };
 })();
 
@@ -2303,11 +2494,8 @@ var NovelGen = (function () {
     var line = result.text.replace(/\r/g, '').replace(/\n/g, ' ').trim();
     if (!line || line.length > limit) return '';
     // 構造タグ行を組み立てて同梱する（執筆AIが骨格を守る強制力）
-    var tags = [];
-    var axes = result.axes || {};
-    for (var k in axes) {
-      if (Object.prototype.hasOwnProperty.call(axes, k) && axes[k]) tags.push(k + '=' + axes[k]);
-    }
+    // 出すのは物語の条件だけ。文の組み立てを表す軸は含めない。
+    var tags = SkeletonEngine.narrativeTags(result);
     return tags.length ? line + '\n［' + tags.join('｜') + '］' : line;
   }
 
@@ -4062,6 +4250,7 @@ var NovelGen = (function () {
     _randint: randint,
     _generateMarkovOneLiner: generateMarkovOneLiner,
     _generateSlotFlowLine: generateSlotFlowLine,
+    _generateSkeletonFlowLine: generateSkeletonFlowLine,
     _heroPairNote: heroPairNote,
     _fixedHeroName: fixedHeroName,
     _matIdForHeroName: matIdForHeroName,
