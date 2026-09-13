@@ -875,11 +875,6 @@ def _skel_render_parts(d: dict, card: dict, parts: list, used: list, depth: int)
                 continue
             out += v
             continue
-        pool = d["slots"].get(name, [])
-        if not pool:
-            if p["optional"]:
-                continue
-            return None
         # 裸タグに埋め込まれた #軸名 をカードの値へ解決する
         need = []
         for tg in p.get("need", []):
@@ -890,11 +885,24 @@ def _skel_render_parts(d: dict, card: dict, parts: list, used: list, depth: int)
                 need.append(tv)
             else:
                 need.append(tg)
+        # スロット名が「・」で終わるときは、先頭の解決済みタグをスロット名に
+        # 連結してから辞書を引く（被り名詞・@#被り対象 → スロット「被り名詞・道具」）。
+        # 連結に使ったタグは語彙の絞り込みには使わない。
+        pool_key = name
+        need_for_filter = need
+        if name.endswith("・") and need:
+            pool_key = name + need[0]
+            need_for_filter = need[1:]
+        pool = d["slots"].get(pool_key, [])
+        if not pool:
+            if p["optional"]:
+                continue
+            return None
         cand = []
         for e in pool:
             if any(t in e["tags"] for t in p.get("deny", [])):
                 continue
-            if any(t not in e["tags"] for t in need):
+            if any(t not in e["tags"] for t in need_for_filter):
                 continue
             if not _skel_conds_pass(e.get("conds", []), card):
                 continue
