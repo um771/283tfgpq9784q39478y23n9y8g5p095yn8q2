@@ -1493,10 +1493,8 @@ def hero_pair_note(h1: str, h2: str) -> str:
     return f"\n{n1}（{g1}）と{n2}（{g2}）は、互いに一切の面識・接点を持たない完全な無関係（他人）である。"
 
 
-def generate_relation_rule(selected_ids: list[str]) -> str:
+def generate_relation_rule(selected_ids: list[str], hero_text: str | None = None) -> str:
     selected = [sid for sid in selected_ids if sid in REL_GROUPS]
-    if not selected:
-        return ""
 
     def member_str(label, members):
         return label if "（" in label else f"{label}（{'、'.join(members)}）"
@@ -1520,6 +1518,28 @@ def generate_relation_rule(selected_ids: list[str]) -> str:
     if len(selected) == 1:
         only = REL_GROUPS[selected[0]]
         lines.append(f"{member_str(*only)}のキャラクターは、このプロンプトに記述されていない他のグループのキャラクターと互いに一切の面識・接点を持たない完全な無関係（他人）である。ただし詳細キャラ資料に関係・面識・接点の記載がある組合せは、その記載を優先する。")
+
+    # 特殊視点で資料外キャラが出た場合の初対面指定
+    # 判定は matId 所属チェック（採用リストに含まれているか）
+    if hero_text and "：" in hero_text:
+        hero_names = hero_names_from_text(hero_text)
+        seen_names: set[str] = set()
+        for name in hero_names:
+            if not name or name in seen_names:
+                continue
+            seen_names.add(name)
+            mid = mat_id_for_hero_name(name)
+            if mid is None or mid not in selected:
+                lines.append(
+                    f"視点キャラクターである{name}は、このプロンプトに記述されている他のすべてのキャラクターと互いに一切の面識・接点を持たない完全な無関係（他人）である。"
+                    f"旧知の仲・顔見知りとして扱うことを禁止し、顔を合わせる場合は必ず初対面として描くこと："
+                    f"互いの名前・素性・性格・能力・過去を知らない前提で、初対面特有の距離感（警戒・探り・よそよそしさ・自己紹介）を持たせる。"
+                    f"旧知同士のような馴染んだ口調、相手の内情を知っている前提の言動、根拠のない親密さや信頼を付加してはならない。"
+                )
+
+    if not selected and not lines:
+        return ""
+
     rule = "キャラクター間の関係：\n" + "\n".join(lines)
     rule += "\nこの指定の趣旨は、互いに面識のないキャラクター同士を「顔を知っている」「旧知の仲」のような顔見知り・旧知扱いで描写することを防ぐことにある。顔合わせそのものを禁じる趣旨ではない。物語の展開やユーザーの指示に応じて、異なるグループのキャラクターが同じ場に現れ、顔を合わせることは許容する。その場合、両者は必ず初対面として描くこと：互いの名前・素性・性格・能力・過去を知らない前提で、初対面特有の距離感（警戒・探り・よそよそしさ・自己紹介）を持たせる。旧知同士のような馴染んだ口調、相手の内情を知っている前提の言動、根拠のない親密さや信頼を付加してはならない。顔合わせを避ける必要はないが、顔を合わせた以上、初対面以外の関係性を勝手に付与してはならない。"
     rule += "\n詳細キャラ資料に関係・面識・接点の記載がある組合せは、無関係（他人）として扱わず、資料の記載を優先すること。ただし記載された関係の範囲を超えて、顔見知り・旧知の関係へ勝手に拡張してはならない。"
@@ -2096,7 +2116,7 @@ def build_contents_priority(files: dict, shuryo_mode: int, use_markov: bool,
             return None
 
     hero_text, hero_mode = choose_hero_for_char_files(selected_ids, HERO_MODE, suppress_hero, files)
-    relation = generate_relation_rule(selected_ids) if shuryo_mode != 2 else ""
+    relation = generate_relation_rule(selected_ids, hero_text) if shuryo_mode != 2 else ""
     template = build_char_template(selected_ids, hero_text, shuryo_mode, files)
 
     # 視点・文字数の最終ブロック
@@ -2130,9 +2150,13 @@ def build_contents_priority(files: dict, shuryo_mode: int, use_markov: bool,
         removed = char_blocks.pop()
         projected -= len(removed) + 2 if removed else 0
         hero_text, hero_mode = choose_hero_for_char_files(selected_ids, HERO_MODE, suppress_hero, files)
+        relation = generate_relation_rule(selected_ids, hero_text) if shuryo_mode != 2 else ""
+        template = build_char_template(selected_ids, hero_text, shuryo_mode, files)
         final_tail = make_final_tail()
 
     final_tail = make_final_tail()
+    relation = generate_relation_rule(selected_ids, hero_text) if shuryo_mode != 2 else ""
+    template = build_char_template(selected_ids, hero_text, shuryo_mode, files)
 
     # 保護ブロック（関係ルール・テンプレ）
     body_blocks: list[list[str]] = []
@@ -2225,7 +2249,7 @@ def build_contents(chosen: dict, use_markov: bool, hero_mode: int, hero_text: st
         if chosen.get("他の人"):
             # 他の人は複数マテリアルに分散
             selected_ids.extend(["lab", "school", "host", "tsun", "watanabe", "hain", "di"])
-        rel = generate_relation_rule(selected_ids)
+        rel = generate_relation_rule(selected_ids, hero_text)
         if rel:
             if not add(rel):
                 return None

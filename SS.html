@@ -2827,7 +2827,7 @@ var NovelGen = (function () {
   }
 
   function charTailText(P, selectedCharFiles, heroText, shuryoMode, files) {
-    var relation = shuryoMode === 2 ? '' : generateRelationRule(selectedCharFiles);
+    var relation = shuryoMode === 2 ? '' : generateRelationRule(selectedCharFiles, heroText);
     var template = buildCharTemplate(selectedCharFiles, heroText, shuryoMode, files, P);
     return { relation: relation, template: template };
   }
@@ -3307,7 +3307,7 @@ var NovelGen = (function () {
 
     // キャラクター間の関係ルール（モード2以外。モード2はAIオリジナル設定のため生成しない）
     if (shuryoMode !== 2) {
-      var relationRule = generateRelationRule(chosen);
+      var relationRule = generateRelationRule(chosen, heroText);
       if (relationRule) {
         if (!addToContents(relationRule)) return null;
         sealBlock();
@@ -3649,9 +3649,8 @@ var NovelGen = (function () {
     return '\n' + n1 + '（' + g1 + '）と' + n2 + '（' + g2 + '）は、互いに一切の面識・接点を持たない完全な無関係（他人）である。';
   }
 
-  function generateRelationRule(selectedCharFiles) {
+  function generateRelationRule(selectedCharFiles, heroText) {
     var selected = (selectedCharFiles || []).filter(function (id) { return !!REL_GROUPS[id]; });
-    if (!selected.length) return '';
     function memberStr(label, members) {
       return label.indexOf('（') >= 0 ? label : label + '（' + members.join('、') + '）';
     }
@@ -3675,6 +3674,26 @@ var NovelGen = (function () {
       var only = REL_GROUPS[selected[0]];
       lines.push(memberStr(only[0], only[1]) + 'のキャラクターは、このプロンプトに記述されていない他のグループのキャラクターと互いに一切の面識・接点を持たない完全な無関係（他人）である。ただし詳細キャラ資料に関係・面識・接点の記載がある組合せは、その記載を優先する。');
     }
+    // 特殊視点で資料外キャラが出た場合の初対面指定（matId所属チェック）
+    if (heroText && heroText.indexOf('：') >= 0) {
+      var heroNames = heroNamesFromText(heroText);
+      var seen = {};
+      for (var hi = 0; hi < heroNames.length; hi++) {
+        var name = heroNames[hi];
+        if (!name || seen[name]) continue;
+        seen[name] = true;
+        var mid = matIdForHeroName(name);
+        if (!mid || selected.indexOf(mid) === -1) {
+          lines.push(
+            '視点キャラクターである' + name + 'は、このプロンプトに記述されている他のすべてのキャラクターと互いに一切の面識・接点を持たない完全な無関係（他人）である。' +
+            '旧知の仲・顔見知りとして扱うことを禁止し、顔を合わせる場合は必ず初対面として描くこと：' +
+            '互いの名前・素性・性格・能力・過去を知らない前提で、初対面特有の距離感（警戒・探り・よそよそしさ・自己紹介）を持たせる。' +
+            '旧知同士のような馴染んだ口調、相手の内情を知っている前提の言動、根拠のない親密さや信頼を付加してはならない。'
+          );
+        }
+      }
+    }
+    if (!selected.length && !lines.length) return '';
     var rule = 'キャラクター間の関係：\n' + lines.join('\n');
     rule += '\nこの指定の趣旨は、互いに面識のないキャラクター同士を「顔を知っている」「旧知の仲」のような顔見知り・旧知扱いで描写することを防ぐことにある。顔合わせそのものを禁じる趣旨ではない。物語の展開やユーザーの指示に応じて、異なるグループのキャラクターが同じ場に現れ、顔を合わせることは許容する。その場合、両者は必ず初対面として描くこと：互いの名前・素性・性格・能力・過去を知らない前提で、初対面特有の距離感（警戒・探り・よそよそしさ・自己紹介）を持たせる。旧知同士のような馴染んだ口調、相手の内情を知っている前提の言動、根拠のない親密さや信頼を付加してはならない。顔合わせを避ける必要はないが、顔を合わせた以上、初対面以外の関係性を勝手に付与してはならない。';
     rule += '\n詳細キャラ資料に関係・面識・接点の記載がある組合せは、無関係（他人）として扱わず、資料の記載を優先すること。ただし記載された関係の範囲を超えて、顔見知り・旧知の関係へ勝手に拡張してはならない。';
