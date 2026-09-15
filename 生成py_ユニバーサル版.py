@@ -3,7 +3,7 @@
 SS.html の JavaScript エンジンと同等の出力をする。
 
 主な変更点（旧py → 新py）:
-  - キャラ資料を9ファイル（二次創作・超加速・ラボ組・学校組・ホスト組・ツン・渡辺さん・ハイン・でぃ）に細分化
+  - キャラ資料を11ファイル（二次創作・超加速・ラボ組・学校組・またんき・フサギコ・ぃょぅ・ツン・渡辺さん・ハイン・でぃ）に細分化
   - キャラ単位の優先度（29名を毎回シャッフル、所属txtを順次追加）
   - ブロックランダム順モード（shuffleBlocksMode）
   - 視点キャラ固定（fixedHero / group:◯◯）
@@ -14,7 +14,8 @@ SS.html の JavaScript エンジンと同等の出力をする。
   - キャラテンプレ提示数の制限（charTemplateMin/Max）
   - キャラブロック内シャッフル
   - ダブルヒーローの短縮版無関係宣言
-  - 横断接点の9資料対応更新
+  - 横断接点の11資料対応更新
+  - 資料未提示の人物（名前だけが登場するキャラ）の捏造防止宣言
 """
 
 import re
@@ -120,7 +121,9 @@ nijisousaku_file = os.path.join(BASE_DIR, "二次創作.txt")
 choukasoku_file = os.path.join(BASE_DIR, "超加速.txt")
 lab_file = os.path.join(BASE_DIR, "ラボ組.txt")
 school_file = os.path.join(BASE_DIR, "学校組.txt")
-host_file = os.path.join(BASE_DIR, "ホスト組.txt")
+matangi_file = os.path.join(BASE_DIR, "またんき.txt")
+fusagiko_file = os.path.join(BASE_DIR, "フサギコ.txt")
+iyou_file = os.path.join(BASE_DIR, "ぃょぅ.txt")
 tsun_file = os.path.join(BASE_DIR, "ツン.txt")
 watanabe_file = os.path.join(BASE_DIR, "渡辺さん.txt")
 hain_file = os.path.join(BASE_DIR, "ハイン.txt")
@@ -137,7 +140,7 @@ opening_slot_file = os.path.join(BASE_DIR, "冒頭スロット.txt")
 ending_slot_file = os.path.join(BASE_DIR, "終盤スロット.txt")
 
 # ============================================================
-# 9資料のキャラ定義
+# 11資料のキャラ定義
 # ============================================================
 
 CHAR_MATERIALS = [
@@ -149,13 +152,39 @@ CHAR_MATERIALS = [
      "names": ["フォックス", "花瓶", "ヒート"]},
     {"id": "school", "label": "学校組", "file": school_file,
      "names": ["デレ", "キュート", "ペニサス"]},
-    {"id": "host", "label": "ホスト組", "file": host_file,
-     "names": ["またんき", "フサギコ", "ぃょぅ"]},
+    {"id": "matangi", "label": "またんき", "file": matangi_file, "names": ["またんき"]},
+    {"id": "fusagiko", "label": "フサギコ", "file": fusagiko_file, "names": ["フサギコ"]},
+    {"id": "iyou", "label": "ぃょぅ", "file": iyou_file, "names": ["ぃょぅ"]},
     {"id": "tsun", "label": "ツン", "file": tsun_file, "names": ["ツン"]},
     {"id": "watanabe", "label": "渡辺さん", "file": watanabe_file, "names": ["渡辺さん"]},
     {"id": "hain", "label": "ハイン", "file": hain_file, "names": ["ハイン"]},
     {"id": "di", "label": "でぃ", "file": di_file, "names": ["でぃ"]},
 ]
+
+# 複数の資料にまたがるグループ指定（視点キャラ固定の group:◯◯ 用）
+# キーはグループ名、値は所属資料IDのリスト。資料IDそのものを group: に渡した場合も有効。
+CHAR_GROUPS = {
+    "host": ["matangi", "fusagiko", "iyou"],
+}
+
+
+def group_material_ids(key: str) -> list[str]:
+    """group: 指定のキーを資料IDのリストへ展開する"""
+    if key in CHAR_GROUPS:
+        return list(CHAR_GROUPS[key])
+    if char_material_by_id(key):
+        return [key]
+    return []
+
+
+def group_member_names(key: str) -> list[str]:
+    names = []
+    for mid in group_material_ids(key):
+        m = char_material_by_id(mid)
+        if m:
+            names.extend(m["names"])
+    return names
+
 
 # キャラ→所属マテリアルの逆引き
 def char_material_by_id(mid: str) -> dict | None:
@@ -1392,11 +1421,11 @@ def fixed_hero_name() -> str:
         return ""
     if v.startswith("group:"):
         mid = v[len("group:"):]
-        m = char_material_by_id(mid)
-        if not m or not m.get("names"):
+        names = group_member_names(mid)
+        if not names:
             return ""
         if mid not in _group_fix_cache:
-            _group_fix_cache[mid] = random.choice(m["names"])
+            _group_fix_cache[mid] = random.choice(names)
         return _group_fix_cache[mid]
     return v
 
@@ -1449,7 +1478,7 @@ def hero_name_from_text(hero_text: str) -> str:
 
 
 # ============================================================
-# キャラクター間の関係ルール（9資料対応）
+# キャラクター間の関係ルール（11資料対応）
 # ============================================================
 
 REL_GROUPS = {
@@ -1457,26 +1486,42 @@ REL_GROUPS = {
     "choukasoku": ("モナーグループ", ["モナー", "ロマネスク", "しぃ", "つー", "ミセリ", "トソン"]),
     "lab": ("ラボ組", ["フォックス", "花瓶", "ヒート"]),
     "school": ("学校組", ["デレ", "キュート", "ペニサス伊藤"]),
-    "host": ("ホスト組", ["またんき", "フサギコ", "ぃょぅ"]),
+    "matangi": ("単独（またんき）", ["またんき"]),
+    "fusagiko": ("単独（フサギコ）", ["フサギコ"]),
+    "iyou": ("単独（ぃょぅ）", ["ぃょぅ"]),
     "tsun": ("単独（ツン）", ["ツン"]),
     "watanabe": ("単独（渡辺さん）", ["渡辺さん"]),
     "hain": ("単独（ハイン）", ["ハイン"]),
     "di": ("単独（でぃ）", ["でぃ"]),
 }
 
+# 横断接点の表。a / b の両資料が採用された回に text を宣言する。
+# when を持つ項目は、when に並ぶ資料も同時に採用されている回だけ宣言する。
+# when が満たされない場合は接点なしとして扱い、通常の無関係宣言が出る。
 CROSS_CONTACTS = [
     {"a": "hain", "b": "choukasoku",
      "text": "ハインは超加速資料のミセリと学校の友人であり、互いに面識がある。ハインが面識を持つのはミセリだけで、モナーグループの他の人物は引き続き無関係として扱う。"},
     {"a": "hain", "b": "lab",
      "text": "ハインの自宅の近隣にラボ（外観・規模は一般住宅）があり、ハインはその騒音・異常事態を「よくわからないが迷惑なもの」として認識している。ただしラボの3人の名前・素性・実態は知らない。"},
-    {"a": "host", "b": "choukasoku",
-     "text": "ホスト組のまたんきはモナーグループの面々と互いに顔と素性を認識しているが、モナーグループのメンバーではない。利害（肉）が一致した時や偶然遭遇した時のみ関わる。フサギコとぃょぅの接点はまたんき経由の個別関係に限る。"},
+    {"a": "matangi", "b": "choukasoku",
+     "text": "またんきはモナーグループの面々と互いに顔と素性を認識しているが、モナーグループのメンバーではない。利害（肉）が一致した時や偶然遭遇した時のみ関わる。"},
+    {"a": "fusagiko", "b": "choukasoku", "when": ["matangi"],
+     "text": "フサギコはモナーグループの面々と面識がない。フサギコがモナーグループと関わる場合、その接点はまたんき経由の個別関係に限る。"},
+    {"a": "iyou", "b": "choukasoku", "when": ["matangi"],
+     "text": "ぃょぅはモナーグループの面々と面識がない。ぃょぅがモナーグループと関わる場合、その接点はまたんき経由の個別関係に限る。"},
+    {"a": "matangi", "b": "fusagiko",
+     "text": "またんきとフサギコは互いに面識がある。フサギコはまたんきの確保を目的に動いており、またんきはフサギコを殴り合う相手として扱っている。関係の中身・距離感・口調は各キャラ資料の記載を優先する。"},
+    {"a": "matangi", "b": "iyou",
+     "text": "またんきとぃょぅは互いに面識がある。関係の中身・距離感・口調は各キャラ資料の記載を優先する。"},
+    {"a": "fusagiko", "b": "iyou",
+     "text": "フサギコとぃょぅは互いに面識がある。関係の中身・距離感・口調は各キャラ資料の記載を優先する。"},
 ]
 
 HERO_PAIR_KNOWN = [
     ["ハイン", "ミセリ"],
     ["またんき", "モナー"], ["またんき", "ロマネスク"], ["またんき", "しぃ"],
     ["またんき", "つー"], ["またんき", "ミセリ"], ["またんき", "トソン"],
+    ["またんき", "フサギコ"], ["またんき", "ぃょぅ"], ["フサギコ", "ぃょぅ"],
 ]
 
 
@@ -1490,18 +1535,73 @@ def hero_group_label(entry: str) -> str | None:
 
 
 def hero_pair_note(h1: str, h2: str) -> str:
-    g1 = hero_group_label(h1)
-    g2 = hero_group_label(h2)
-    if not g1 or not g2 or g1 == g2:
-        return ""
+    """別資料のキャラ2人が視点に並んだ時の短縮版・無関係宣言"""
     n1, n2 = hero_entry_name(h1), hero_entry_name(h2)
+    k1 = mat_id_for_hero_name(n1)
+    k2 = mat_id_for_hero_name(n2)
+    if not k1 or not k2 or k1 == k2:
+        return ""
     for pair in HERO_PAIR_KNOWN:
         if (pair[0] == n1 and pair[1] == n2) or (pair[0] == n2 and pair[1] == n1):
             return ""
-    return f"\n{n1}（{g1}）と{n2}（{g2}）は、互いに一切の面識・接点を持たない完全な無関係（他人）である。"
+    g1, g2 = hero_group_label(h1), hero_group_label(h2)
+    s1 = n1 if g1 == "単独" else f"{n1}（{g1}）"
+    s2 = n2 if g2 == "単独" else f"{n2}（{g2}）"
+    return f"\n{s1}と{s2}は、互いに一切の面識・接点を持たない完全な無関係（他人）である。"
 
 
-def generate_relation_rule(selected_ids: list[str], hero_text: str | None = None) -> str:
+# ============================================================
+# 資料が提示されていない人物の捏造防止
+# ============================================================
+# 採用されたキャラ資料の本文に名前が登場するのに、その人物のキャラ資料が
+# 採用されていない場合、執筆AIは手元にない設定を創作して穴埋めする。
+# 該当する名前を列挙し、設定の創作と登場を禁じる宣言を関係ルールに付ける。
+# 検出は長い名前を先に当てて該当箇所を潰す方式とする
+# （フサギコの本文中の「ギコ」など、部分一致の誤爆を防ぐため）。
+
+ROSTER_NAMES = sorted({n for m in CHAR_MATERIALS for n in m["names"]}, key=len, reverse=True)
+NAME_TO_MAT_ID = {n: m["id"] for m in CHAR_MATERIALS for n in m["names"]}
+
+
+def absent_referenced_chars(selected_ids: list[str], hero_text: str | None,
+                            files: dict | None) -> list[str]:
+    """採用資料の本文に名前があるのに資料が不採用のキャラ名を列挙する"""
+    if not files:
+        return []
+    adopted = [sid for sid in (selected_ids or []) if sid in NAME_TO_MAT_ID.values()]
+    adopted_set = set(adopted)
+    body = "\n".join(str(files.get(mid) or "") for mid in adopted)
+    if not body.strip():
+        return []
+    heroes = set(hero_names_from_text(hero_text or ""))
+    work = body
+    found: list[str] = []
+    for name in ROSTER_NAMES:
+        if name not in work:
+            continue
+        mid = NAME_TO_MAT_ID.get(name)
+        if mid not in adopted_set and name not in heroes and name not in found:
+            found.append(name)
+        work = work.replace(name, "　")
+    return found
+
+
+def build_absent_char_rule(absent: list[str]) -> str:
+    if not absent:
+        return ""
+    names = "、".join(absent)
+    return (
+        "\n資料が提示されていない人物："
+        f"採用されたキャラ資料の本文には「{names}」という名前が登場するが、この人物たちのキャラ資料はこのプロンプトに含まれていない。"
+        "資料が提示されていない人物について、容姿・体格・年齢・性格・口調・能力・過去・他者との関係を創作してはならない。"
+        "想像で補完した設定を与えることも、創作した設定で場に出すことも禁止する。"
+        "名前が話題に出る場合は、姿を見せない形（不在・噂・言及・名前を呼ばれる・伝聞や記録上の名前）に留め、台詞・行動・外見描写を与えてはならない。"
+        "この指定はキャラ資料が同梱されていない人物にのみ適用する。資料が同梱されている人物は、資料の記載どおりに登場させてよい。"
+    )
+
+
+def generate_relation_rule(selected_ids: list[str], hero_text: str | None = None,
+                           files: dict | None = None) -> str:
     selected = [sid for sid in selected_ids if sid in REL_GROUPS]
 
     def member_str(label, members):
@@ -1509,7 +1609,10 @@ def generate_relation_rule(selected_ids: list[str], hero_text: str | None = None
 
     def find_contact(x, y):
         for c in CROSS_CONTACTS:
-            if (c["a"] == x and c["b"] == y) or (c["a"] == y and c["b"] == x):
+            if not ((c["a"] == x and c["b"] == y) or (c["a"] == y and c["b"] == x)):
+                continue
+            when = c.get("when") or []
+            if all(w in selected for w in when):
                 return c
         return None
 
@@ -1551,11 +1654,12 @@ def generate_relation_rule(selected_ids: list[str], hero_text: str | None = None
     rule = "キャラクター間の関係：\n" + "\n".join(lines)
     rule += "\nこの指定の趣旨は、互いに面識のないキャラクター同士を「顔を知っている」「旧知の仲」のような顔見知り・旧知扱いで描写することを防ぐことにある。顔合わせそのものを禁じる趣旨ではない。物語の展開やユーザーの指示に応じて、異なるグループのキャラクターが同じ場に現れ、顔を合わせることは許容する。その場合、両者は必ず初対面として描くこと：互いの名前・素性・性格・能力・過去を知らない前提で、初対面特有の距離感（警戒・探り・よそよそしさ・自己紹介）を持たせる。旧知同士のような馴染んだ口調、相手の内情を知っている前提の言動、根拠のない親密さや信頼を付加してはならない。顔合わせを避ける必要はないが、顔を合わせた以上、初対面以外の関係性を勝手に付与してはならない。"
     rule += "\n詳細キャラ資料に関係・面識・接点の記載がある組合せは、無関係（他人）として扱わず、資料の記載を優先すること。ただし記載された関係の範囲を超えて、顔見知り・旧知の関係へ勝手に拡張してはならない。"
+    rule += build_absent_char_rule(absent_referenced_chars(selected, hero_text, files))
     return rule
 
 
 # ============================================================
-# 汎用キャラクター一覧（9資料対応）
+# 汎用キャラクター一覧（11資料対応）
 # ============================================================
 
 TEMPLATE_EXCLUDE_BY_FILE = {
@@ -1563,7 +1667,9 @@ TEMPLATE_EXCLUDE_BY_FILE = {
     "choukasoku": {"モナー", "ロマネスク", "しぃ", "つー", "ミセリ", "トソン"},
     "lab": {"花瓶", "ヒート", "フォックス"},
     "school": {"デレ", "キュート", "ペニサス伊藤"},
-    "host": {"またんき", "フサギコ", "ぃょぅ"},
+    "matangi": {"またんき"},
+    "fusagiko": {"フサギコ"},
+    "iyou": {"ぃょぅ"},
     "tsun": {"ツン"},
     "watanabe": {"渡辺さん"},
     "hain": {"ハイン"},
@@ -1575,7 +1681,9 @@ TEMPLATE_EXCLUDE_AA_BY_FILE = {
     "choukasoku": {"（ ´∀｀）", "（ ФωФ）", "(*ﾟーﾟ)", "(*ﾟ∀ﾟ)", "ﾐｾ*ﾟーﾟ)ﾘ", "(ﾟ、ﾟﾄｿﾝ"},
     "lab": {"i!iiﾘﾟ ヮﾟﾉﾙ", "ﾉﾊﾟ⊿ﾟ)", "爪'ー`)y‐"},
     "school": {"ζ(ﾟーﾟ*ζ", "o川*ﾟーﾟ)o", "('、`*川"},
-    "host": {"(・∀ ・)", "ミ,,ﾟДﾟ彡", "(=ﾟωﾟ)ﾉ"},
+    "matangi": {"(・∀ ・)"},
+    "fusagiko": {"ミ,,ﾟДﾟ彡"},
+    "iyou": {"(=ﾟωﾟ)ﾉ"},
     "tsun": {"ξﾟ⊿ﾟ)ξ"},
     "watanabe": {"从'ー'从"},
     "hain": {"从 ﾟ∀从"},
@@ -1770,8 +1878,8 @@ def _candidates_for_char_files(file_ids: list[str]) -> list[str]:
             pool = BOON_CHARACTERS
         elif fid == "choukasoku":
             pool = [e for e in MONA_CHARACTERS if "またんき" not in e]
-        elif fid == "host":
-            pool = MONA_CHARACTERS + TANO_CHARACTERS
+        elif fid == "matangi":
+            pool = MONA_CHARACTERS
         else:
             pool = TANO_CHARACTERS
         for entry in pool:
@@ -1889,7 +1997,7 @@ FIRST_PERSON_LINE = "一人称視点の形式で書くこと"
 
 
 # ============================================================
-# build_contents（プロンプト本体の組み立て）— 9資料対応版
+# build_contents（プロンプト本体の組み立て）— 11資料対応版
 # ============================================================
 
 def build_contents_priority(files: dict, shuryo_mode: int, use_markov: bool,
@@ -2124,7 +2232,7 @@ def build_contents_priority(files: dict, shuryo_mode: int, use_markov: bool,
             return None
 
     hero_text, hero_mode = choose_hero_for_char_files(selected_ids, HERO_MODE, suppress_hero, files)
-    relation = generate_relation_rule(selected_ids, hero_text) if shuryo_mode != 2 else ""
+    relation = generate_relation_rule(selected_ids, hero_text, files) if shuryo_mode != 2 else ""
     template = build_char_template(selected_ids, hero_text, shuryo_mode, files)
 
     # 視点・文字数の最終ブロック
@@ -2158,12 +2266,12 @@ def build_contents_priority(files: dict, shuryo_mode: int, use_markov: bool,
         removed = char_blocks.pop()
         projected -= len(removed) + 2 if removed else 0
         hero_text, hero_mode = choose_hero_for_char_files(selected_ids, HERO_MODE, suppress_hero, files)
-        relation = generate_relation_rule(selected_ids, hero_text) if shuryo_mode != 2 else ""
+        relation = generate_relation_rule(selected_ids, hero_text, files) if shuryo_mode != 2 else ""
         template = build_char_template(selected_ids, hero_text, shuryo_mode, files)
         final_tail = make_final_tail()
 
     final_tail = make_final_tail()
-    relation = generate_relation_rule(selected_ids, hero_text) if shuryo_mode != 2 else ""
+    relation = generate_relation_rule(selected_ids, hero_text, files) if shuryo_mode != 2 else ""
     template = build_char_template(selected_ids, hero_text, shuryo_mode, files)
 
     # 保護ブロック（関係ルール・テンプレ）
@@ -2256,8 +2364,9 @@ def build_contents(chosen: dict, use_markov: bool, hero_mode: int, hero_text: st
             selected_ids.append("choukasoku")
         if chosen.get("他の人"):
             # 他の人は複数マテリアルに分散
-            selected_ids.extend(["lab", "school", "host", "tsun", "watanabe", "hain", "di"])
-        rel = generate_relation_rule(selected_ids, hero_text)
+            selected_ids.extend(["lab", "school", "matangi", "fusagiko", "iyou",
+                                 "tsun", "watanabe", "hain", "di"])
+        rel = generate_relation_rule(selected_ids, hero_text, files_global)
         if rel:
             if not add(rel):
                 return None
@@ -2728,7 +2837,9 @@ if __name__ == "__main__":
         "choukasoku": safe_read(choukasoku_file),
         "lab": safe_read(lab_file),
         "school": safe_read(school_file),
-        "host": safe_read(host_file),
+        "matangi": safe_read(matangi_file),
+        "fusagiko": safe_read(fusagiko_file),
+        "iyou": safe_read(iyou_file),
         "tsun": safe_read(tsun_file),
         "watanabe": safe_read(watanabe_file),
         "hain": safe_read(hain_file),
