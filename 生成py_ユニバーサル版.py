@@ -108,7 +108,7 @@ SHUFFLE_BLOCKS_MODE = 0
 # 視点キャラ固定（''=ランダム / キャラ名 / group:◯◯）
 FIXED_HERO = ""
 
-# 最低キャラ資料文字数
+# 採用キャラ資料の合計文字数下限（0=チェック無し）
 MIN_CHAR_MATERIAL_CHARS = 10000
 
 # ファイルパス
@@ -1457,11 +1457,52 @@ def hero_entry_name(entry: str) -> str:
     return entry[i + 1:] if i >= 0 else entry
 
 
-def hero_names_from_text(hero_text: str) -> list[str]:
+def _hero_entry_candidates(files: dict | None = None) -> list[str]:
+    """視点行から拾う「AA＋全角スペース＋名前」の候補一覧（長い順）"""
+    cands = set(BUGAI_CHARACTERS)
+    text = (files or {}).get("charaTemplate") if files else None
+    if text:
+        _header, _sep, rows = _parse_template(text)
+        for r in rows:
+            core = (r[0] or "").split("（")[0].strip()
+            aa = (r[1] or "").strip() if len(r) >= 2 else ""
+            if core and aa:
+                cands.add(aa + "　" + core)
+    return sorted((c for c in cands if c), key=len, reverse=True)
+
+
+def hero_names_from_text(hero_text: str, files: dict | None = None) -> list[str]:
+    """視点行「今回の視点は[ ～ ]です」からキャラ名を取り出す。
+
+    括弧内を候補エントリ（AA＋全角スペース＋名前）と突き合わせ、
+    位置順・最長優先・重複なしで拾う。AA に読点やカンマを含むキャラ
+    （(,,ﾟДﾟ) や (ﾟ、ﾟﾄｿﾝ など）でも、区切り記号と取り違えない。
+    """
     m = re.search(r"今回の視点は\[\s*(.+?)\s*\]です", hero_text or "")
     if not m:
         return []
     x = m.group(1)
+    hits: list[tuple[int, str]] = []
+    work = x
+    for entry in _hero_entry_candidates(files):
+        start = 0
+        while True:
+            i = work.find(entry, start)
+            if i < 0:
+                break
+            hits.append((i, entry))
+            start = i + len(entry)
+        if entry in work:
+            work = work.replace(entry, "\x00" * len(entry))
+    if hits:
+        hits.sort(key=lambda t: t[0])
+        names = []
+        for _pos, entry in hits:
+            nm = hero_entry_name(entry)
+            if nm and nm not in names:
+                names.append(nm)
+        return names
+    # 候補エントリに一つも一致しない表記のときのフォールバック
     if "：" in x:
         x = x.split("：", 1)[1]
     names = []
@@ -1472,8 +1513,8 @@ def hero_names_from_text(hero_text: str) -> list[str]:
     return names
 
 
-def hero_name_from_text(hero_text: str) -> str:
-    names = hero_names_from_text(hero_text)
+def hero_name_from_text(hero_text: str, files: dict | None = None) -> str:
+    names = hero_names_from_text(hero_text, files)
     return names[0] if names else ""
 
 
@@ -1573,7 +1614,7 @@ def absent_referenced_chars(selected_ids: list[str], hero_text: str | None,
     body = "\n".join(str(files.get(mid) or "") for mid in adopted)
     if not body.strip():
         return []
-    heroes = set(hero_names_from_text(hero_text or ""))
+    heroes = set(hero_names_from_text(hero_text or "", files))
     work = body
     found: list[str] = []
     for name in ROSTER_NAMES:
@@ -1633,7 +1674,7 @@ def generate_relation_rule(selected_ids: list[str], hero_text: str | None = None
     # 特殊視点で資料外キャラが出た場合の初対面指定
     # 判定は matId 所属チェック（採用リストに含まれているか）
     if hero_text and "：" in hero_text:
-        hero_names = hero_names_from_text(hero_text)
+        hero_names = hero_names_from_text(hero_text, files)
         seen_names: set[str] = set()
         for name in hero_names:
             if not name or name in seen_names:
@@ -1724,7 +1765,7 @@ def build_char_template(selected_ids: list[str], hero_text: str, shuryo_mode: in
         return min(pool_size, random.randint(lo, hi))
 
     def split_hero(src_rows):
-        hero_names = hero_names_from_text(hero_text)
+        hero_names = hero_names_from_text(hero_text, files)
         hero_blob = norm_aa(hero_text)
         heroes, others = [], []
         for r in src_rows:
@@ -2311,6 +2352,7 @@ def build_contents_priority(files: dict, shuryo_mode: int, use_markov: bool,
         "charPriority": priority,
         "heroText": hero_text,
         "heroMode": hero_mode,
+        "charMaterialLength": sum(len(b) for b in char_blocks if b),
     }
 
 
@@ -2569,6 +2611,8 @@ def run_generation(suppress_hero: bool = False, files: dict | None = None) -> tu
                 if markov_max > MARKOV_LINES_MIN:
                     markov_max = max(MARKOV_LINES_MIN, markov_max - random.randint(1, 500))
                 continue
+            if MIN_CHAR_MATERIAL_CHARS > 0 and result.get("charMaterialLength", 0) < MIN_CHAR_MATERIAL_CHARS:
+                continue
             total_len = sum(len(x) + 2 for x in result["contents"])
             if total_len <= MAX_CHAR:
                 ids = result["selectedCharFiles"]
@@ -2791,6 +2835,7 @@ def _parse_cli_args():
       --char-max=N         CHAR_COUNT_MAX
       --first-person=N     FIRST_PERSON_RATE (0〜100)
       --shuffle-blocks=N   SHUFFLE_BLOCKS_MODE (0=OFF, 1=ON)
+      --min-char-material=N MIN_CHAR_MATERIAL_CHARS (0=チェック無し)
       --opening-rate=N     OPENING_RATE (0〜100)
       --ending-rate=N      ENDING_RATE (0〜100)
       --stdout / -p        標準出力にプロンプト全文を出力
@@ -2808,6 +2853,7 @@ def _parse_cli_args():
         "--char-max": ("CHAR_COUNT_MAX", int),
         "--first-person": ("FIRST_PERSON_RATE", int),
         "--shuffle-blocks": ("SHUFFLE_BLOCKS_MODE", int),
+        "--min-char-material": ("MIN_CHAR_MATERIAL_CHARS", int),
         "--opening-rate": ("OPENING_RATE", int),
         "--ending-rate": ("ENDING_RATE", int),
     }

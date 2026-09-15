@@ -319,6 +319,7 @@ footer { text-align: center; color: #5b6378; font-size: 11px; padding: 24px 0 40
         <li><b>フロー指示文</b>：スロット辞書で組み立てた1行の直後には「↑ これが冒頭の流れ。ここで出した要素や言及は、物語のどこかで必ず意味を持つ伏線として張っておけ。」（終盤は「↑ これが終盤の流れ。この終盤の着地を、物語のどこかで既に張った伏線を拾い上げる形で実現しろ。」）を置きます。マルコフ連鎖で組み立てた1行の直後には、文が破綻していても意図を補完して強引に解釈させる指示を含めた文を置きます。<b>冒頭／終盤のスロット辞書合成</b>をOFFにした場合、辞書が取得できない場合、試行回数内に合格文が出ない場合は、マルコフ連鎖で1行を組み立てます。</li>
         <li><b>ブロックランダム順モード</b>（デフォルトOFF）をONにすると、プロンプトの各ブロック（採用キャラ資料群・関係ルール・SS.txt・共通.txt・各マルコフ＋区切り・最後.txt・キャラテンプレ・冒頭／終盤／テーマ／トーン等）を毎回ランダムな順番に並べ替えます。<b>「視点提示 → 文字数指定」の2つだけはシャッフルされず、常に最後の固定位置</b>（一人称指定行は視点提示の一部として同じく固定）です。「マルコフ文＋これは資料です」等のペアは順序のまま維持されます。</li>
         <li><b>資料が提示されていない人物の捏造防止</b>：採用したキャラ資料の本文に名前が登場するのに、その人物のキャラ資料が採用されなかった回では、<code>キャラクター間の関係</code> の末尾に「資料が提示されていない人物：…」の宣言を自動で追加します。名前を列挙したうえで、容姿・体格・年齢・性格・口調・能力・過去・他者との関係の創作を禁止し、名前が話題に出る場合も不在・噂・言及など姿を見せない形に留めさせます。視点キャラに指定された人物は列挙から除外します。検出は長い名前を先に照合する方式で、<code>フサギコ</code> の本文中の「ギコ」のような部分一致の誤爆を防ぎます。</li>
+        <li><b>採用キャラ資料の合計文字数下限</b>（上級パラメータ・既定10000）：資料オンリーモード（-1／3）で、採用されたキャラ資料の合計文字数がこの値に届かない結果は本編生成に回さず、優先度を引き直してリトライします。キャラ資料が1つも採用されなかった回や、薄い資料だけが入った回を除外するための検査です。<b>0 にすると検査を行いません</b>。</li>
         <li><b>グループ横断の既知接点</b>：またんき・フサギコ・ぃょぅは1人ずつ別資料なので、2人以上が同時に採用された回だけ「互いに面識がある」ことを宣言します。フサギコ・ぃょぅとモナーグループの接点は、またんきの資料も採用されている回だけ「またんき経由の個別関係に限る」と宣言し、またんきが不採用の回は無関係として扱います。</li>
         <li>採用した各キャラ資料txtの内部では、そのtxtの代表AAで始まる人物ブロックを毎回ランダムな順に並べ替えます（★欲の位置はファイルごとに違うため使いません）。グループ概要・世界設定など人物以外の見出し以降は末尾に残します。</li>
         <li>旧来の統合資料 <code>他の人.txt</code> は旧Python版との互換用に残っていますが、SS.htmlでは参照しません。</li>
@@ -341,6 +342,7 @@ footer { text-align: center; color: #5b6378; font-size: 11px; padding: 24px 0 40
         <tr><td>資料オンリーモード</td><td>SHURYO_ONLY_MODE</td></tr>
         <tr><td>ブロックランダム順モード</td><td>—（SS.html独自機能。py版には無い）</td></tr>
         <tr><td>キャラ資料優先度</td><td>11資料を毎回シャッフルし、上限で停止</td></tr>
+        <tr><td>採用キャラ資料の合計文字数下限（上級）</td><td>MIN_CHAR_MATERIAL_CHARS</td></tr>
         <tr><td>マルコフ連鎖</td><td>USE_MARKOV_MODE</td></tr>
         <tr><td>視点モード</td><td>HERO_MODE</td></tr>
         <tr><td>視点キャラ固定（上級）</td><td>—（SS.html独自機能。py版には無い。全モードで「今回の視点は～」を1名に確定。-1/3では所属txtの採用を確認、不採用ならリトライ。優先度順序は不変。「group:◯◯」指定でグループから1名をクリックごとに抽選）</td></tr>
@@ -2569,6 +2571,7 @@ var NovelGen = (function () {
   // -1 / 3 では、旧「ブーン・モナー・他の人」の三択を使わない。
   // ここに並ぶ11資料のキャラ（計29名）を毎回シャッフルし、キャラの
   // 所属資料（txt）を上から順にプロンプト先頭へ加える。
+  // 採用キャラ資料の合計文字数下限（パラメータ minCharMaterialChars の既定値。0=チェック無し）
   var MIN_CHAR_MATERIAL_CHARS = 10000;
   var MARKOV_LINES_HARD_MAX = 1000;
   var CHAR_MATERIALS = [
@@ -3739,7 +3742,7 @@ var NovelGen = (function () {
     }
     // 特殊視点で資料外キャラが出た場合の初対面指定（matId所属チェック）
     if (heroText && heroText.indexOf('：') >= 0) {
-      var heroNames = heroNamesFromText(heroText);
+      var heroNames = heroNamesFromText(heroText, files);
       var seen = {};
       for (var hi = 0; hi < heroNames.length; hi++) {
         var name = heroNames[hi];
@@ -3793,7 +3796,7 @@ var NovelGen = (function () {
     var adopted = (selectedCharFiles || []).filter(function (id) { return !!REL_GROUPS[id]; });
     var body = adopted.map(function (id) { return files[id] || ''; }).join('\n');
     if (!body.trim()) return [];
-    var heroes = heroNamesFromText(heroText || '');
+    var heroes = heroNamesFromText(heroText || '', files);
     var work = body;
     var found = [];
     for (var i = 0; i < ROSTER_NAMES.length; i++) {
@@ -3851,21 +3854,62 @@ var NovelGen = (function () {
 
   // ダブル視点は「AA　名前、AA　名前」と連結されるため、末尾だけを見ると
   // 2人目しか拾えず1人目が提示から漏れる。読点で分割して全員返す。
-  function heroNamesFromText(heroText) {
+  // 視点行から拾う「AA＋全角スペース＋名前」の候補一覧（長い順）。
+  // 内蔵の主要AA一覧に、キャラテンプレ.txt の行から作ったエントリを加える。
+  function heroEntryCandidates(files) {
+    var set = {};
+    (DATA.bugai || []).forEach(function (e) { if (e) set[e] = true; });
+    var rows = parseCharaTemplateRows(files && files.charaTemplate);
+    for (var i = 0; i < rows.length; i++) {
+      var core = (rows[i][0] || '').split('（')[0].trim();
+      var aa = (rows[i][1] || '').trim();
+      if (core && aa) set[aa + '　' + core] = true;
+    }
+    return Object.keys(set).sort(function (a, b) { return b.length - a.length; });
+  }
+
+  // 括弧内を候補エントリと突き合わせ、位置順・最長優先・重複なしで拾う。
+  // AA に読点やカンマを含むキャラ（(,,ﾟДﾟ) や (ﾟ、ﾟﾄｿﾝ など）でも、
+  // 区切り記号と取り違えない。
+  function heroNamesFromText(heroText, files) {
     var m = /今回の視点は\[\s*(.+?)\s*\]です/.exec(heroText || '');
     if (!m) return [];
     var x = m[1];
+    var hits = [];
+    var work = x;
+    var cands = heroEntryCandidates(files);
+    for (var ci = 0; ci < cands.length; ci++) {
+      var entry = cands[ci];
+      var idx = work.indexOf(entry);
+      var hit = false;
+      while (idx >= 0) {
+        hits.push([idx, entry]);
+        hit = true;
+        idx = work.indexOf(entry, idx + entry.length);
+      }
+      if (hit) work = work.split(entry).join(new Array(entry.length + 1).join('\u0000'));
+    }
+    if (hits.length) {
+      hits.sort(function (a, b) { return a[0] - b[0]; });
+      var names = [];
+      for (var hi = 0; hi < hits.length; hi++) {
+        var nm = heroEntryName(hits[hi][1]);
+        if (nm && names.indexOf(nm) < 0) names.push(nm);
+      }
+      return names;
+    }
+    // 候補エントリに一つも一致しない表記のときのフォールバック
     if (x.indexOf('：') >= 0) x = x.split('：')[1];
-    var names = [];
+    var out = [];
     x.split(/[、,]/).forEach(function (chunk) {
       var parts = chunk.split('　').filter(function (p) { return p.trim(); });
-      if (parts.length) names.push(parts[parts.length - 1].trim());
+      if (parts.length) out.push(parts[parts.length - 1].trim());
     });
-    return names;
+    return out;
   }
 
-  function heroNameFromText(heroText) {
-    var names = heroNamesFromText(heroText);
+  function heroNameFromText(heroText, files) {
+    var names = heroNamesFromText(heroText, files);
     return names.length ? names[0] : '';
   }
 
@@ -3906,7 +3950,7 @@ var NovelGen = (function () {
 
     // 視点キャラの行を名前 or AA で拾う（全modeで共通に使う）
     function splitHero(srcRows) {
-      var heroNames = heroNamesFromText(heroText);
+      var heroNames = heroNamesFromText(heroText, files);
       var heroBlob = normAA(heroText);
       var heroes = [], others = [];
       srcRows.forEach(function (r) {
@@ -4010,7 +4054,11 @@ var NovelGen = (function () {
           continue;
         }
         // 誰も選ばれていない／資料が薄すぎる結果は本編生成に回さない。
-        if (made.selectedCharMaterialLength < MIN_CHAR_MATERIAL_CHARS) continue;
+        // 下限はパラメータ（minCharMaterialChars）。0 でチェック無し。
+        var minCharMaterial = parseInt(P.minCharMaterialChars, 10);
+        if (isNaN(minCharMaterial)) minCharMaterial = MIN_CHAR_MATERIAL_CHARS;
+        if (minCharMaterial < 0) minCharMaterial = 0;
+        if (minCharMaterial > 0 && made.selectedCharMaterialLength < minCharMaterial) continue;
         var priorityResult = made.contents.join('\n\n');
         if (priorityResult.length <= P.maxChar) {
           var _fixedNamePat = fixedHeroName(P);
@@ -4481,6 +4529,7 @@ NovelGen.setNovelData(NOVEL_DATA);
     markovLinesMin: 1,
     markovLinesMaxShuryo: 1000,
     maxChar: 119000,
+    minCharMaterialChars: 10000, // 採用キャラ資料の合計文字数下限（0=チェック無し）
     markovSentenceMinChars: 10,
     markovSentenceMaxChars: 500,
     maxRetry: 50,
@@ -4521,6 +4570,7 @@ NovelGen.setNovelData(NOVEL_DATA);
     { key: 'markovLinesMin', label: 'マルコフ最小行数', type: 'number', min: 1, adv: true },
     { key: 'markovLinesMaxShuryo', label: '資料オンリー時のマルコフ最大行数（上限1000）', type: 'number', min: 1, max: 1000, adv: true },
     { key: 'maxChar', label: '全体上限文字数（MAX_CHAR）', type: 'number', min: 1000, adv: true },
+    { key: 'minCharMaterialChars', label: '採用キャラ資料の合計文字数下限（0=チェック無し）', type: 'number', min: 0, adv: true },
     { key: 'markovSentenceMinChars', label: 'マルコフ1文の最小文字数', type: 'number', min: 1, adv: true },
     { key: 'markovSentenceMaxChars', label: 'マルコフ1文の最大文字数', type: 'number', min: 1, adv: true },
     { key: 'maxRetry', label: '内側リトライ回数', type: 'number', min: 1, adv: true },
@@ -5099,6 +5149,5 @@ NovelGen.setNovelData(NOVEL_DATA);
 })();
 
 </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a37423e6cf8c57b5',t:'MTc4ODc2NzYxMQ=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script><script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a385b37deb4d4b50',t:'MTc4ODk1MTc1MQ=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script><script type="module" src="https://static.cloudflareinsights.com/beacon.min.js/v31edd6df95cf4e85bb4c19e7a9bdbcba1788362987495" integrity="sha512-iIg7k2xntmwu6/uSb5tpc/hySgZc4eoL31yB29W6tJFo2akwjPWcEqnCEdJvGexCL0KEQwVYv5BlowfhVz26hg==" data-cf-beacon='{"version":"2024.11.0","token":"1954b47c125f43f8b4338b3c4f804e4f","spa":2}' crossorigin="anonymous"></script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a3940bb62e547955',t:'MTc4OTEwMjE2NQ=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+</body>
 </html>
