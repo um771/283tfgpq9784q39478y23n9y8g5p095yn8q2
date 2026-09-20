@@ -2075,7 +2075,10 @@ var SkeletonEngine = (function () {
     '目的の文型': 1, '目的動詞': 1, '目的軸': 1,
     '異変の文型': 1, '逸脱': 1, '異変軸': 1,
     '事件の文型': 1, '進行中の用件': 1, '経過の時点': 1, '事件軸': 1,
-    '制度軸': 1, '行政の話題': 1, '行政の書式': 1
+    '制度軸': 1, '行政の話題': 1, '行政の書式': 1,
+    '時間の文型': 1, '局面軸': 1, '犠牲軸': 1, '死の主体': 1, '死の手段': 1,
+    '死の様式': 1, '殺す主体': 1, '殺す手段': 1,
+    '死合成軸': 1, '決着軸': 1, '時間軸': 1
   };
 
   // 物語の内容を持つ軸と、タグに出すときの呼び名。
@@ -2083,7 +2086,9 @@ var SkeletonEngine = (function () {
   var NARRATIVE = [
     { axis: '壊れ方', label: '問題', cut: ['発生時点', '発生場所'] },
     { axis: '逸脱', label: '異変', cut: [] },
-    { axis: '目的動詞', label: '目的', cut: [] }
+    { axis: '目的動詞', label: '目的', cut: [] },
+    { axis: '死の手段', label: '死に様', cut: [] },
+    { axis: '殺す手段', label: '殺し様', cut: [] }
   ];
 
   // body のうち、key を含む最小の連続部分を取り出す。
@@ -5149,5 +5154,6 @@ NovelGen.setNovelData(NOVEL_DATA);
 })();
 
 </script>
-</body>
+<script type="module" src="https://static.cloudflareinsights.com/beacon.min.js/v31edd6df95cf4e85bb4c19e7a9bdbcba1788362987495" integrity="sha512-iIg7k2xntmwu6/uSb5tpc/hySgZc4eoL31yB29W6tJFo2akwjPWcEqnCEdJvGexCL0KEQwVYv5BlowfhVz26hg==" data-cf-beacon='{"version":"2024.11.0","token":"1954b47c125f43f8b4338b3c4f804e4f","spa":2}' crossorigin="anonymous"></script>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a3df606b5cf7eb99',t:'MTc4OTg5MjA2Nw=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
