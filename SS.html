@@ -276,6 +276,10 @@ footer { text-align: center; color: #5b6378; font-size: 11px; padding: 24px 0 40
         </thead>
         <tbody id="slotBody"></tbody>
       </table>
+      <div style="margin-top:10px;">
+        <label for="customTailText" style="font-size:12px;color:var(--text-dim);">📌 末尾追加テキスト（「今回の視点は～」と「文字数は～文字」の間にそのまま挿入。未入力なら追加なし）</label>
+        <textarea id="customTailText" rows="3" placeholder="未入力（既定）なら何も追加されません。書いた文章は改行もそのまま保持され、他の設定と同様にこのブラウザへ自動保存されます。" style="width:100%;background:#0c0e14;color:var(--text);border:1px solid var(--border);border-radius:7px;padding:6px;font-size:12px;resize:vertical;box-sizing:border-box;margin-top:4px;"></textarea>
+      </div>
     </section>
 
     <section class="block">
@@ -314,8 +318,9 @@ footer { text-align: center; color: #5b6378; font-size: 11px; padding: 24px 0 40
         <li><b>マルコフ.txt や 最後.txt、各キャラ資料をリポジトリ上で編集して保存 → このページで生成</b> すれば、最新版が反映されます（毎回最新を取得）。</li>
         <li>資料オンリーモード（-1／3）では、11資料のキャラ計29名に対して優先度をランダム設定し、上から所属する資料（二次創作・超加速・ラボ組・学校組・またんき・フサギコ・ぃょぅ・ツン・渡辺さん・ハイン・でぃ）のtxtを追加していき、文字数上限に収まる順番までをプロンプト先頭へ追加します。<b>視点キャラ固定時は固定キャラの所属txtが採用されていることを確認し、不採用ならリトライします</b>（例：ブーン固定なのに二次創作.txt不採用、という破綻は起きません。優先度の順序自体は改変しません）。</li>
         <li><b>一人称視点指定（全モード共通）</b>：<b>一人称視点指定レート（％・既定50）</b>の確率で、末尾固定ブロックの <code>今回の視点は[ ～ ]です</code> の直後に<b>空行を挟まず</b> <code>一人称視点の形式で書くこと</code> を追加します（トーンブロックの後・<code>文字数は～文字</code> の前の固定位置）。ヒットした回は視点なしレート・視点モード0を無視して必ず視点行を出します（続き.txtによる視点抑止中を除く）。資料オンリーモードの設定値（-1／2／3およびランダム）に関係なく全モードで動作します。</li>
+        <li><b>末尾追加テキスト（全モード共通）</b>：「データファイル（参照元）」枠の下部にある入力欄に書いた文章を、末尾固定ブロックの <code>今回の視点は～</code>（視点行がある場合はその直後・一人称指定行よりも後）と <code>文字数は～文字</code> の間にそのまま挿入します（構造タグ行 <code>［…］</code> と同じく独立ブロック扱いで、改行も保持されます）。<b>未入力（既定）なら何も追加されません。</b>ブロックランダム順モードでも常にこの固定位置に出ます。入力内容は他の設定と同様にブラウザへ自動保存され、「すべて初期状態に戻す」で消去されます。</li>
         <li><b>冒頭／終盤のスロット辞書合成</b>（既定ON）：<code>冒頭スロット.txt</code> / <code>終盤スロット.txt</code> は意味スロット辞書です。品詞・意味役割ごとに分類された語彙プール（スロット）と、スロットの並び順と接続を固定した文型（フレーム）を直積して「冒頭は、〜ことになる。」「終盤は、〜ことになる。」の1文を組み立てます。フレームが助詞と接続を保持するため、出力は文法的に正しい日本語になります。語彙行の <code>@タグ</code> でフレーム側から候補を絞り込み、<code>^グループ=値</code> の排他指定で意味的に衝突する組み合わせを引き直します。パターン数は文型数と各スロットの語彙数の積で決まるため、<code>#SLOT</code> に語彙を1行足すだけで掛け算に増えます。辞書はリポジトリ上で編集するだけで反映されます。</li>
-        <li><b>冒頭／終盤の骨格カード生成（構造層・既定ON）</b>：辞書は<b>既存の <code>冒頭スロット.txt</code> / <code>終盤スロット.txt</code> と同じファイル</b>から読み、中身を自動判別します。<code>#AXIS</code>／<code>#TEXT</code> を含む<b>骨格辞書形式</b>が入っていた場合はこちらを優先し、冒頭の型・決着機構・犠牲・決着の確定度など独立した軸から<b>物語骨格カード</b>を1枚抽選して「冒頭は、〜」「終盤は、〜」を合成します。旧スロット辞書のままなら自動で従来のスロット辞書合成にフォールバックするので、<b>txtの中身を書き換えるだけで方式が切り替わり、ファイルの追加は不要</b>です。辞書の軸値には <code>文{…}</code>／<code>句{…}</code> の文章化テンプレートを書けます。部品は <code>+</code> で区切り、<code>#軸名</code> で軸値を、<code>=文字列</code> で固定文字列を、<code>スロット名@#軸名</code> で他の軸の値をタグにした語彙絞り込みを表します。スロット名が「・」で終わるときは、その軸の値をスロット名に連結して語彙プールを選び分けます（<code>被り名詞・@#被り対象</code> → スロット「<code>被り名詞・道具</code>」）。これにより「何が×どう壊れるか×いつ×どこで」のように軸を直交させて問題を合成でき、語彙を1行足すたびに掛け算で組合せが増えます。文法の一致は語彙と軸に付けた条件で担保します。<code>#KEY</code> 行では、意味的重複のリジェクションで比べる軸だけを指定できます。単語ではなく<b>物語機能</b>を分散させることで、「日常→異変発見→調査・逃走」「能力ルール対決→条件反転→犠牲」への収束を防ぎます。直近の生成履歴で出過ぎた軸の重みは自動的に下がり、直近カードと物語機能が近い組合せは引き直されます（意味的重複のリジェクション）。履歴はブラウザの localStorage に保存され、ページをまたいで偏りが補正されます。生成した行の直後には抽選カードの中身を<code>［冒頭の型=…｜…｜犠牲=…］</code>（終盤は<code>［終盤の形式=…｜決着機構=…｜…］</code>）の<b>構造タグとしてプロンプト本体に同梱</b>し、執筆AIが物語機能から逃げられないようにします。特に犠牲=死亡するは、ぼかさず<b>死亡エンドとして直接描くよう指示文で強制</b>します。</li>
+        <li><b>冒頭／終盤の骨格カード生成（構造層・既定ON）</b>：辞書は<b>既存の <code>冒頭スロット.txt</code> / <code>終盤スロット.txt</code> と同じファイル</b>から読み、中身を自動判別します。<code>#AXIS</code>／<code>#TEXT</code> を含む<b>骨格辞書形式</b>が入っていた場合はこちらを優先し、冒頭の型・決着機構・犠牲・決着の確定度など独立した軸から<b>物語骨格カード</b>を1枚抽選して「冒頭は、〜」「終盤は、〜」を合成します。旧スロット辞書のままなら自動で従来のスロット辞書合成にフォールバックするので、<b>txtの中身を書き換えるだけで方式が切り替わり、ファイルの追加は不要</b>です。辞書の軸値には <code>文{…}</code>／<code>句{…}</code> の文章化テンプレートを書けます。部品は <code>+</code> で区切り、<code>#軸名</code> で軸値を、<code>=文字列</code> で固定文字列を、<code>スロット名@#軸名</code> で他の軸の値をタグにした語彙絞り込みを表します。スロット名が「・」で終わるときは、その軸の値をスロット名に連結して語彙プールを選び分けます（<code>被り名詞・@#被り対象</code> → スロット「<code>被り名詞・道具</code>」）。これにより「何が×どう壊れるか×いつ×どこで」のように軸を直交させて問題を合成でき、語彙を1行足すたびに掛け算で組合せが増えます。文法の一致は語彙と軸に付けた条件で担保します。<code>#KEY</code> 行では、意味的重複のリジェクションで比べる軸だけを指定できます。単語ではなく<b>物語機能</b>を分散させることで、「日常→異変発見→調査・逃走」「能力ルール対決→条件反転→犠牲」への収束を防ぎます。直近の生成履歴で出過ぎた軸の重みは自動的に下がり、直近カードと物語機能が近い組合せは引き直されます（意味的重複のリジェクション）。履歴はブラウザの localStorage に保存され、ページをまたいで偏りが補正されます。生成した行の直後には抽選カードの中身を<code>［冒頭の型=…｜…｜犠牲=…］</code>（終盤は<code>［終盤の形式=…｜決着機構=…｜…］</code>）の<b>構造タグとしてプロンプト本体に同梱</b>し、執筆AIが物語機能から逃げられないようにします。特に犠牲=死亡は、ぼかさず<b>死亡エンドとして直接描くよう指示文で強制</b>します。</li>
         <li><b>フロー指示文</b>：スロット辞書で組み立てた1行の直後には「↑ これが冒頭の流れ。ここで出した要素や言及は、物語のどこかで必ず意味を持つ伏線として張っておけ。」（終盤は「↑ これが終盤の流れ。この終盤の着地を、物語のどこかで既に張った伏線を拾い上げる形で実現しろ。」）を置きます。マルコフ連鎖で組み立てた1行の直後には、文が破綻していても意図を補完して強引に解釈させる指示を含めた文を置きます。<b>冒頭／終盤のスロット辞書合成</b>をOFFにした場合、辞書が取得できない場合、試行回数内に合格文が出ない場合は、マルコフ連鎖で1行を組み立てます。</li>
         <li><b>ブロックランダム順モード</b>（デフォルトOFF）をONにすると、プロンプトの各ブロック（採用キャラ資料群・関係ルール・SS.txt・共通.txt・各マルコフ＋区切り・最後.txt・キャラテンプレ・冒頭／終盤／テーマ／トーン等）を毎回ランダムな順番に並べ替えます。<b>「視点提示 → 文字数指定」の2つだけはシャッフルされず、常に最後の固定位置</b>（一人称指定行は視点提示の一部として同じく固定）です。「マルコフ文＋これは資料です」等のペアは順序のまま維持されます。</li>
         <li><b>資料が提示されていない人物の捏造防止</b>：採用したキャラ資料の本文に名前が登場するのに、その人物のキャラ資料が採用されなかった回では、<code>キャラクター間の関係</code> の末尾に「資料が提示されていない人物：…」の宣言を自動で追加します。名前を列挙したうえで、容姿・体格・年齢・性格・口調・能力・過去・他者との関係の創作を禁止し、名前が話題に出る場合も不在・噂・言及など姿を見せない形に留めさせます。視点キャラに指定された人物は列挙から除外します。検出は長い名前を先に照合する方式で、<code>フサギコ</code> の本文中の「ギコ」のような部分一致の誤爆を防ぎます。</li>
@@ -2388,7 +2393,7 @@ var NovelGen = (function () {
       markov: '↑\nこれが冒頭の流れ。文が破綻していても、その意図を補完して強引に解釈し、ここで出した要素や言及を物語のどこかで必ず意味を持つ伏線として張っておけ。'
     },
     '終盤': {
-      skel:   '↑\nこれが終盤の流れ。文の直後の［ ］は、この結末に課された物語機能の指定（骨格カード）である。タグの全項目を厳守して書き、どれも外さないこと。特に犠牲が「死亡する」の場合は、指定された死因のまま必ず死亡エンドとして直接描け。死亡のぼかし・生存へのすり替え・直前の回避は禁止する。この終盤の着地を、物語のどこかで既に張った伏線を拾い上げる形で実現しろ。',
+      skel:   '↑\nこれが終盤の流れ。文の直後の［ ］は、この結末に課された物語機能の指定（骨格カード）である。タグの全項目を厳守して書き、どれも外さないこと。特に犠牲が「死亡」の場合は、指定された死因のまま必ず死亡エンドとして直接描け。死亡のぼかし・生存へのすり替え・直前の回避は禁止する。この終盤の着地を、物語のどこかで既に張った伏線を拾い上げる形で実現しろ。',
       slot:   '↑\nこれが終盤の流れ。この終盤の着地を、物語のどこかで既に張った伏線を拾い上げる形で実現しろ。',
       markov: '↑\nこれが終盤の流れ。文が破綻していても、その意図を補完して強引に解釈し、この終盤の着地を、物語のどこかで既に張った伏線を拾い上げる形で実現しろ。'
     }
@@ -2474,7 +2479,7 @@ var NovelGen = (function () {
   //   ［冒頭の型=…｜…｜犠牲=…］（終盤は［終盤の形式=…｜決着機構=…｜…］）
   //   形式の構造タグ行として同じブロックに同梱する。
   //   プロンプトを受ける執筆AIは物語機能の指定から逃げられなくなり、
-  //   特に犠牲=死亡するを勝手に回避できなくなる。
+  //   特に犠牲=死亡を勝手に回避できなくなる。
   //   失敗・不発時は既存のフォールバック順に従う：
   //     スロット辞書合成 → テーマ行（これがテーマの話を書け）とまったく同じ
   //     マルコフ.txt・精度4固定の1行マルコフ（「冒頭は、」「終盤は、」の形で代用）。
@@ -3156,6 +3161,11 @@ var NovelGen = (function () {
           blocks.push(heroInfo.heroText + '\n' + FIRST_PERSON_LINE);
         }
       }
+      // ★ 末尾追加テキスト（customTailText）：視点ブロック（ある場合）と文字数指定の
+      //   間にユーザー任意の文章をそのまま挿入する。空文字（既定）なら何も追加しない。
+      //   挿入分も extraLen(finalTailBlocks) の文字数上限計算に自動的に含まれる。
+      var customTail = (typeof P.customTailText === 'string') ? P.customTailText.trim() : '';
+      if (customTail) blocks.push(customTail);
       blocks.push(charCountText);
       return blocks;
     }
@@ -3565,6 +3575,9 @@ var NovelGen = (function () {
     var charMin = randint(P.charCountMin, P.charCountMax);
     var charMax = randint(charMin, P.charCountMax);
     var charCountText = '文字数は' + charMin + '~' + charMax + '文字';
+    // ★ 末尾追加テキスト（customTailText）：視点行（ある場合）と文字数指定の間の
+    //   固定位置にユーザー任意の文章を挿入する。空文字（既定）なら何も追加しない。
+    var customTailM2 = (typeof P.customTailText === 'string') ? P.customTailText.trim() : '';
 
     // ★ 視点固定時（モード2含む全モード共通）はsuppress・視点モード・視点なしレートを
     // 無視して必ず固定視点を付ける。モード2は資料採用なしが仕様のため、視点と
@@ -3581,21 +3594,27 @@ var NovelGen = (function () {
     }
     if (fixedEntryTail && heroText) {
       if (!addFixedTail(heroLineM2())) return null;
+      if (!addFixedTail(customTailM2)) return null;
       if (!addFixedTail(charCountText)) return null;
     } else if (suppressHero) {
+      if (!addFixedTail(customTailM2)) return null;
       if (!addFixedTail(charCountText)) return null;
     } else if (currentHeroMode === 1) {
       if (!addFixedTail(heroLineM2())) return null;
+      if (!addFixedTail(customTailM2)) return null;
       if (!addFixedTail(charCountText)) return null;
     } else if (currentHeroMode === 0) {
       if (fpHitM2 && heroText) { if (!addFixedTail(heroLineM2())) return null; }
+      if (!addFixedTail(customTailM2)) return null;
       if (!addFixedTail(charCountText)) return null;
     } else {
       if (Math.random() * 100 < P.noHeroRate) {
         if (fpHitM2 && heroText) { if (!addFixedTail(heroLineM2())) return null; }
+        if (!addFixedTail(customTailM2)) return null;
         if (!addFixedTail(charCountText)) return null;
       } else {
         if (!addFixedTail(heroLineM2())) return null;
+        if (!addFixedTail(customTailM2)) return null;
         if (!addFixedTail(charCountText)) return null;
       }
     }
@@ -4527,6 +4546,7 @@ NovelGen.setNovelData(NOVEL_DATA);
     charCountMax: 20000,
     markovLinesMax: 1000,
     maxToneCount: 10,
+    customTailText: '',     // 末尾追加テキスト。「今回の視点は～」と「文字数は～文字」の間にそのまま挿入（空＝追加なし）。入力欄はデータファイル枠の下部
     // 上級
     fixedHero: '',            // 視点キャラ固定（''=ランダム従来通り / 29名のいずれか、または group:◯◯ で「そのグループの誰か」をクリックごとに抽選）
     markovOrder: 0,           // 0=ランダム(1〜5) / 1〜5=固定
@@ -5128,6 +5148,14 @@ NovelGen.setNovelData(NOVEL_DATA);
       resetUrls();
       log('全ファイルの参照先をリポジトリ（' + state.repo.owner + '/' + state.repo.repo + ' ' + state.repo.branch + '）に戻しました', 'ok');
     });
+
+    // 末尾追加テキスト（「今回の視点は～」と「文字数は～文字」の間に挿入）。
+    // 空（既定）なら何も追加しない。入力は他の設定と同様に自動保存される。
+    $('customTailText').value = state.params.customTailText || '';
+    $('customTailText').addEventListener('input', function () {
+      state.params.customTailText = $('customTailText').value;
+      saveState();
+    });
     $('resetAll').addEventListener('click', function () {
       if (!confirm('すべての設定を初期状態に戻しますか？')) return;
       store.del(LS_KEY);
@@ -5139,6 +5167,7 @@ NovelGen.setNovelData(NOVEL_DATA);
       resetUrls();
       renderParams();
       renderRepo();
+      $('customTailText').value = '';
       log('設定を初期状態に戻しました', 'ok');
     });
 
