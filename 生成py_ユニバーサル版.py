@@ -1809,7 +1809,6 @@ def build_char_template(selected_ids: list[str], hero_text: str, shuryo_mode: in
         return ""
     out = [
         "汎用キャラクター一覧（サブ・モブ用テンプレ）：",
-        "この一覧に記載されたキャラクターのみを使用できる。一覧に無いキャラクターは使用しない。",
     ]
     if header:
         out.append(header)
@@ -2100,7 +2099,7 @@ def build_contents_priority(files: dict, shuryo_mode: int, use_markov: bool,
             return None
         seal_base()
 
-    if not add_base("主要AAのキャラのみを使用し、モブを用意する場合も主要AAから使用する"):
+    if not add_base("主要AAのキャラのみを使用し、モブを用意する場合も12-2の選出順序に従う"):
         return None
     seal_base()
 
@@ -2399,7 +2398,7 @@ def build_contents(chosen: dict, use_markov: bool, hero_mode: int, hero_text: st
             if not add(kyoutsu):
                 return None
 
-    if not add("主要AAのキャラのみを使用し、モブを用意する場合も主要AAから使用する"):
+    if not add("主要AAのキャラのみを使用し、モブを用意する場合も12-2の選出順序に従う"):
         return None
 
     if shuryo_mode != 2:

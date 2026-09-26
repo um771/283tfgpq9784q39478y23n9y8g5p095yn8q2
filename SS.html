@@ -2480,7 +2480,7 @@ var NovelGen = (function () {
       if (!addBase(files.kyoutsu)) return null;
       sealBase();
     }
-    if (!addBase('主要AAのキャラのみを使用し、モブを用意する場合も主要AAから使用する')) return null;
+    if (!addBase('主要AAのキャラのみを使用し、モブを用意する場合も12-2の選出順序に従う')) return null;
     sealBase();
 
     if (useMarkov) {
@@ -2892,7 +2892,7 @@ var NovelGen = (function () {
 
     // 主要AAキャラ限定制約
     if (randint(1, 1) === 1) {
-      if (!addToContents('主要AAのキャラのみを使用し、モブを用意する場合も主要AAから使用する')) return null;
+      if (!addToContents('主要AAのキャラのみを使用し、モブを用意する場合も12-2の選出順序に従う')) return null;
       sealBlock();
     }
 
@@ -3551,7 +3551,6 @@ var NovelGen = (function () {
     if (!kept.length) return '';
     var out = [
       '汎用キャラクター一覧（サブ・モブ用テンプレ）：',
-      'この一覧に記載されたキャラクターのみを使用できる。一覧に無いキャラクターは使用しない。'
     ];
     if (header) out.push(header);
     if (sep) out.push(sep);
