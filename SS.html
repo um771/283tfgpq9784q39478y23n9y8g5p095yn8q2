@@ -2614,7 +2614,7 @@ var NovelGen = (function () {
       }
     }
     var toneLines = selectedNames.map(function (n, i) { return '・' + n + ' ' + values[i] + '%'; }).join('\n');
-    if (!addBase('話のトーン（本編内でこの語彙を使用することを控えろ）\n' + toneLines)) return null;
+    if (!addBase('話のトーン（割合が高いトーンの性質を、本文中の少なくとも一つの場面として実現させろ。トーン名と割合の数値をそのまま本文の語彙として使うな）\n' + toneLines)) return null;
     sealBase();
     if (A.tailText) {
       if (!addBase(A.tailText)) return null;
@@ -3091,7 +3091,7 @@ var NovelGen = (function () {
     var toneLines = selectedNames.map(function (n, i) {
       return '・' + n + ' ' + values[i] + '%';
     }).join('\n');
-    var toneText = '話のトーン（本編内でこの語彙を使用することを控えろ）\n' + toneLines;
+    var toneText = '話のトーン（割合が最も高いトーンの性質を、本文中の少なくとも一つの場面として実現させろ。トーン名と割合の数値をそのまま本文の語彙として使うな）\n' + toneLines;
     if (!addToContents(toneText)) return null;
     sealBlock();
 
