@@ -1,0 +1,4048 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>SVP 変換器 — VSQX / USTX / VoiSona (SV2 対応)</title>
+<style>
+:root{
+  --bg:#0d1117; --panel:#161b22; --panel2:#1c2230; --line:#2d3748;
+  --fg:#e6edf3; --dim:#8b949e; --accent:#4b9fff; --ok:#3fb950;
+  --warn:#d29922; --err:#f85149; --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);
+  font-family:-apple-system,BlinkMacSystemFont,"Hiragino Sans","Noto Sans JP",Segoe UI,sans-serif;
+  line-height:1.6;padding:24px 16px 64px}
+.wrap{max-width:900px;margin:0 auto}
+h1{font-size:22px;margin:0 0 4px;letter-spacing:.02em}
+.sub{color:var(--dim);font-size:13px;margin-bottom:20px}
+.badge{display:inline-block;background:var(--panel2);border:1px solid var(--line);
+  color:var(--accent);border-radius:99px;padding:1px 9px;font-size:11px;margin-left:6px;font-family:var(--mono)}
+
+#drop{border:2px dashed var(--line);border-radius:14px;background:var(--panel);
+  padding:44px 24px;text-align:center;transition:.15s;cursor:pointer}
+#drop:hover{border-color:var(--accent);background:var(--panel2)}
+#drop.hot{border-color:var(--accent);background:#132132;transform:scale(1.005)}
+#drop .big{font-size:17px;font-weight:600;margin-bottom:6px}
+#drop .small{color:var(--dim);font-size:13px}
+.kbd{font-family:var(--mono);background:var(--panel2);border:1px solid var(--line);
+  border-radius:5px;padding:1px 6px;font-size:12px}
+
+.opts{display:grid;grid-template-columns:repeat(auto-fit,minmax(215px,1fr));gap:10px;margin:18px 0}
+.opt{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:11px 13px}
+.opt label{display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer}
+.opt .hint{color:var(--dim);font-size:11.5px;margin-top:4px;padding-left:24px}
+input[type=checkbox]{accent-color:var(--accent);width:15px;height:15px;flex:none}
+select,input[type=number]{background:var(--panel2);color:var(--fg);border:1px solid var(--line);
+  border-radius:6px;padding:4px 7px;font-size:13px;font-family:var(--mono)}
+
+.card{background:var(--panel);border:1px solid var(--line);border-radius:12px;
+  padding:15px 17px;margin-top:14px}
+.card h3{margin:0 0 10px;font-size:14px;display:flex;align-items:center;gap:8px}
+table{width:100%;border-collapse:collapse;font-size:12.5px;font-family:var(--mono)}
+td{padding:3px 0;vertical-align:top}
+td:first-child{color:var(--dim);width:180px}
+.pill{border-radius:5px;padding:1px 7px;font-size:11px;font-family:var(--mono)}
+.p-ok{background:rgba(63,185,80,.15);color:var(--ok);border:1px solid rgba(63,185,80,.35)}
+.p-warn{background:rgba(210,153,34,.15);color:var(--warn);border:1px solid rgba(210,153,34,.35)}
+.p-err{background:rgba(248,81,73,.15);color:var(--err);border:1px solid rgba(248,81,73,.35)}
+.p-info{background:rgba(75,159,255,.15);color:var(--accent);border:1px solid rgba(75,159,255,.35)}
+
+.btn{background:var(--accent);color:#05203f;border:0;border-radius:8px;padding:9px 18px;
+  font-size:13.5px;font-weight:700;cursor:pointer;margin-top:12px;margin-right:8px}
+.btn:hover{filter:brightness(1.1)} .btn.sec{background:var(--panel2);color:var(--fg);border:1px solid var(--line)}
+.msg{padding:9px 13px;border-radius:8px;font-size:13px;margin-top:10px}
+.msg.e{background:rgba(248,81,73,.1);border:1px solid rgba(248,81,73,.4);color:#ffb4b0}
+.msg.w{background:rgba(210,153,34,.1);border:1px solid rgba(210,153,34,.4);color:#ffdf9e}
+.msg.i{background:rgba(75,159,255,.1);border:1px solid rgba(75,159,255,.4);color:#bcd9ff}
+canvas{width:100%;height:150px;background:var(--panel2);border:1px solid var(--line);border-radius:8px;display:block}
+.fmtbar{margin:18px 0 4px}
+.fmtlabel{font-size:12px;color:var(--dim);margin-bottom:7px}
+.fmts{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:9px}
+.fmt{display:block;cursor:pointer;position:relative}
+.fmt input{position:absolute;opacity:0;pointer-events:none}
+.fmt span{display:block;background:var(--panel);border:1px solid var(--line);border-radius:10px;
+  padding:10px 13px;transition:.13s}
+.fmt span b{display:block;font-size:13.5px;font-family:var(--mono);letter-spacing:.02em}
+.fmt span em{display:block;font-style:normal;color:var(--dim);font-size:11.5px;margin-top:2px}
+.fmt span i{font-style:normal;color:var(--warn)}
+.fmt:hover span{border-color:#3d4c66}
+.fmt input:checked + span{border-color:var(--accent);background:#132132;
+  box-shadow:0 0 0 1px var(--accent) inset}
+.legend{font-size:11px;color:var(--dim);margin-top:6px;font-family:var(--mono)}
+.dotc{display:inline-block;width:9px;height:2.5px;vertical-align:middle;margin-right:4px}
+details{margin-top:14px}
+summary{cursor:pointer;color:var(--dim);font-size:13px}
+.doc{font-size:12.5px;color:var(--dim);margin-top:10px}
+.doc code{font-family:var(--mono);background:var(--panel2);padding:1px 5px;border-radius:4px;color:#a5d6ff}
+.doc b{color:var(--fg)}
+.hidden{display:none}
+.filelist{font-family:var(--mono);font-size:12px;color:var(--dim);margin-top:8px}
+.filelist span{color:var(--fg)}
+table.trk{width:100%;border-collapse:collapse;font-size:12.5px;margin-top:4px}
+table.trk th{text-align:left;color:var(--dim);font-weight:500;font-size:11.5px;
+  padding:4px 8px 4px 0;border-bottom:1px solid var(--line)}
+table.trk td{padding:5px 8px 5px 0;border-bottom:1px solid #1e2530;vertical-align:middle}
+table.trk td.nm{font-family:var(--mono);color:var(--fg)}
+table.trk select{max-width:230px}
+.dlrow{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:12px}
+.btn.sm{padding:6px 12px;font-size:12.5px;margin:0}
+.rangebar{display:flex;flex-wrap:wrap;gap:7px;align-items:center;margin:7px 0 2px;min-height:0}
+.rangebar .selinfo{font-family:var(--mono);font-size:11.5px;color:var(--accent);margin-right:4px}
+.rangebar:empty{margin:0}
+.prog{height:3px;background:var(--panel2);border-radius:2px;overflow:hidden;margin-top:10px}
+.prog i{display:block;height:100%;background:var(--accent);width:0;transition:width .2s}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>SVP 変換器 <span class="badge">SV1 / SV2 対応</span></h1>
+  <div class="sub">
+    Synthesizer V の AI ピッチを <b>VOCALOID4 (.vsqx) / OpenUTAU (.ustx) / VoiSona (.tssln, .tssprj)</b> へ移植します。
+    SV2 で廃止された「歌唱→マニュアル」変換は不要 — <code style="font-family:var(--mono)">pitchControls</code> から直接読み出します。
+    全処理はブラウザ内で完結し、ファイルはどこにも送信されません。
+  </div>
+
+  <div id="drop">
+    <div class="big">.svp をここにドロップ</div>
+    <div class="small">
+      ピッチが無い / ラップの場合は <b>SV2 で書き出した .wav も一緒に</b>ドロップ（複数可）<br>
+      複数トラックは <code style="font-family:var(--mono)">&lt;曲名&gt;_&lt;トラック名&gt;.wav</code> で自動割り当て<br>
+      またはクリックして選択　<span class="kbd">.svp</span> <span class="kbd">.wav ×N</span> <span class="kbd">.mid</span><br>
+      <span style="color:var(--dim)">FL Studio 用：.mid も一緒にドロップすると、そのMIDIに SV のピッチを乗せます</span>
+    </div>
+    <div class="filelist" id="filelist"></div>
+    <input type="file" id="file" multiple accept=".svp,.wav,.json,.mid,.midi" class="hidden">
+  </div>
+
+  <div class="fmtbar">
+    <div class="fmtlabel">出力フォーマット</div>
+    <div class="fmts">
+      <label class="fmt"><input type="radio" name="fmt" value="vsqx" checked>
+        <span><b>VSQX</b><em>VOCALOID4 / Piapro Studio</em></span></label>
+      <label class="fmt"><input type="radio" name="fmt" value="ustx">
+        <span><b>USTX 単独音</b><em>OpenUTAU / CV（足立レイ 等）</em></span></label>
+      <label class="fmt"><input type="radio" name="fmt" value="ustxvcv">
+        <span><b>USTX 連続音</b><em>JA VCV &amp; CVVC（ナースロボ 等）</em></span></label>
+      <label class="fmt"><input type="radio" name="fmt" value="tssprj">
+        <span><b>TSSPRJ</b><em>VoiSona ソング</em></span></label>
+      <label class="fmt"><input type="radio" name="fmt" value="flmidi">
+        <span><b>MIDI + ピッチ</b><em>FL Studio（要 .mid 入力）</em></span></label>
+    </div>
+  </div>
+
+  <div class="doc" style="margin:-4px 0 14px">
+    UTAU は音源の種類でボタンを選んでください。<b>単独音</b>＝歌詞がそのままサンプル名になる音源
+    （足立レイ 等）。<b>連続音</b>＝<code>- あ</code> / <code>a あ</code> のような VCV・CVVC 音源
+    （ナースロボ_タイプT 等）。間違えると音が鳴りません。
+  </div>
+
+  <div class="fmtbar">
+    <div class="fmtlabel">出力言語（音源の言語に合わせる — 日本語音源と英語音源で音素が違うため混在不可）</div>
+    <div class="fmts" style="grid-template-columns:repeat(auto-fit,minmax(220px,1fr))">
+      <label class="fmt"><input type="radio" name="lang" value="ja" checked>
+        <span><b>日本語音源向け</b><em>英語の歌詞はカタカナ英語に近似</em></span></label>
+      <label class="fmt"><input type="radio" name="lang" value="en">
+        <span><b>英語音源向け</b><em>日本語の歌詞は英語音素に近似</em></span></label>
+    </div>
+  </div>
+
+  <div class="opts">
+    <div class="opt">
+      <label><input type="checkbox" id="o-pitch" checked> ピッチを変換</label>
+      <div class="hint">AI ピッチカーブを出力先のピッチ形式へ書き出す</div>
+    </div>
+    <div class="opt">
+      <label><input type="checkbox" id="o-phon" checked> 音素を自動生成</label>
+      <div class="hint">かな歌詞 → VOCALOID 日本語音素 (X-SAMPA)</div>
+    </div>
+    <div class="opt">
+      <label><input type="checkbox" id="o-split" checked> 多音素ノートを分割</label>
+      <div class="hint">「はい」「じょう」等を音節ごとのノートに分ける（ピッチカーブは不変）</div>
+    </div>
+    <div class="opt" id="opt-pbrange">
+      <label style="display:block">ピッチベンド幅<br><select id="o-pbrange" style="margin-top:5px;max-width:100%">
+        <option value="2" selected>±2 半音（FL既定・確実）</option>
+        <option value="4">±4 半音</option>
+        <option value="6">±6 半音</option>
+        <option value="12">±12 半音</option>
+      </select></label>
+      <div class="hint">FL の MIDI 取込は常に ±2 半音として読みます。広げる場合は
+        FL 側の Pitch ノブも同じ値に設定してください</div>
+    </div>
+    <div class="opt" id="opt-retune">
+      <label><input type="checkbox" id="o-retune"> ラップのノート音程を WAV から復元</label>
+      <div class="hint"><b>rap ノートのみ</b>対象。歌唱ノートのメロディは絶対に書き換えません</div>
+    </div>
+    <div class="opt">
+      <label>解像度 <select id="o-step">
+        <option value="2">高 (2 tick)</option>
+        <option value="4" selected>標準 (4 tick)</option>
+        <option value="8">粗 (8 tick)</option>
+      </select></label>
+      <div class="hint">ピッチ点の間隔。細かいほど忠実で重い</div>
+    </div>
+    <div class="opt" id="opt-pbs">
+      <label>PBS <select id="o-pbs">
+        <option value="0" selected>自動</option>
+        <option>1</option><option>2</option><option>3</option><option>4</option>
+        <option>5</option><option>6</option><option>8</option><option>12</option><option>24</option>
+      </select></label>
+      <div class="hint">ピッチベンド幅(半音)。自動は必要最小値を選択</div>
+    </div>
+    <div class="opt">
+      <label>プリメジャー <input type="number" id="o-pre" value="1" min="0" max="8" style="width:56px"></label>
+      <div class="hint">VOCALOID の頭の空小節数</div>
+    </div>
+  </div>
+
+  <div id="out"></div>
+
+  <details>
+    <summary>この変換の仕組み / SV2 で従来手法が使えない理由</summary>
+    <div class="doc">
+      <p><b>従来手法 (SV1)：</b> 全ノートを選択しピッチモードを「歌唱」→「マニュアル」に変更すると、
+      AI の生成したピッチが <code>pitchDelta</code> パラメータに焼き込まれ、UtaFormatix がそれを読める。</p>
+      <p><b>SV2 での問題：</b> この「歌唱→マニュアル」コマンドが<b>存在しない</b>。
+      そのため <code>pitchDelta</code> は空のままで、UtaFormatix に通してもピッチが一切乗らない。</p>
+      <p><b>本ツールの解決策：</b> SV2 は AI ピッチを別の未公開フィールド <code>pitchControls</code> に保存している。
+      これを直接デコードする：</p>
+      <p style="padding-left:14px">
+      <code>pitchControls[i] = { pos, pitch, type:"curve", points:[dt₀,ds₀, dt₁,ds₁, …] }</code><br>
+      <code>絶対ピッチ(pos + dtₙ) = pitch + dsₙ</code>　(pos=blick, pitch=絶対MIDI, ds=半音差分)
+      </p>
+      <p>これを VOCALOID の <code>PIT = round(偏差 ÷ PBS × 8192)</code> に変換して書き出す。
+      同一曲の SV1／SV2 ファイルで検証したところ平均誤差 0.12 半音（差分は AI モデル自体の違いのみ）、
+      SV1 経路は UtaFormatix の出力と平均 2 セント（≒完全一致）で再現。</p>
+      <p><b>各フォーマットのピッチ表現：</b></p>
+      <p style="padding-left:14px">
+      <b>VSQX</b>　<code>PIT = round(偏差半音 ÷ PBS × 8192)</code>（PBS は自動で必要最小値）<br>
+      <b>USTX</b>　パート内カーブ <code>pitd</code>（ノート音程からの偏差、単位センチ＝cents）<br>
+      <b>VoiSona</b>　<code>Parameter &gt; LogF0</code>（<code>ln(Hz)</code> の絶対値、Index/Repeat のランレングス圧縮）
+      </p>
+      <p>VoiSona は JUCE の ValueTree バイナリ形式です。<b>UtaFormatix の .tssln 書き出しはノートと歌詞だけで
+      ピッチを出力しません</b>が、本ツールは LogF0 を書き込むため<b>ピッチまで移植できます</b>。</p>
+      <p><b>ラップ (musicalType="rap") について：</b> SV は仕様上ラップノートのピッチカーブを
+      <code>.svp</code> に保存しません（譜面上のピッチもプレースホルダ値のまま）。
+      この場合は SV2 でレンダリングした <b>.wav を一緒にドロップ</b>してください。
+      YIN 音高推定でピッチを復元します（検証時の中央値誤差 2.4 セント）。
+      有声/無声マスクで自動的に時間ずれも補正します。</p>
+    </div>
+  </details>
+</div>
+
+<script>
+/* ===== engine (svp) ===== */
+
+/* ============================================================================
+   svp2vsqx engine  --  Synthesizer V (SV1 / SV2) .svp  ->  VOCALOID4 .vsqx
+   Pure browser JS. No upload, no server: everything runs locally.
+   ==========================================================================*/
+const BPQ = 705600000;          // blicks per quarter note
+const TPQ = 480;                // vsqx ticks per quarter note
+const BPT = BPQ / TPQ;          // 1470000 blicks per tick
+
+const KANA2 = {"きゃ": "k' a", "きゅ": "k' M", "きょ": "k' o", "きぇ": "k' e", "ぎゃ": "g' a", "ぎゅ": "g' M", "ぎょ": "g' o", "ぎぇ": "g' e", "しゃ": "S a", "しゅ": "S M", "しょ": "S o", "しぇ": "S e", "じゃ": "dZ a", "じゅ": "dZ M", "じょ": "dZ o", "じぇ": "dZ e", "ちゃ": "tS a", "ちゅ": "tS M", "ちょ": "tS o", "ちぇ": "tS e", "ぢゃ": "dZ a", "ぢゅ": "dZ M", "ぢょ": "dZ o", "にゃ": "J a", "にゅ": "J M", "にょ": "J o", "にぇ": "J e", "ひゃ": "C a", "ひゅ": "C M", "ひょ": "C o", "ひぇ": "C e", "びゃ": "b' a", "びゅ": "b' M", "びょ": "b' o", "びぇ": "b' e", "ぴゃ": "p' a", "ぴゅ": "p' M", "ぴょ": "p' o", "ぴぇ": "p' e", "みゃ": "m' a", "みゅ": "m' M", "みょ": "m' o", "みぇ": "m' e", "りゃ": "4' a", "りゅ": "4' M", "りょ": "4' o", "りぇ": "4' e", "ふぁ": "p\\ a", "ふぃ": "p\\' i", "ふぇ": "p\\ e", "ふぉ": "p\\ o", "ふゅ": "p\\' M", "つぁ": "ts a", "つぃ": "ts i", "つぇ": "ts e", "つぉ": "ts o", "てぃ": "t' i", "とぅ": "t M", "でぃ": "d' i", "どぅ": "d M", "でゅ": "d' M", "てゅ": "t' M", "うぃ": "w i", "うぇ": "w e", "うぉ": "w o", "ゔぁ": "b a", "ゔぃ": "b' i", "ゔぇ": "b e", "ゔぉ": "b o", "ゔ": "b M", "いぇ": "j e", "しぃ": "S i", "ちぃ": "tS i"};
+const KANA1 = {"あ": "a", "い": "i", "う": "M", "え": "e", "お": "o", "か": "k a", "き": "k' i", "く": "k M", "け": "k e", "こ": "k o", "が": "g a", "ぎ": "g' i", "ぐ": "g M", "げ": "g e", "ご": "g o", "さ": "s a", "し": "S i", "す": "s M", "せ": "s e", "そ": "s o", "ざ": "dz a", "じ": "dZ i", "ず": "dz M", "ぜ": "dz e", "ぞ": "dz o", "た": "t a", "ち": "tS i", "つ": "ts M", "て": "t e", "と": "t o", "だ": "d a", "ぢ": "dZ i", "づ": "dz M", "で": "d e", "ど": "d o", "な": "n a", "に": "J i", "ぬ": "n M", "ね": "n e", "の": "n o", "は": "h a", "ひ": "C i", "ふ": "p\\ M", "へ": "h e", "ほ": "h o", "ば": "b a", "び": "b' i", "ぶ": "b M", "べ": "b e", "ぼ": "b o", "ぱ": "p a", "ぴ": "p' i", "ぷ": "p M", "ぺ": "p e", "ぽ": "p o", "ま": "m a", "み": "m' i", "む": "m M", "め": "m e", "も": "m o", "や": "j a", "ゆ": "j M", "よ": "j o", "ら": "4 a", "り": "4' i", "る": "4 M", "れ": "4 e", "ろ": "4 o", "わ": "w a", "ゐ": "i", "ゑ": "e", "を": "o", "ん": "N\\", "ぁ": "a", "ぃ": "i", "ぅ": "M", "ぇ": "e", "ぉ": "o", "っ": "cl", "ー": "-", "ゃ": "j a", "ゅ": "j M", "ょ": "j o"};
+
+function kataToHira(s){
+  let o = "";
+  for (const c of s){
+    const k = c.codePointAt(0);
+    o += (k >= 0x30a1 && k <= 0x30f6) ? String.fromCodePoint(k - 0x60) : c;
+  }
+  return o;
+}
+
+function lyricToPhoneme(lyric, fallback){
+  fallback = fallback || "a";
+  if (!lyric) return fallback;
+  let s = kataToHira(lyric.trim()).replace(/\u30fc/g, "\u30fc");
+  s = s.replace(/\u30fc/g, "ー");
+  const out = []; let i = 0, ok = false;
+  while (i < s.length){
+    const two = s.substr(i,2);
+    if (KANA2[two]){ out.push(KANA2[two]); i += 2; ok = true; continue; }
+    const one = s[i];
+    if (KANA1[one]){
+      const v = KANA1[one];
+      if (v === "-"){
+        const prev = out.length ? out[out.length-1].split(" ").pop() : "a";
+        out.push("aiMeo".includes(prev) ? prev : "a");
+      } else out.push(v);
+      i += 1; ok = true; continue;
+    }
+    i += 1;
+  }
+  if (!ok || !out.length) return fallback;
+  return out.join(" ").split(/\s+/).join(" ");
+}
+
+/* ---------- .svp loading -------------------------------------------------- */
+function loadSvp(buf){
+  let text = new TextDecoder("utf-8").decode(buf);
+  // SV writes UTF-8 with a trailing NUL; some exports also carry a BOM.
+  text = text.replace(/^\uFEFF/, "").trim().replace(/\u0000+$/g, "").trim();
+  try {
+    return JSON.parse(text);
+  } catch (e) {
+    throw new Error("この .svp を読み込めませんでした。Synthesizer V の "
+      + "プロジェクトファイル (.svp) ではない可能性があります。 / Not a valid .svp project file.");
+  }
+}
+
+/* ---------- pitch extraction --------------------------------------------- */
+
+/* SV2: the AI pitch lives in `pitchControls`.
+   absolute_pitch(pos + dt_i) = pitch + dsemi_i                              */
+/* Max distance (in blicks) a lone "point" anchor may influence. SV2 writes a
+   bare anchor when the user nudged one spot; the pitch elsewhere is the AI's
+   default, NOT a glide to the next anchor tens of bars away. Without this cap
+   we interpolate straight through whole phrases, which both destroys the
+   melody and inflates PBS (measured PBS 14 on a real project). One beat of
+   influence on each side matches what SV actually renders. */
+const ANCHOR_SPAN_BLICKS = 705600000;   // 1 quarter note
+
+function curveFromPitchControls(pcs){
+  const pts = [];
+  for (const pc of (pcs || [])){
+    const pos = pc.pos || 0, base = pc.pitch;
+    if (base === undefined || base === null) continue;
+    if (pc.type === "curve" && pc.points && pc.points.length){
+      const p = pc.points;
+      for (let i = 0; i + 1 < p.length; i += 2) pts.push([pos + p[i], base + p[i+1]]);
+    } else {
+      // isolated anchor: mark it so we can fence it off below
+      pts.push([pos, base, true]);
+    }
+  }
+  pts.sort((a,b) => a[0]-b[0]);
+  const merged = [];
+  for (const p of pts){
+    if (merged.length && merged[merged.length-1][0] === p[0]) merged[merged.length-1] = p;
+    else merged.push(p);
+  }
+  /* Fence isolated anchors: if the neighbouring sample is further away than
+     ANCHOR_SPAN_BLICKS, insert a "return to the note pitch" point so the
+     deviation decays locally instead of ramping across the gap. */
+  const out = [];
+  for (let i = 0; i < merged.length; i++){
+    const [t, v, isolated] = merged[i];
+    const prev = merged[i-1], next = merged[i+1];
+    if (isolated && (!prev || t - prev[0] > ANCHOR_SPAN_BLICKS))
+      out.push([t - ANCHOR_SPAN_BLICKS, null]);
+    out.push([t, v]);
+    if (isolated && (!next || next[0] - t > ANCHOR_SPAN_BLICKS))
+      out.push([t + ANCHOR_SPAN_BLICKS, null]);
+  }
+  return out;
+}
+
+function noteBaseFn(notes){
+  const ns = notes.slice().sort((a,b)=>a.onset-b.onset);
+  if (!ns.length) return () => null;
+  const st = ns.map(n=>n.onset);
+  return function(t){
+    if (t < st[0]) return ns[0].pitch;
+    let lo = 0, hi = ns.length-1;
+    while (lo < hi){ const m = (lo+hi+1)>>1; if (st[m] <= t) lo = m; else hi = m-1; }
+    return ns[lo].pitch;
+  };
+}
+
+/* SV1: absolute = note step pitch + pitchDelta(cents)/100.
+   The base is a STEP function, so we inject sharp breakpoints at every onset,
+   otherwise interpolation smears each note transition (up to ~1.7 semitones). */
+function curveFromPitchDelta(notes, pd){
+  const p = (pd && pd.points) || [];
+  if (!p.length) return [];
+  const T = [], V = [];
+  for (let i = 0; i + 1 < p.length; i += 2){ T.push(p[i]); V.push(p[i+1]); }
+  function delta(t){
+    if (t <= T[0]) return V[0];
+    if (t >= T[T.length-1]) return V[V.length-1];
+    let lo = 0, hi = T.length-1;
+    while (lo < hi-1){ const m = (lo+hi)>>1; if (T[m] <= t) lo = m; else hi = m; }
+    if (T[hi] === T[lo]) return V[hi];
+    return V[lo] + (V[hi]-V[lo]) * (t-T[lo]) / (T[hi]-T[lo]);
+  }
+  const base = noteBaseFn(notes);
+  const out = [];
+  for (let i = 0; i + 1 < p.length; i += 2){
+    const b = base(p[i]);
+    if (b === null) continue;
+    out.push([p[i], b + p[i+1]/100]);
+  }
+  for (const n of notes){
+    const o = n.onset, d = delta(o)/100;
+    if (o > 0) out.push([o-1, base(o-1) + d]);
+    out.push([o, n.pitch + d]);
+  }
+  out.sort((a,b)=>a[0]-b[0]);
+  return out;
+}
+
+/* `null` in a curve means "no deviation here -- fall back to the note pitch".
+   Callers pass baseFn so we can resolve it at the right place. */
+function sampleCurve(c, t, baseFn){
+  if (!c.length) return null;
+  const resolve = (v, tt) => (v === null ? (baseFn ? baseFn(tt) : null) : v);
+  if (t <= c[0][0]) return resolve(c[0][1], c[0][0]);
+  if (t >= c[c.length-1][0]) return resolve(c[c.length-1][1], c[c.length-1][0]);
+  let lo = 0, hi = c.length-1;
+  while (lo < hi-1){ const m = (lo+hi)>>1; if (c[m][0] <= t) lo = m; else hi = m; }
+  const t0 = c[lo][0], t1 = c[hi][0];
+  /* Resolve each endpoint AT ITS OWN position: a fence point means "back to
+     whatever note is sounding there", so evaluating it at t would drag the
+     wrong note's pitch into the interpolation. */
+  const v0 = resolve(c[lo][1], t0), v1 = resolve(c[hi][1], t1);
+  if (v0 === null && v1 === null) return null;
+  if (v0 === null) return v1;
+  if (v1 === null) return v0;
+  return t1 === t0 ? v1 : v0 + (v1-v0)*(t-t0)/(t1-t0);
+}
+
+/* ---------- project normalisation ---------------------------------------- */
+function parseProject(doc){
+  const time = doc.time || {};
+  let tempos = (time.tempo || []).map(t => [t.position||0, t.bpm||120]);
+  if (!tempos.length) tempos = [[0,120]];
+  tempos.sort((a,b)=>a[0]-b[0]);
+  let meters = (time.meter || []).map(m => [m.index||0, m.numerator||4, m.denominator||4]);
+  if (!meters.length) meters = [[0,4,4]];
+  meters.sort((a,b)=>a[0]-b[0]);
+
+  const libs = {};
+  for (const g of (doc.library || [])) libs[g.uuid] = g;
+
+  const info = {
+    format: (doc.library && doc.library.length) || (doc.version||0) >= 180 ? "SV2" : "SV1",
+    version: doc.version, pitchSource: null, rapNotes: 0
+  };
+  const tracks = [];
+
+  for (const tr of (doc.tracks || [])){
+    const main = tr.mainGroup || {};
+    const chunks = [];
+    if (main.notes && main.notes.length){
+      const ref = tr.mainRef || {};
+      chunks.push([main.notes, main.pitchControls, main.parameters || {},
+                   ref.blickOffset||0, ref.pitchOffset||0]);
+    }
+    for (const ref of (tr.groups || [])){
+      const lib = libs[ref.groupID];
+      if (!lib || !lib.notes || !lib.notes.length) continue;
+      chunks.push([lib.notes, lib.pitchControls, lib.parameters || {},
+                   ref.blickOffset||0, ref.pitchOffset||0]);
+    }
+    const mainPc = main.pitchControls;
+
+    const notesAll = [], curveAll = [];
+    for (const [notes, pcs, params, boff, poff] of chunks){
+      for (const n of notes){
+        if (n.musicalType === "rap") info.rapNotes++;
+        notesAll.push({
+          onset: n.onset + boff, duration: n.duration, pitch: n.pitch + poff,
+          lyrics: n.lyrics || "", phonemes: n.phonemes || "",
+          // languageOverride / phonesetOverride live here; the phoneme engine
+          // needs them to know whether a note is Japanese or English.
+          attributes: n.attributes || {},
+          // SV's real phoneme timing: attributes.phonemes[k].leftOffset is the
+          // start of phoneme k in SECONDS relative to the note onset
+          // (negative = consonant lead-in). This is the authoritative timing;
+          // never divide a note evenly when this is present.
+          phTiming: (n.attributes && n.attributes.phonemes) || null,
+          // kept so downstream code can tell a real melody note from a rap
+          // placeholder -- never rewrite the pitch of a "singing" note.
+          musicalType: n.musicalType || "singing"
+        });
+      }
+      let c = curveFromPitchControls(pcs), src = "pitchControls";
+      if (!c.length && mainPc){ c = curveFromPitchControls(mainPc); }
+      if (!c.length){ c = curveFromPitchDelta(notes, params.pitchDelta); src = "pitchDelta"; }
+      if (c.length){
+        info.pitchSource = src;
+        // keep null (= "use the note pitch here") intact: null+poff would
+        // silently become 0 and read as MIDI note 0.
+        for (const [t,v] of c) curveAll.push([t+boff, v === null ? null : v+poff]);
+      }
+    }
+    if (!notesAll.length) continue;
+    notesAll.sort((a,b)=>a.onset-b.onset);
+    curveAll.sort((a,b)=>a[0]-b[0]);
+    tracks.push({ name: tr.name || "Track", notes: notesAll, curve: curveAll });
+  }
+  return { tempos, meters, tracks, info };
+}
+
+/* ---------- pitch curve -> VOCALOID PIT / PBS ----------------------------- */
+function buildPit(track, stepTicks, forcePbs, maxPbs){
+  stepTicks = stepTicks || 4; maxPbs = maxPbs || 24;
+  if (!track.curve.length || !track.notes.length) return [null, []];
+  const base = noteBaseFn(track.notes);
+  const firstB = Math.max(0, Math.min(track.curve[0][0], track.notes[0].onset));
+  let lastB = track.curve[track.curve.length-1][0];
+  for (const n of track.notes) lastB = Math.max(lastB, n.onset + n.duration);
+  const t0 = Math.floor(firstB / BPT), t1 = Math.ceil(lastB / BPT);
+
+  const set = new Set();
+  for (let t = t0; t <= t1; t += stepTicks) set.add(t);
+  set.add(t1);
+  for (const n of track.notes){
+    for (const b of [n.onset, n.onset + n.duration]){
+      const k = Math.round(b / BPT);
+      set.add(k); set.add(Math.max(t0, k-1));
+    }
+  }
+  const ticks = [...set].filter(t => t >= t0 && t <= t1).sort((a,b)=>a-b);
+
+  const raw = []; let peak = 0;
+  for (const tk of ticks){
+    const bp = base(tk * BPT);
+    const v = sampleCurve(track.curve, tk * BPT, base);
+    if (v === null) continue;
+    if (bp === null) continue;
+    const dev = v - bp;
+    if (Math.abs(dev) > peak) peak = Math.abs(dev);
+    raw.push([tk, dev]);
+  }
+  if (!raw.length) return [null, []];
+
+  /* PBS from the peak alone is fragile: a handful of samples right at a note
+     transition (or a single detector glitch on a WAV-derived curve) can double
+     the range and throw away resolution everywhere else. Size PBS on the
+     99.5th percentile instead and let the rare outliers clip -- clipping a few
+     transition frames is inaudible, halving the resolution of the whole track
+     is not. Exact curves are unaffected (their p99.5 == peak). */
+  let pbs = forcePbs;
+  if (!pbs) {
+    const mags = raw.map(r => Math.abs(r[1])).sort((a, b) => a - b);
+    const p995 = mags[Math.min(mags.length - 1, Math.floor(mags.length * 0.995))];
+    pbs = Math.max(1, Math.min(maxPbs, Math.ceil(p995 - 1e-9)));
+  }
+  const out = [];
+  let clipped = 0;
+  for (const [tk, dev] of raw){
+    let pit = Math.round(dev / pbs * 8192);
+    if (pit > 8191 || pit < -8192) clipped++;
+    pit = Math.max(-8192, Math.min(8191, pit));
+    if (out.length && out[out.length-1][1] === pit) continue;
+    out.push([tk, pit]);
+  }
+  return [pbs, out, { peak, clipped }];
+}
+
+/* ---------- VSQX writer --------------------------------------------------- */
+function cdata(s){ return "<![CDATA[" + String(s).split("]]>").join("]]]]><![CDATA[>") + "]]>"; }
+
+function buildVsqx(tempos, meters, tracks, opts){
+  const o = Object.assign({
+    resolution: TPQ, preMeasure: 1, seqName: "Untitled0",
+    comment: "Converted by svp2vsqx",
+    voice: { bs:0, pc:0, id:"BCXDC6CZLSZHZCB4", name:"VY2V3" },
+    convertPitch: true, genPhonemes: true, stepTicks: 4, pbs: null, velocity: 64
+  }, opts || {});
+
+  const res = o.resolution, nu = meters[0][1], de = meters[0][2];
+  const measureTicks = Math.round(res * 4 * nu / de);
+  const preTicks = o.preMeasure * measureTicks;
+
+  const L = [], ap = s => L.push(s), v = o.voice;
+  ap('<?xml version="1.0" encoding="UTF-8" standalone="no"?>');
+  ap('<vsq4 xmlns="http://www.yamaha.co.jp/vocaloid/schema/vsq4/" ' +
+     'xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" ' +
+     'xsi:schemaLocation="http://www.yamaha.co.jp/vocaloid/schema/vsq4/ vsq4.xsd">');
+  ap("    <vender>" + cdata("Yamaha corporation") + "</vender>");
+  ap("    <version>" + cdata("4.0.0.3") + "</version>");
+  ap("    <vVoiceTable>");
+  ap("        <vVoice>");
+  ap("            <bs>" + v.bs + "</bs>");
+  ap("            <pc>" + v.pc + "</pc>");
+  ap("            <id>" + cdata(v.id) + "</id>");
+  ap("            <name>" + cdata(v.name) + "</name>");
+  ap("            <vPrm><bre>0</bre><bri>0</bri><cle>0</cle><gen>0</gen><ope>0</ope></vPrm>");
+  ap("        </vVoice>");
+  ap("    </vVoiceTable>");
+  ap("    <mixer>");
+  ap("        <masterUnit><oDev>0</oDev><rLvl>0</rLvl><vol>0</vol></masterUnit>");
+  for (let i = 0; i < Math.max(1, tracks.length); i++)
+    ap('        <vsUnit><tNo>' + i + '</tNo><iGin>0</iGin><sLvl>-898</sLvl>' +
+       '<sEnable>0</sEnable><m>0</m><s>0</s><pan>64</pan><vol>0</vol></vsUnit>');
+  ap("        <monoUnit><iGin>0</iGin><sLvl>-898</sLvl><sEnable>0</sEnable>" +
+     "<m>0</m><s>0</s><pan>64</pan><vol>0</vol></monoUnit>");
+  ap("        <stUnit><iGin>0</iGin><m>0</m><s>0</s><vol>-129</vol></stUnit>");
+  ap("    </mixer>");
+  ap("    <masterTrack>");
+  ap("        <seqName>" + cdata(o.seqName) + "</seqName>");
+  ap("        <comment>" + cdata(o.comment) + "</comment>");
+  ap("        <resolution>" + res + "</resolution>");
+  ap("        <preMeasure>" + o.preMeasure + "</preMeasure>");
+  for (const [mi, mnu, mde] of meters)
+    ap("        <timeSig><m>" + mi + "</m><nu>" + mnu + "</nu><de>" + mde + "</de></timeSig>");
+  tempos.forEach(([pos,bpm], i) => {
+    const t = i === 0 ? 0 : Math.round(pos / BPT) + preTicks;
+    ap("        <tempo><t>" + t + "</t><v>" + Math.round(bpm*100) + "</v></tempo>");
+  });
+  ap("    </masterTrack>");
+
+  const report = [];
+  const lyricStats = [];
+  tracks.forEach((tr0, ti) => {
+    let tr = tr0;
+    let noteStart = Infinity, noteEnd = 0;
+    for (const n of tr.notes){
+      noteStart = Math.min(noteStart, n.onset);
+      noteEnd = Math.max(noteEnd, n.onset + n.duration);
+    }
+    /* Resolve lyrics/phonemes and split multi-syllable notes BEFORE anything
+       that depends on note boundaries. Pitch is a time curve, so splitting
+       never moves the sound. */
+    const prep = prepareNotes(tr.notes, { target:"vocaloid", outLang:o.outLang || "ja",
+                                          split:o.splitNotes !== false, tempoBpm: tempos[0][1],
+                                          genPhonemes:o.genPhonemes });
+    tr = { name: tr.name, notes: prep.notes, curve: tr.curve };
+    lyricStats.push(prep.stats);
+
+    let pbs = null, pit = [], pitInfo = null;
+    if (o.convertPitch) [pbs, pit, pitInfo] = buildPit(tr, o.stepTicks, o.pbs);
+
+    let hiTick = Math.ceil(noteEnd / BPT);
+    if (pit.length) hiTick = Math.max(hiTick, pit[pit.length-1][0]);
+    const playTime = Math.max(measureTicks,
+      Math.ceil((hiTick + 1) / measureTicks) * measureTicks);
+
+    report.push({ name: tr.name, notes: tr.notes.length, pbs, pitPoints: pit.length,
+                  clipped: pitInfo ? pitInfo.clipped : 0,
+                  lyrics: prep.stats });
+
+    ap("    <vsTrack>");
+    ap("        <tNo>" + ti + "</tNo>");
+    ap("        <name>" + cdata(tr.name) + "</name>");
+    ap("        <comment>" + cdata("Track") + "</comment>");
+    ap("        <vsPart>");
+    ap("            <t>" + preTicks + "</t>");
+    ap("            <playTime>" + playTime + "</playTime>");
+    ap("            <name>" + cdata("NewPart") + "</name>");
+    ap("            <comment>" + cdata("New Musical Part") + "</comment>");
+    ap("            <sPlug>");
+    ap("                <id>" + cdata("ACA9C502-A04B-42b5-B2EB-5CEA36D16FCE") + "</id>");
+    ap("                <name>" + cdata("VOCALOID2 Compatible Style") + "</name>");
+    ap("                <version>" + cdata("3.0.0.1") + "</version>");
+    ap("            </sPlug>");
+    ap("            <pStyle>");
+    for (const [k,val] of [["accent",50],["bendDep",8],["bendLen",0],["decay",50],
+                           ["fallPort",0],["opening",127],["risePort",0]])
+      ap('                <v id="' + k + '">' + val + '</v>');
+    ap("            </pStyle>");
+    ap("            <singer><t>0</t><bs>" + v.bs + "</bs><pc>" + v.pc + "</pc></singer>");
+
+    if (pit.length && pbs){
+      ap('            <cc><t>' + Math.max(0, pit[0][0]) + '</t><v id="S">' + pbs + '</v></cc>');
+      for (const [tk, val] of pit)
+        ap('            <cc><t>' + Math.max(0, tk) + '</t><v id="P">' + val + '</v></cc>');
+    }
+    for (const n of tr.notes){
+      const t = Math.round(n.onset / BPT);
+      const dur = Math.max(1, Math.round(n.duration / BPT));
+      let ph = (n.phonemeOut !== undefined) ? n.phonemeOut
+                                            : (n.phonemes || "").trim();
+      if (!ph && !o.genPhonemes) ph = "a";
+      ap("            <note>");
+      ap("                <t>" + t + "</t>");
+      ap("                <dur>" + dur + "</dur>");
+      ap("                <n>" + Math.max(0, Math.min(127, Math.round(n.pitch))) + "</n>");
+      ap("                <v>" + o.velocity + "</v>");
+      ap("                <y>" + cdata(n.lyricOut || n.lyrics || "a") + "</y>");
+      ap("                <p>" + cdata(ph) + "</p>");
+      ap("                <nStyle>");
+      for (const [k,val] of [["accent",50],["bendDep",0],["bendLen",0],["decay",50],
+                             ["fallPort",0],["opening",127],["risePort",0],
+                             ["vibLen",0],["vibType",0]])
+        ap('                    <v id="' + k + '">' + val + '</v>');
+      ap("                </nStyle>");
+      ap("            </note>");
+    }
+    ap("            <plane>0</plane>");
+    ap("        </vsPart>");
+    ap("    </vsTrack>");
+  });
+
+  ap("    <monoTrack>\n    </monoTrack>");
+  ap("    <stTrack>\n    </stTrack>");
+  ap("    <aux>");
+  ap("        <id>" + cdata("AUX_VST_HOST_CHUNK_INFO") + "</id>");
+  ap("        <content>" + cdata("VlNDSwAAAAADAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=") + "</content>");
+  ap("    </aux>");
+  ap("</vsq4>");
+  return { xml: L.join("\n"), report, lyricStats };
+}
+
+function convertSvp(buf, opts){
+  const doc = loadSvp(buf);
+  const { tempos, meters, tracks, info } = parseProject(doc);
+  if (!tracks.length) throw new Error("この .svp にノートが見つかりません / No notes found.");
+  const { xml, report } = buildVsqx(tempos, meters, tracks, opts);
+  return {
+    xml,
+    stats: {
+      format: info.format, version: info.version, pitchSource: info.pitchSource,
+      rapNotes: info.rapNotes, tempo: tempos[0][1],
+      tracks: tracks.length,
+      notes: tracks.reduce((a,t)=>a+t.notes.length, 0),
+      curvePoints: tracks.reduce((a,t)=>a+t.curve.length, 0),
+      report
+    }
+  };
+}
+
+/* ===== yin ===== */
+/* YIN fundamental frequency estimator (de Cheveigne & Kawahara 2002)
+   + parabolic interpolation + octave-jump repair + median smoothing.
+   Used to recover pitch from a rendered SV2 WAV when the .svp carries no
+   pitchControls (e.g. musicalType="rap", which never stores a pitch curve). */
+
+function yinFrame(buf, sr, threshold, fmin, fmax){
+  const N = buf.length, W = N >> 1;
+  const tauMin = Math.max(2, Math.floor(sr / fmax));
+  const tauMax = Math.min(W - 1, Math.ceil(sr / fmin));
+  const d = new Float32Array(W);
+  for (let tau = tauMin; tau <= tauMax; tau++){
+    let s = 0;
+    for (let i = 0; i < W; i++){ const dv = buf[i] - buf[i+tau]; s += dv*dv; }
+    d[tau] = s;
+  }
+  // cumulative mean normalised difference
+  const cmnd = new Float32Array(W); cmnd[0] = 1;
+  let run = 0;
+  for (let tau = tauMin; tau <= tauMax; tau++){
+    run += d[tau];
+    cmnd[tau] = run === 0 ? 1 : d[tau] * (tau - tauMin + 1) / run;
+  }
+  // absolute threshold: first local min below threshold
+  let tau = -1;
+  for (let t = tauMin; t <= tauMax; t++){
+    if (cmnd[t] < threshold){
+      while (t + 1 <= tauMax && cmnd[t+1] < cmnd[t]) t++;
+      tau = t; break;
+    }
+  }
+  if (tau < 0){ // fall back to global min
+    let best = Infinity;
+    for (let t = tauMin; t <= tauMax; t++) if (cmnd[t] < best){ best = cmnd[t]; tau = t; }
+    if (tau < 0 || best > 0.6) return [0, 0];
+  }
+  // parabolic interpolation around tau
+  const x0 = tau > tauMin ? tau-1 : tau, x2 = tau+1 <= tauMax ? tau+1 : tau;
+  let better = tau;
+  if (x0 !== tau && x2 !== tau){
+    const s0 = cmnd[x0], s1 = cmnd[tau], s2 = cmnd[x2];
+    const den = 2*(2*s1 - s2 - s0);
+    if (den !== 0) better = tau + (s2 - s0) / den;
+  }
+  const f = sr / better;
+  return [(f >= fmin && f <= fmax) ? f : 0, 1 - cmnd[tau]];
+}
+
+function estimateF0(samples, sr, opts){
+  const o = Object.assign({ hop: 256, frame: 2048, fmin: 65, fmax: 1000,
+                            threshold: 0.15, minClarity: 0.35 }, opts || {});
+  const n = samples.length;
+  const nFrames = Math.max(0, Math.floor((n - o.frame) / o.hop) + 1);
+  const f0 = new Float64Array(nFrames), cl = new Float64Array(nFrames);
+  const rms = new Float64Array(nFrames);
+  const buf = new Float32Array(o.frame);
+  for (let i = 0; i < nFrames; i++){
+    const off = i * o.hop;
+    let e = 0;
+    for (let k = 0; k < o.frame; k++){ const v = samples[off+k]; buf[k] = v; e += v*v; }
+    rms[i] = Math.sqrt(e / o.frame);
+    const [f, c] = yinFrame(buf, sr, o.threshold, o.fmin, o.fmax);
+    f0[i] = f; cl[i] = c;
+  }
+  // silence gate: relative to loudest frame
+  let peak = 0; for (let i=0;i<nFrames;i++) peak = Math.max(peak, rms[i]);
+  const gate = peak * 0.02;
+  for (let i=0;i<nFrames;i++) if (rms[i] < gate || cl[i] < o.minClarity) f0[i] = 0;
+
+  /* Octave repair.
+
+     The old version compared every frame against ONE global median for the
+     whole file. That cannot fix a note which genuinely sits an octave away
+     from the song's average -- exactly the "受付の鱧 last note" case, where a
+     strong f/2 subharmonic made YIN lock to the octave below for the entire
+     note (measured: -11.97 semitones sustained).
+
+     Two-stage fix:
+       1. LOCAL median over a moving window, so the reference follows the
+          melody instead of the whole song.
+       2. Re-score the octave candidates on the actual signal: for a frame at
+          period tau, compare the normalised difference at tau, tau/2 and
+          2*tau and keep the one the waveform really supports. YIN's own
+          cumulative-mean rule is biased toward long periods, which is what
+          produces sub-octave locks in the first place. */
+  const WIN = 40;                       // ~0.23 s at hop 256 / 44.1 kHz
+  const localMedian = i => {
+    const w = [];
+    for (let j = Math.max(0, i - WIN); j < Math.min(nFrames, i + WIN); j++)
+      if (f0[j] > 0) w.push(f0[j]);
+    if (!w.length) return 0;
+    w.sort((a, b) => a - b);
+    return w[w.length >> 1];
+  };
+
+  // ---- stage 1: snap outliers toward the local melody line
+  const snapped = new Float64Array(nFrames);
+  for (let i = 0; i < nFrames; i++) {
+    snapped[i] = f0[i];
+    if (!f0[i]) continue;
+    const med = localMedian(i);
+    if (!med) continue;
+    let best = f0[i], bestD = Math.abs(Math.log2(f0[i] / med));
+    for (const m of [0.5, 2, 0.25, 4]) {
+      const d = Math.abs(Math.log2(f0[i] * m / med));
+      if (d < bestD - 0.35) { best = f0[i] * m; bestD = d; }
+    }
+    snapped[i] = best;
+  }
+  for (let i = 0; i < nFrames; i++) f0[i] = snapped[i];
+
+  /* ---- stage 2: verify each voiced RUN against the waveform.
+     A run that is uniformly an octave out will not be caught by any median
+     test, because its own neighbourhood agrees with it. So measure how well
+     the signal matches the candidate period directly. */
+  const buf2 = new Float32Array(o.frame);
+  const ndfAt = (frameIdx, period) => {
+    const off = frameIdx * o.hop;
+    if (off + o.frame > n || period < 2 || period > (o.frame >> 1) - 1) return Infinity;
+    for (let k = 0; k < o.frame; k++) buf2[k] = samples[off + k];
+    const W = o.frame >> 1;
+    const t = Math.round(period);
+    let num = 0, p1 = 0, p2 = 0;
+    for (let k = 0; k < W; k++) {
+      const a = buf2[k], b = buf2[k + t];
+      const d = a - b; num += d * d; p1 += a * a; p2 += b * b;
+    }
+    const den = p1 + p2;
+    return den > 0 ? (2 * num) / den : Infinity;   // 0 = perfect periodicity
+  };
+
+  let i0 = 0;
+  while (i0 < nFrames) {
+    if (!f0[i0]) { i0++; continue; }
+    let i1 = i0;
+    while (i1 + 1 < nFrames && f0[i1 + 1] > 0) i1++;
+    const len = i1 - i0 + 1;
+    if (len >= 6) {
+      // sample the run and score the three octave candidates
+      const cands = [1, 0.5, 2];
+      const score = cands.map(() => 0);
+      let used = 0;
+      for (let k = 0; k < 9; k++) {
+        const idx = i0 + Math.floor(len * (k + 0.5) / 9);
+        if (!f0[idx]) continue;
+        const basePeriod = sr / f0[idx];
+        let any = false;
+        const s3 = cands.map(c => ndfAt(idx, basePeriod / c));
+        for (let c = 0; c < 3; c++) if (isFinite(s3[c])) any = true;
+        if (!any) continue;
+        for (let c = 0; c < 3; c++) score[c] += isFinite(s3[c]) ? s3[c] : 2;
+        used++;
+      }
+      if (used) {
+        let bestC = 0;
+        for (let c = 1; c < 3; c++) {
+          // require a clear win: octave errors otherwise flip good notes
+          if (score[c] < score[bestC] * 0.7) bestC = c;
+        }
+        if (bestC !== 0) {
+          const mul = cands[bestC];
+          for (let j = i0; j <= i1; j++) if (f0[j]) f0[j] *= mul;
+        }
+      }
+    }
+    i0 = i1 + 1;
+  }
+  // 5-point median smoothing on voiced runs (kills isolated spikes)
+  const out = new Float64Array(nFrames);
+  for (let i=0;i<nFrames;i++){
+    if (!f0[i]){ out[i]=0; continue; }
+    const w=[];
+    for (let k=-2;k<=2;k++){ const j=i+k; if (j>=0&&j<nFrames&&f0[j]>0) w.push(f0[j]); }
+    w.sort((a,b)=>a-b); out[i]=w[w.length>>1];
+  }
+  // YIN correlates buf[i] against buf[i+tau] over only the FIRST HALF of the
+  // frame, so a frame's effective analysis centre is off + frame/4 -- NOT
+  // off + frame/2. Using frame/2 misaligns the curve by ~12 ms and inflates
+  // the error from ~1.6 to ~13 cents median. Callers must use frameCenter.
+  return { f0: out, clarity: cl, hop: o.hop, sr,
+           frame: o.frame, centerOffset: o.frame / 4,
+           timeOf: i => (i * o.hop + o.frame / 4) / sr };
+}
+
+
+/* ===== wav ===== */
+
+/* ============================================================================
+   wav2curve -- turn a rendered SV2 WAV into the same [blick, midi] curve that
+   pitchControls would have given us. Needed for musicalType="rap" projects,
+   which by design never store a pitch curve in the .svp.
+   ==========================================================================*/
+
+function decodeWav(arrayBuffer){
+  // Minimal RIFF/WAVE reader: PCM 8/16/24/32-bit + IEEE float 32/64, any rate.
+  const dv = new DataView(arrayBuffer);
+  const rd4 = o => String.fromCharCode(dv.getUint8(o),dv.getUint8(o+1),dv.getUint8(o+2),dv.getUint8(o+3));
+  if (rd4(0) !== "RIFF" || rd4(8) !== "WAVE") throw new Error("WAV ではありません / Not a RIFF/WAVE file.");
+  let off = 12, fmt = null, dataOff = -1, dataLen = 0;
+  while (off + 8 <= dv.byteLength){
+    const id = rd4(off), sz = dv.getUint32(off+4, true);
+    if (id === "fmt "){
+      fmt = { format: dv.getUint16(off+8,true), channels: dv.getUint16(off+10,true),
+              sampleRate: dv.getUint32(off+12,true), bits: dv.getUint16(off+22,true) };
+      if (fmt.format === 0xFFFE && sz >= 40) fmt.format = dv.getUint16(off+8+24,true);
+    } else if (id === "data"){ dataOff = off+8; dataLen = sz; }
+    off += 8 + sz + (sz & 1);
+  }
+  if (!fmt || dataOff < 0) throw new Error("WAV の fmt/data チャンクが読めません.");
+  const bytes = fmt.bits >> 3, frames = Math.floor(dataLen / (bytes * fmt.channels));
+  const out = new Float32Array(frames);
+  for (let i = 0; i < frames; i++){
+    let acc = 0;
+    for (let c = 0; c < fmt.channels; c++){
+      const p = dataOff + (i*fmt.channels + c)*bytes;
+      let v = 0;
+      if (fmt.format === 3){ v = bytes === 8 ? dv.getFloat64(p,true) : dv.getFloat32(p,true); }
+      else if (bytes === 1){ v = (dv.getUint8(p)-128)/128; }
+      else if (bytes === 2){ v = dv.getInt16(p,true)/32768; }
+      else if (bytes === 3){ const b0=dv.getUint8(p),b1=dv.getUint8(p+1),b2=dv.getUint8(p+2);
+                             let s=(b2<<16)|(b1<<8)|b0; if (s & 0x800000) s|=~0xFFFFFF; v=s/8388608; }
+      else if (bytes === 4){ v = dv.getInt32(p,true)/2147483648; }
+      acc += v;
+    }
+    out[i] = acc / fmt.channels;
+  }
+  return { samples: out, sampleRate: fmt.sampleRate, channels: fmt.channels,
+           duration: frames / fmt.sampleRate };
+}
+
+/* Convert an f0 track (Hz) into the [blick, midi] curve used by the writer.
+   secPerQuarter comes from the project tempo so blicks line up with the notes. */
+function f0ToCurve(est, tempoBpm, notes, opts){
+  const o = Object.assign({ offsetSec: 0, snapToNotes: true, maxDevSemi: 12 }, opts||{});
+  const secPerQuarter = 60 / tempoBpm;
+  const blickPerSec = BPQ / secPerQuarter;
+  const pts = [];
+  for (let i = 0; i < est.f0.length; i++){
+    const f = est.f0[i];
+    if (!f) continue;
+    const tSec = (i * est.hop + est.centerOffset) / est.sr + o.offsetSec;
+    if (tSec < 0) continue;
+    pts.push([Math.round(tSec * blickPerSec), 69 + 12 * Math.log2(f / 440)]);
+  }
+  if (!pts.length) return [];
+  if (!o.snapToNotes || !notes || !notes.length) return pts;
+
+  // Keep only samples that fall inside a note, and clamp absurd deviations so
+  // a single detector glitch can't blow the PBS range out for the whole track.
+  const kept = [];
+  for (const [b, m] of pts){
+    let hit = null;
+    for (const n of notes) if (n.onset <= b && b < n.onset + n.duration){ hit = n; break; }
+    if (!hit) continue;
+    const dev = m - hit.pitch;
+    kept.push([b, Math.abs(dev) > o.maxDevSemi
+                    ? hit.pitch + Math.sign(dev)*o.maxDevSemi : m]);
+  }
+  return kept.length ? kept : pts;
+}
+
+/* Estimate the constant lag between WAV and score.
+
+   NOTE: matching detected pitch against written note pitch does NOT work for
+   musicalType="rap" projects -- SV writes every rap note at a placeholder
+   pitch (all 65 in the sample file) while the render is fully expressive, so
+   the pitch-similarity score is flat and the search runs to its boundary.
+   We instead align the VOICED/UNVOICED mask against note coverage, which is
+   independent of pitch and works for both rap and singing. */
+function estimateOffset(est, tempoBpm, notes, searchSec){
+  searchSec = searchSec === undefined ? 1.0 : searchSec;
+  if (!notes || !notes.length) return 0;
+  const secPerQuarter = 60 / tempoBpm;
+  const frameSec = est.hop / est.sr;
+  const nF = est.f0.length;
+
+  // detected voiced mask
+  const voiced = new Uint8Array(nF);
+  for (let i = 0; i < nF; i++) voiced[i] = est.f0[i] > 0 ? 1 : 0;
+
+  // score mask sampled on the same frame grid, as a function of shift
+  const noteSpans = notes.map(n => [
+    n.onset / BPQ * secPerQuarter,
+    (n.onset + n.duration) / BPQ * secPerQuarter
+  ]);
+  const scoreAt = tSec => {
+    for (const [a,b] of noteSpans) if (tSec >= a && tSec < b) return 1;
+    return 0;
+  };
+
+  const maxShift = Math.round(searchSec / frameSec);
+  let best = { off: 0, score: -Infinity };
+  for (let k = -maxShift; k <= maxShift; k++){
+    let agree = 0, tot = 0;
+    for (let i = 0; i < nF; i++){
+      const tSec = (i * est.hop + est.centerOffset) / est.sr - k * frameSec;
+      if (tSec < -0.5) continue;
+      agree += (voiced[i] === scoreAt(tSec)) ? 1 : 0;
+      tot++;
+    }
+    if (!tot) continue;
+    const sc = agree / tot;
+    if (sc > best.score) best = { off: k * frameSec, score: sc };
+  }
+  return best.off;
+}
+
+/* For rap (and any render that drifts far from the written pitch) it is much
+   better to RETUNE the notes to what was actually sung than to force a huge
+   pitch bend. Returns new note pitches = median detected semitone per note,
+   which keeps PBS small and makes the VSQX readable/editable in VOCALOID. */
+/* Rewrite note pitches to what was actually sung.
+
+   HARD RULE: only ever touch musicalType === "rap" notes.
+
+   A "singing" note's pitch IS the user's melody -- SV wrote it, the user wrote
+   it, and the WAV was rendered FROM it. Changing it can only ever corrupt the
+   score. (Earlier this ran on every track and silently moved 5 notes of a
+   singing melody, one of them by a full octave because YIN picked the wrong
+   harmonic. That is exactly the failure this guard exists to prevent.)
+
+   Rap notes are different: SV stores a placeholder pitch (all 65 in the sample
+   project) that is deliberately meaningless, so deriving it from the render is
+   a repair, not an edit.
+
+   Additional safety even for rap:
+     - require solid coverage of the note, not just 3 stray frames
+     - ignore octave-jump outliers instead of trusting the median blindly
+     - never move a note more than `maxShift` semitones                      */
+function retuneNotesToCurve(notes, curve, opts){
+  const o = Object.assign({ maxShift: 12, minFrames: 8, minCoverage: 0.5,
+                            allowSinging: false }, opts || {});
+  if (!curve.length) return 0;
+  let changed = 0;
+  for (const n of notes){
+    const isRap = n.musicalType === "rap";
+    if (!isRap && !o.allowSinging) continue;   // <- the guard
+
+    const vals = [];
+    for (const [b, m] of curve) if (b >= n.onset && b < n.onset + n.duration) vals.push(m);
+    if (vals.length < o.minFrames) continue;
+
+    vals.sort((a,b)=>a-b);
+    const med = vals[vals.length >> 1];
+
+    // discard frames an octave (or more) away from the median -- those are
+    // classic f0 halving/doubling errors -- then re-take the median.
+    const inliers = vals.filter(v => Math.abs(v - med) < 6);
+    if (inliers.length < Math.max(o.minFrames, vals.length * o.minCoverage)) continue;
+    const med2 = inliers[inliers.length >> 1];
+
+    const p = Math.round(med2);
+    if (p === n.pitch || p < 0 || p > 127) continue;
+    if (Math.abs(p - n.pitch) > o.maxShift) continue;
+    n.pitch = p; changed++;
+  }
+  return changed;
+}
+
+
+/* ===== templates ===== */
+/* VoiSona (.tssln) template, JUCE ValueTree binary, base64.
+   Source: sdercolin/utaformatix3 core/src/main/resources/format_templates/template.tssln.json */
+const TSSLN_TEMPLATE_B64 = "VFNTb2x1dGlvbgABAVZlcnNpb25PZkFwcEZpbGVTYXZlZAABCgUxLjEwLjEuMAABA1BsYXlDb250cm9sAAEETG9vcAABAQNMb29wU3RhcnQAAQkEAAAAAAAAAABMb29wRW5kAAEJBAAAAAAAAAAAUGxheVBvc2l0aW9uAAEJBAAAAAAAAAAAAFRyYWNrcwAAAQFUcmFjawABBlR5cGUAAQUBAAAAAE5hbWUAAQkFU2luZ2VyMQBTdGF0ZQABBQEAAAAAVm9sdW1lAAEJBAAAAAAAAAAAUGFuAAEJBAAAAAAAAAAAUGx1Z2luRGF0YQACMgQIU3RhdGVJbmZvcm1hdGlvbgABAVZlcnNpb25PZkFwcEZpbGVTYXZlZAABCgUxLjEwLjEuMAABClNvbmdFZGl0b3IAAQJFZGl0b3JXaWR0aAABBQEOBQAARWRpdG9ySGVpZ2h0AAEFAegBAAAAQ29udHJvbFBhbmVsU3RhdHVzAAEEUXVhbnRpemF0aW9uAAEFAQgAAABSZWNvcmROb3RlAAEBAlJlY29yZFRlbXBvAAEBAkVkaXRUb29sAAEFAQIAAAAAQWRqdXN0VG9vbEJhclN0YXR1cwABAk1haW5QYW5lbAABBQH/////U3ViUGFuZWwAAQUBAQAAAABNYWluUGFuZWxTdGF0dXMAAQRTY2FsZVhfVjIAAQkEAQAAAAAAFEBTY2FsZVkAAQkEAAAAAAAA4D9TY3JvbGxYAAEJBAAAAAAAAIA9U2Nyb2xsWQABCQQqRg1/m2K0vwBQYW5lbENvbnRyb2xsZXJTdGF0dXMAAQRUZW1wb1BhbmVsAAEBAkJlYXRQYW5lbAABAQNLZXlQYW5lbAABAQJEeW5hbWljc1BhbmVsAAEBAgBWb2ljZUluZm9ybWF0aW9uAAEFQ2hhcmFjdGVyTmFtZQABCAVDaGlzLUEAVm9pY2VGaWxlTmFtZQABJAVuaXRlY2gtanBfamFfSlBfZjAwOF9zdnNzLnRzbnZvaWNlAExhbmd1YWdlAAEHBWphX0pQAFZvaWNlVmVyc2lvbgABBwUyLjAuMABBY3RpdmVBZnRlclRoaXNWZXJzaW9uAAEJBTEuNy4xLjIAAQJFbW90aW9uTGlzdAAAAQFFbW90aW9uAAECTGFiZWwAAQgFTm9ybWFsAFJhdGlvAAEJBAAAAAAAAPA/AE5ldXJhbFZvY29kZXJMaXN0AAAAR2xvYmFsUGFyYW1ldGVycwABBUdsb2JhbFR1bmUAAQkEAAAAAAAAAABHbG9iYWxWaWJBbXAAAQkEAAAAAAAA8D9HbG9iYWxWaWJGcnEAAQkEAAAAAAAA8D9HbG9iYWxBbHBoYQABCQQAAAAAAAAAAEdsb2JhbEh1c2t5AAEJBAAAAAAAAAAAAFNvbmcAAAEDVGVtcG8AAAEBU291bmQAAQJDbG9jawABBQEAAAAAVGVtcG8AAQkEAAAAAAAAXkAAQmVhdAAAAQFUaW1lAAEDQ2xvY2sAAQUBAAAAAEJlYXRzAAEFAQQAAABCZWF0VHlwZQABBQEEAAAAAFNjb3JlAAABAktleQABA0Nsb2NrAAEFAQAAAABGaWZ0aHMAAQUBAAAAAE1vZGUAAQUBAAAAAABEeW5hbWljcwABAkNsb2NrAAEFAQAAAABWYWx1ZQABBQEFAAAAAFBhcmFtZXRlcgABAVZvY29kZXJMb2dGMAABCQQAAAAAAAAAAABTaWduZXJDb25maWcAAAAAR1VJU3RhdHVzAAEDU2NhbGVYAAEJBAAAAAAAAFlAU2NhbGVZAAEJBAEAAAAAAOA/R3JpZE1vZGUAAQUBAQAAAAA=";
+
+function tsslnTemplateBytes(){
+  const bin = atob(TSSLN_TEMPLATE_B64);
+  const u = new Uint8Array(bin.length);
+  for (let i=0;i<bin.length;i++) u[i]=bin.charCodeAt(i);
+  return u;
+}
+
+/* VoiSona .tssprj template (JUCE ValueTree, root=StateInformation).
+   Derived from a real VoiSona 1.17.1.0 export supplied by the user,
+   with notes/parameters stripped and global tweaks reset to defaults. */
+const TSSPRJ_TEMPLATE_B64 = "U3RhdGVJbmZvcm1hdGlvbgABAlRlbXBvU3luYwABAQNWZXJzaW9uT2ZBcHBGaWxlU2F2ZWQAAQoFMS4xNy4xLjAAAQpTb25nRWRpdG9yAAECRWRpdG9yV2lkdGgAAQUBFQUAAEVkaXRvckhlaWdodAABBQH3AgAAAENvbnRyb2xQYW5lbFN0YXR1cwABBFF1YW50aXphdGlvbgABBQEIAAAAUmVjb3JkTm90ZQABAQJSZWNvcmRUZW1wbwABAQJFZGl0VG9vbAABBQECAAAAAEFkanVzdFRvb2xCYXJTdGF0dXMAAQJNYWluUGFuZWwAAQUB/////1N1YlBhbmVsAAEFAQEAAAAATWFpblBhbmVsU3RhdHVzAAEEU2NhbGVYX1YyAAEJBGdmZmZmZgJAU2NhbGVZAAEJBKrx0k1iENg/U2Nyb2xsWAABCQRYEiUhLan9QFNjcm9sbFkAAQkEs0zAdNA5s78AUGFuZWxDb250cm9sbGVyU3RhdHVzAAEHVGVtcG9QYW5lbAABAQJCZWF0UGFuZWwAAQEDS2V5UGFuZWwAAQECRHluYW1pY3NQYW5lbAABAQJHbG9iYWxQYXJhbVBhbmVsAAEBA0x5cmljUGFuZWwAAQEDUHJvcGVydHlQYW5lbAABAQMAVm9pY2VJbmZvcm1hdGlvbgABBkNoYXJhY3Rlck5hbWUAAQgFQ2hpcy1BAFZvaWNlRmlsZU5hbWUAASQFbml0ZWNoLWpwX2phX0pQX2YwMDhfc3Zzcy50c252b2ljZQBMYW5ndWFnZQABBwVqYV9KUABWb2ljZVZlcnNpb24AAQcFMi4xLjAAQWN0aXZlQWZ0ZXJUaGlzVmVyc2lvbgABCAUxLjExLjAAVHJpYWxPbmx5AAEBAwEDRW1vdGlvbkxpc3QAAAEBRW1vdGlvbgABAkxhYmVsAAEIBU5vcm1hbABSYXRpbwABCQQAAAAAAADwPwBOZXVyYWxWb2NvZGVyTGlzdAAAAFNwZWNpYWxTeW1ib2wAAQJTcGVjaWFsU3ltYm9sUmFzcHkAAQ8HAQIBAwVAAAEFBe+8oABTcGVjaWFsU3ltYm9sRmFsc2V0dG8AARYHAQMBAwUkAAEFBe+8hAABBQXigLsAAEdsb2JhbFBhcmFtZXRlcnMAAQVHbG9iYWxUdW5lAAEJBAAAAAAAAAAAR2xvYmFsVmliQW1wAAEJBAAAAAAAAPA/R2xvYmFsVmliRnJxAAEJBAAAAAAAAPA/R2xvYmFsQWxwaGEAAQkEAAAAAAAAAABHbG9iYWxIdXNreQABCQQAAAAAAAAAAABTb25nAAABA1RlbXBvAAABAVNvdW5kAAECQ2xvY2sAAQUBAAAAAFRlbXBvAAEJBAAAAAAAAGVAAEJlYXQAAAEBVGltZQABA0Nsb2NrAAEFAQAAAABCZWF0cwABBQEEAAAAQmVhdFR5cGUAAQUBBAAAAABTY29yZQAAAQJLZXkAAQNDbG9jawABBQEAAAAARmlmdGhzAAEFAQAAAABNb2RlAAEFAQAAAAAARHluYW1pY3MAAQJDbG9jawABBQEAAAAAVmFsdWUAAQUBBQAAAABQYXJhbWV0ZXIAAQFWb2NvZGVyTG9nRjAAAQkEAAAAAAAAAAAAU2lnbmVyQ29uZmlnAAAA";
+
+function tssprjTemplateBytes(){
+  const bin = atob(TSSPRJ_TEMPLATE_B64);
+  const u = new Uint8Array(bin.length);
+  for (let i=0;i<bin.length;i++) u[i]=bin.charCodeAt(i);
+  return u;
+}
+
+/* VoiSona / CeVIO (Sinsy) Japanese romaji phoneme table, comma separated.
+   Verified against 67 distinct lyric->phoneme pairs taken from four real
+   VoiSona 1.17.1.0 .tssprj exports (62/67 exact; the 5 others are the
+   user typing romaji or repeated vowels on purpose).
+   NOTE: this is NOT the VOCALOID X-SAMPA set -- VoiSona uses sh/ch/ts/j/y/N. */
+const VS_KANA2 = {"きゃ": "ky,a", "きゅ": "ky,u", "きょ": "ky,o", "きぇ": "ky,e", "きぃ": "ky,i", "ぎゃ": "gy,a", "ぎゅ": "gy,u", "ぎょ": "gy,o", "ぎぇ": "gy,e", "しゃ": "sh,a", "しゅ": "sh,u", "しょ": "sh,o", "しぇ": "sh,e", "しぃ": "sh,i", "じゃ": "j,a", "じゅ": "j,u", "じょ": "j,o", "じぇ": "j,e", "ちゃ": "ch,a", "ちゅ": "ch,u", "ちょ": "ch,o", "ちぇ": "ch,e", "ちぃ": "ch,i", "ぢゃ": "j,a", "ぢゅ": "j,u", "ぢょ": "j,o", "にゃ": "ny,a", "にゅ": "ny,u", "にょ": "ny,o", "にぇ": "ny,e", "ひゃ": "hy,a", "ひゅ": "hy,u", "ひょ": "hy,o", "ひぇ": "hy,e", "びゃ": "by,a", "びゅ": "by,u", "びょ": "by,o", "びぇ": "by,e", "ぴゃ": "py,a", "ぴゅ": "py,u", "ぴょ": "py,o", "ぴぇ": "py,e", "みゃ": "my,a", "みゅ": "my,u", "みょ": "my,o", "みぇ": "my,e", "りゃ": "ry,a", "りゅ": "ry,u", "りょ": "ry,o", "りぇ": "ry,e", "ふぁ": "f,a", "ふぃ": "f,i", "ふぇ": "f,e", "ふぉ": "f,o", "ふゅ": "fy,u", "つぁ": "ts,a", "つぃ": "ts,i", "つぇ": "ts,e", "つぉ": "ts,o", "てぃ": "t,i", "とぅ": "t,u", "でぃ": "d,i", "どぅ": "d,u", "でゅ": "dy,u", "てゅ": "ty,u", "うぃ": "w,i", "うぇ": "w,e", "うぉ": "w,o", "ゔぁ": "v,a", "ゔぃ": "v,i", "ゔぇ": "v,e", "ゔぉ": "v,o", "ゔ": "v,u", "いぇ": "y,e", "じぃ": "j,i", "すぃ": "s,i", "ずぃ": "z,i"};
+const VS_KANA1 = {"あ": "a", "い": "i", "う": "u", "え": "e", "お": "o", "か": "k,a", "き": "k,i", "く": "k,u", "け": "k,e", "こ": "k,o", "が": "g,a", "ぎ": "g,i", "ぐ": "g,u", "げ": "g,e", "ご": "g,o", "さ": "s,a", "し": "sh,i", "す": "s,u", "せ": "s,e", "そ": "s,o", "ざ": "z,a", "じ": "j,i", "ず": "z,u", "ぜ": "z,e", "ぞ": "z,o", "た": "t,a", "ち": "ch,i", "つ": "ts,u", "て": "t,e", "と": "t,o", "だ": "d,a", "ぢ": "j,i", "づ": "z,u", "で": "d,e", "ど": "d,o", "な": "n,a", "に": "n,i", "ぬ": "n,u", "ね": "n,e", "の": "n,o", "は": "h,a", "ひ": "h,i", "ふ": "f,u", "へ": "h,e", "ほ": "h,o", "ば": "b,a", "び": "b,i", "ぶ": "b,u", "べ": "b,e", "ぼ": "b,o", "ぱ": "p,a", "ぴ": "p,i", "ぷ": "p,u", "ぺ": "p,e", "ぽ": "p,o", "ま": "m,a", "み": "m,i", "む": "m,u", "め": "m,e", "も": "m,o", "や": "y,a", "ゆ": "y,u", "よ": "y,o", "ら": "r,a", "り": "r,i", "る": "r,u", "れ": "r,e", "ろ": "r,o", "わ": "w,a", "ゐ": "i", "ゑ": "e", "を": "o", "ん": "N", "ぁ": "a", "ぃ": "i", "ぅ": "u", "ぇ": "e", "ぉ": "o", "っ": "cl", "ー": "-", "ゃ": "y,a", "ゅ": "y,u", "ょ": "y,o"};
+
+function voisonaLyricToPhoneme(lyric){
+  if (!lyric) return "";
+  let s = kataToHira(String(lyric).trim()).replace(/\u30fc/g, "ー");
+  const out = []; let i = 0, ok = false;
+  while (i < s.length){
+    const two = s.substr(i,2);
+    if (VS_KANA2[two]){ out.push(VS_KANA2[two]); i += 2; ok = true; continue; }
+    const one = s[i];
+    if (VS_KANA1[one]){
+      const v = VS_KANA1[one];
+      if (v === "-"){
+        const prev = out.length ? out[out.length-1].split(",").pop() : "a";
+        out.push("aiueo".includes(prev) ? prev : "a");
+      } else out.push(v);
+      i += 1; ok = true; continue;
+    }
+    i += 1;
+  }
+  return (ok && out.length) ? out.join(",") : "";
+}
+
+/* ===== phonemes + lyrics ===== */
+/* ============================================================================
+   phonemes.js -- Synthesizer V phonemes -> VOCALOID4 / OpenUTAU / VoiSona
+
+   Real projects contain, in one file:
+     * hand-edited phonemes on some notes (must be honoured, not regenerated)
+     * multi-mora lyrics on a single note ("はい", "だい", "じょう")
+     * English words next to Japanese ("gone", "white", "wanna")
+     * rap and singing notes mixed
+
+   Design
+   ------
+   1. Everything is first normalised to the SynthV phoneme set. That set is the
+      common currency because it is what the .svp actually stores:
+        JA: a i u e o N cl q  k ky g gy s sh z j t ty ch ts d dy n ny h hy f
+            b by p py m my y r ry w v kw gw  pau sil br
+        EN: ARPABET-like: aa ae ah ao aw ax ay eh er ey ih iy ow oy uh uw
+            b ch d dh dr dx f g hh jh k l m n ng p r s sh t th tr v w y z zh
+            cl pau sil br
+   2. Each target then maps SynthV -> its own alphabet, using the official
+      tables shipped with UtaFormatix3 where they exist.
+   3. Anything unmappable is approximated rather than dropped, and every
+      approximation is reported so the user can see what happened.
+
+   Language is a hard switch (JA / EN) because a VOCALOID / OpenUTAU / VoiSona
+   voicebank is either Japanese or English -- the two phoneme sets cannot
+   coexist in one file.
+   ==========================================================================*/
+
+/* ---------------------------------------------------------------- SynthV -- */
+
+const SV_JA_VOWELS = ["a", "i", "u", "e", "o", "N"];
+const SV_JA_SET = new Set([
+  "a","i","u","e","o","N","cl","q",
+  "k","ky","g","gy","s","sh","z","j","t","ty","ch","ts","d","dy",
+  "n","ny","h","hy","f","b","by","p","py","m","my","y","r","ry","w","v",
+  "kw","gw","pau","sil","br"
+]);
+const SV_EN_VOWELS = new Set([
+  "aa","ae","ah","ao","aw","ax","ay","eh","er","ey","ih","iy","ow","oy","uh","uw"
+]);
+const SV_EN_SET = new Set([
+  ...SV_EN_VOWELS,
+  "b","ch","d","dh","dr","dx","f","g","hh","jh","k","l","m","n","ng","p","r",
+  "s","sh","t","th","tr","v","w","y","z","zh","cl","pau","sil","br"
+]);
+
+function svPhonemeLang(tokens) {
+  let ja = 0, en = 0;
+  for (const t of tokens) {
+    const inJa = SV_JA_SET.has(t), inEn = SV_EN_SET.has(t);
+    if (inJa && !inEn) ja++;
+    else if (inEn && !inJa) en++;
+  }
+  return en > ja ? "en" : (ja > 0 ? "ja" : null);
+}
+
+/* ------------------------------------------------- kana -> SynthV JA ----- */
+
+const KANA_SV_2 = {
+  "きゃ":"ky a","きゅ":"ky u","きょ":"ky o","きぇ":"ky e","きぃ":"ky i",
+  "ぎゃ":"gy a","ぎゅ":"gy u","ぎょ":"gy o","ぎぇ":"gy e",
+  "しゃ":"sh a","しゅ":"sh u","しょ":"sh o","しぇ":"sh e","しぃ":"sh i",
+  "じゃ":"j a","じゅ":"j u","じょ":"j o","じぇ":"j e",
+  "ちゃ":"ch a","ちゅ":"ch u","ちょ":"ch o","ちぇ":"ch e","ちぃ":"ch i",
+  "ぢゃ":"j a","ぢゅ":"j u","ぢょ":"j o",
+  "にゃ":"ny a","にゅ":"ny u","にょ":"ny o","にぇ":"ny e",
+  "ひゃ":"hy a","ひゅ":"hy u","ひょ":"hy o","ひぇ":"hy e",
+  "びゃ":"by a","びゅ":"by u","びょ":"by o","びぇ":"by e",
+  "ぴゃ":"py a","ぴゅ":"py u","ぴょ":"py o","ぴぇ":"py e",
+  "みゃ":"my a","みゅ":"my u","みょ":"my o","みぇ":"my e",
+  "りゃ":"ry a","りゅ":"ry u","りょ":"ry o","りぇ":"ry e",
+  "ふぁ":"f a","ふぃ":"f i","ふぇ":"f e","ふぉ":"f o","ふゅ":"f y u",
+  "つぁ":"ts a","つぃ":"ts i","つぇ":"ts e","つぉ":"ts o",
+  "てぃ":"t i","とぅ":"t u","でぃ":"d i","どぅ":"d u",
+  "でゅ":"dy u","てゅ":"ty u","ちゅぃ":"ch u i",
+  "うぃ":"w i","うぇ":"w e","うぉ":"w o",
+  "ゔぁ":"v a","ゔぃ":"v i","ゔぇ":"v e","ゔぉ":"v o","ゔゅ":"v y u",
+  "いぇ":"y e","じぃ":"j i","すぃ":"s i","ずぃ":"z i",
+  // rarer combining moras seen in real projects
+  "すぁ":"s a","すぇ":"s e","すぉ":"s o","ずぇ":"z e","ずぉ":"z o",
+  "つぅ":"ts u","とぁ":"t a","どぁ":"d a","ふぅ":"f u",
+  "ひぃ":"h i","みぃ":"m i","にぃ":"n i","りぃ":"r i","きぃぇ":"ky e",
+  "うぁ":"w a","うぅ":"u","ゐぇ":"w e","んん":"N N",
+  "くゎ":"kw a","ぐゎ":"gw a",
+};
+const KANA_SV_1 = {
+  "あ":"a","い":"i","う":"u","え":"e","お":"o",
+  "か":"k a","き":"k i","く":"k u","け":"k e","こ":"k o",
+  "が":"g a","ぎ":"g i","ぐ":"g u","げ":"g e","ご":"g o",
+  "さ":"s a","し":"sh i","す":"s u","せ":"s e","そ":"s o",
+  "ざ":"z a","じ":"j i","ず":"z u","ぜ":"z e","ぞ":"z o",
+  "た":"t a","ち":"ch i","つ":"ts u","て":"t e","と":"t o",
+  "だ":"d a","ぢ":"j i","づ":"z u","で":"d e","ど":"d o",
+  "な":"n a","に":"n i","ぬ":"n u","ね":"n e","の":"n o",
+  "は":"h a","ひ":"h i","ふ":"f u","へ":"h e","ほ":"h o",
+  "ば":"b a","び":"b i","ぶ":"b u","べ":"b e","ぼ":"b o",
+  "ぱ":"p a","ぴ":"p i","ぷ":"p u","ぺ":"p e","ぽ":"p o",
+  "ま":"m a","み":"m i","む":"m u","め":"m e","も":"m o",
+  "や":"y a","ゆ":"y u","よ":"y o",
+  "ら":"r a","り":"r i","る":"r u","れ":"r e","ろ":"r o",
+  "わ":"w a","ゐ":"i","ゑ":"e","を":"o","ん":"N","ゔ":"v u",
+  "ぁ":"a","ぃ":"i","ぅ":"u","ぇ":"e","ぉ":"o",
+  "っ":"cl","ゃ":"y a","ゅ":"y u","ょ":"y o","ゎ":"w a",
+};
+
+function kataToHira(s) {
+  let o = "";
+  for (const c of String(s)) {
+    const k = c.codePointAt(0);
+    o += (k >= 0x30a1 && k <= 0x30f6) ? String.fromCodePoint(k - 0x60) : c;
+  }
+  return o;
+}
+
+const SMALL_KANA = "ぁぃぅぇぉゃゅょゎ";
+
+/** Split a kana string into mora chunks: "じょう" -> ["じょ","う"] */
+function splitMoras(lyric) {
+  const s = kataToHira(String(lyric || "")).replace(/\u30fc/g, "ー");
+  const out = [];
+  for (let i = 0; i < s.length; i++) {
+    const c = s[i];
+    if (SMALL_KANA.includes(c) && out.length) { out[out.length - 1] += c; continue; }
+    if ((c === "っ" || c === "ー") && out.length) { out[out.length - 1] += c; continue; }
+    out.push(c);
+  }
+  return out;
+}
+
+/** One mora chunk -> SynthV JA phoneme tokens */
+function moraToSvJa(mora, prevVowel) {
+  let base = mora, trailCl = false;
+  if (base.length > 1 && base.endsWith("っ")) { trailCl = true; base = base.slice(0, -1); }
+  let longVowel = false;
+  if (base.length > 1 && base.endsWith("ー")) { longVowel = true; base = base.slice(0, -1); }
+
+  let toks = null;
+  if (KANA_SV_2[base]) toks = KANA_SV_2[base].split(" ");
+  else if (KANA_SV_1[base]) toks = KANA_SV_1[base].split(" ");
+  else if (base === "ー") toks = [prevVowel && SV_JA_VOWELS.includes(prevVowel) ? prevVowel : "a"];
+
+  /* Generic fallback for a base kana plus a trailing small vowel that is not
+     a real digraph ("かぁ", "とぉ" ...). SV treats these as the kana followed
+     by that vowel, so decompose instead of failing. */
+  if (!toks && base.length > 1) {
+    const small = base[base.length - 1];
+    const head = base.slice(0, -1);
+    const SMALL_VOWEL = { "ぁ":"a","ぃ":"i","ぅ":"u","ぇ":"e","ぉ":"o" };
+    if (SMALL_VOWEL[small] && (KANA_SV_2[head] || KANA_SV_1[head])) {
+      toks = (KANA_SV_2[head] || KANA_SV_1[head]).split(" ").concat([SMALL_VOWEL[small]]);
+    }
+  }
+  if (!toks) return null;
+
+  if (longVowel) {
+    const v = toks[toks.length - 1];
+    if (SV_JA_VOWELS.includes(v)) toks = toks.concat([v]);
+  }
+  if (trailCl) toks = toks.concat(["cl"]);
+  return toks;
+}
+
+/* Romanised kana ("ka", "shi", "ha") -> SynthV JA. Only accepts strings that
+   parse completely as kana syllables, so real English words fall through. */
+const ROMAJI_SYL_SRC = [
+  "kya","kyu","kyo","gya","gyu","gyo","sha","shu","sho","she","shi",
+  "cha","chu","cho","che","chi","tsa","tsu","tse","tso",
+  "nya","nyu","nyo","hya","hyu","hyo","bya","byu","byo",
+  "pya","pyu","pyo","mya","myu","myo","rya","ryu","ryo",
+  "ja","ju","jo","je","ji","fa","fi","fu","fe","fo",
+  "wa","wo","wi","we","ya","yu","yo",
+  "ka","ki","ku","ke","ko","ga","gi","gu","ge","go",
+  "sa","su","se","so","za","zu","ze","zo",
+  "ta","te","to","da","de","do",
+  "na","ni","nu","ne","no","ha","hi","he","ho",
+  "ba","bi","bu","be","bo","pa","pi","pu","pe","po",
+  "ma","mi","mu","me","mo","ra","ri","ru","re","ro",
+  "a","i","u","e","o","n"
+].join("|");
+const ROMAJI_RE = new RegExp("^(" + ROMAJI_SYL_SRC + ")");
+const ROMAJI_MAP = {
+  a:"a", i:"i", u:"u", e:"e", o:"o", n:"N",
+  ka:"k a", ki:"k i", ku:"k u", ke:"k e", ko:"k o",
+  ga:"g a", gi:"g i", gu:"g u", ge:"g e", go:"g o",
+  sa:"s a", shi:"sh i", su:"s u", se:"s e", so:"s o",
+  za:"z a", ji:"j i", zu:"z u", ze:"z e", zo:"z o",
+  ta:"t a", chi:"ch i", tsu:"ts u", te:"t e", to:"t o",
+  da:"d a", de:"d e", do:"d o",
+  na:"n a", ni:"n i", nu:"n u", ne:"n e", no:"n o",
+  ha:"h a", hi:"h i", fu:"f u", he:"h e", ho:"h o",
+  ba:"b a", bi:"b i", bu:"b u", be:"b e", bo:"b o",
+  pa:"p a", pi:"p i", pu:"p u", pe:"p e", po:"p o",
+  ma:"m a", mi:"m i", mu:"m u", me:"m e", mo:"m o",
+  ya:"y a", yu:"y u", yo:"y o",
+  ra:"r a", ri:"r i", ru:"r u", re:"r e", ro:"r o",
+  wa:"w a", wo:"o", wi:"w i", we:"w e",
+  kya:"ky a", kyu:"ky u", kyo:"ky o", gya:"gy a", gyu:"gy u", gyo:"gy o",
+  sha:"sh a", shu:"sh u", sho:"sh o", she:"sh e",
+  cha:"ch a", chu:"ch u", cho:"ch o", che:"ch e",
+  tsa:"ts a", tse:"ts e", tso:"ts o",
+  nya:"ny a", nyu:"ny u", nyo:"ny o", hya:"hy a", hyu:"hy u", hyo:"hy o",
+  bya:"by a", byu:"by u", byo:"by o", pya:"py a", pyu:"py u", pyo:"py o",
+  mya:"my a", myu:"my u", myo:"my o", rya:"ry a", ryu:"ry u", ryo:"ry o",
+  ja:"j a", ju:"j u", jo:"j o", je:"j e",
+  fa:"f a", fi:"f i", fe:"f e", fo:"f o",
+};
+function romajiToSvJa(w) {
+  const out = [];
+  let rest = w;
+  while (rest.length) {
+    const m = rest.match(ROMAJI_RE);
+    if (!m || !ROMAJI_MAP[m[1]]) return null;
+    out.push(...ROMAJI_MAP[m[1]].split(" "));
+    rest = rest.slice(m[1].length);
+  }
+  return out.length ? out : null;
+}
+
+/* ------------------------------------------- English word -> SynthV EN --- */
+/* A compact grapheme rule set. It will never match a full dictionary, but it
+   keeps English words audible instead of collapsing them to "a". Words we saw
+   in the real project are covered explicitly. */
+
+/* Synthesizer V's English phoneset is ARPABET with two extra affricates,
+   "dr" and "tr" -- SV writes "drag" as [dr ae g], not [d r ae g]. Match that,
+   because these are the tokens the .svp itself uses. */
+const EN_WORDS = {
+  "a":"ax", "ah":"aa", "and":"ae n d", "is":"ih z", "this":"dh ih s",
+  "we":"w iy", "to":"t uw", "more":"m ao r", "drag":"dr ae g",
+  "drop":"dr aa p", "light":"l ay t", "white":"w ay t", "gone":"g ao n",
+  "wanna":"w aa n ax", "ha":"hh aa", "the":"dh ax", "you":"y uw",
+  "i":"ay", "me":"m iy", "my":"m ay", "no":"n ow", "go":"g ow",
+  "love":"l ah v", "night":"n ay t", "day":"d ey", "time":"t ay m",
+  "away":"ax w ey", "down":"d aw n", "up":"ah p", "out":"aw t",
+  "in":"ih n", "on":"aa n", "it":"ih t", "be":"b iy", "so":"s ow",
+  "oh":"ow", "yeah":"y ae", "hey":"hh ey", "now":"n aw", "one":"w ah n",
+  "all":"ao l", "can":"k ae n", "get":"g eh t", "let":"l eh t",
+  "know":"n ow", "like":"l ay k", "make":"m ey k", "take":"t ey k",
+  "want":"w aa n t", "will":"w ih l", "with":"w ih dh", "your":"y ao r",
+};
+
+const EN_DIGRAPH = {
+  "ch":"ch","sh":"sh","th":"th","ph":"f","wh":"w","ck":"k","ng":"ng",
+  "qu":"k w","gh":"", "kn":"n","wr":"r","dr":"dr","tr":"tr",
+  "ai":"ey","ay":"ey","ea":"iy","ee":"iy","ie":"ay","oa":"ow","oo":"uw",
+  "ou":"aw","ow":"aw","oi":"oy","oy":"oy","au":"ao","aw":"ao","ei":"ey",
+};
+const EN_SINGLE = {
+  "a":"ae","b":"b","c":"k","d":"d","e":"eh","f":"f","g":"g","h":"hh",
+  "i":"ih","j":"jh","k":"k","l":"l","m":"m","n":"n","o":"aa","p":"p",
+  "q":"k","r":"r","s":"s","t":"t","u":"ah","v":"v","w":"w","x":"k s",
+  "y":"y","z":"z",
+};
+
+function englishToSvEn(word) {
+  const w = String(word || "").toLowerCase().replace(/[^a-z']/g, "");
+  if (!w) return null;
+  if (EN_WORDS[w]) return EN_WORDS[w].split(" ");
+
+  const out = [];
+  for (let i = 0; i < w.length; ) {
+    // silent trailing e (make -> m ey k)
+    if (i === w.length - 1 && w[i] === "e" && w.length > 2 && out.length) { i++; continue; }
+    const two = w.substr(i, 2);
+    if (EN_DIGRAPH[two] !== undefined) {
+      const v = EN_DIGRAPH[two];
+      if (v) out.push(...v.split(" "));
+      i += 2; continue;
+    }
+    const one = EN_SINGLE[w[i]];
+    if (one) out.push(...one.split(" "));
+    i += 1;
+  }
+  return out.length ? out : null;
+}
+
+/* ================= SynthV -> target alphabets ============================ */
+
+/* --- VOCALOID4 Japanese (X-SAMPA). Official table from UtaFormatix3
+       "SynthV JA to Vocaloid JA.txt", extended with the identity entries. */
+const SV2VOCA_JA = {
+  "a":"a","i":"i","u":"M","e":"e","o":"o","N":"N\\","cl":"?","q":"?",
+  "k":"k","ky":"k'","g":"g","gy":"g'","s":"s","sh":"S","z":"dz","j":"dZ",
+  "t":"t","ty":"t'","ch":"tS","ts":"ts","d":"d","dy":"d'",
+  "n":"n","ny":"J","h":"h","hy":"C","f":"p\\","b":"b","by":"b'",
+  "p":"p","py":"p'","m":"m","my":"m'","y":"j","r":"4","ry":"4'",
+  "w":"w","v":"p\\","kw":"k w","gw":"g w",
+  "pau":"Asp","sil":"Sil",
+  // "br" (breath) is an English-bank phoneme: MIKU_V4X returned it as "a".
+  // Emit nothing so the note is dropped instead of turning into a stray vowel.
+  "br":"",
+};
+/* --- VOCALOID4 English (X-SAMPA). From "SynthV EN to Vocaloid EN.txt". */
+const SV2VOCA_EN = {
+  "aa":"Q","ae":"{","ah":"V","ao":"O:","aw":"aU","ax":"@","ay":"aI",
+  "eh":"e","er":"@r","ey":"eI","ih":"I","iy":"i:","ow":"@U","oy":"OI",
+  "uh":"U","uw":"u:",
+  "b":"b","ch":"tS","d":"d","dh":"D","dx":"4","f":"f","g":"g","hh":"h",
+  "jh":"dZ","k":"k","l":"l","m":"m","n":"n","ng":"N","p":"p","r":"r",
+  "s":"s","sh":"S","t":"t","th":"T","v":"v","w":"w","y":"j","z":"z","zh":"Z",
+  "dr":"D r","tr":"T r",
+  "br":"br1","cl":"Asp","pau":"Sil","sil":"Sil",
+};
+
+/* --- OpenUTAU. Japanese banks use plain romaji (same as SynthV), English
+       banks use ARPAsing (also the same tokens). So OpenUTAU is essentially
+       pass-through; only the silence markers differ. */
+const SV2OU_JA = { "pau":"", "sil":"", "br":"" };   // others pass through
+const SV2OU_EN = { "pau":"", "sil":"", "br":"", "dr":"jh r", "tr":"ch r", "dx":"d", "ax":"ah" };
+
+/* --- VoiSona / CeVIO Japanese. Romaji, but a smaller set than SynthV:
+       no ty/dy/kw/gw/v, and ん is N. Verified against real .tssprj exports. */
+const SV2VOISONA_JA = {
+  "a":"a","i":"i","u":"u","e":"e","o":"o","N":"N","cl":"cl","q":"cl",
+  "k":"k","ky":"ky","g":"g","gy":"gy","s":"s","sh":"sh","z":"z","j":"j",
+  "t":"t","ch":"ch","ts":"ts","d":"d",
+  "n":"n","ny":"ny","h":"h","hy":"hy","f":"f","b":"b","by":"by",
+  "p":"p","py":"py","m":"m","my":"my","y":"y","r":"r","ry":"ry","w":"w",
+  // not in the VoiSona inventory -> nearest supported sound
+  "ty":"ch","dy":"j","v":"b","kw":"k w","gw":"g w",
+  "pau":"","sil":"sil","br":"",
+};
+
+/* --- English -> Japanese approximation, used when an English phoneme has to
+       come out of a Japanese voicebank (VoiSona JA, or a JA VOCALOID bank).
+       Vowels become the nearest Japanese vowel; consonants the nearest
+       Japanese consonant; consonant clusters get epenthetic vowels the way
+       Japanese loanwords do. Result is katakana-English, but it sings. */
+const EN2JA_VOWEL = {
+  "aa":["a"], "ae":["a"], "ah":["a"], "ao":["o"], "aw":["a","u"],
+  "ax":["a"], "ay":["a","i"], "eh":["e"], "er":["a","a"], "ey":["e","i"],
+  "ih":["i"], "iy":["i"], "ow":["o","u"], "oy":["o","i"], "uh":["u"], "uw":["u"],
+};
+const EN2JA_CONS = {
+  "b":"b","ch":"ch","d":"d","dh":"d","dx":"r","f":"f","g":"g","hh":"h",
+  "jh":"j","k":"k","l":"r","m":"m","n":"n","ng":"N","p":"p","r":"r",
+  "s":"s","sh":"sh","t":"t","th":"s","v":"b","w":"w","y":"y","z":"z","zh":"j",
+  // dr / tr are single affricates in SV; keep them as ONE consonant so they
+  // bind to the following vowel ("dr ae" -> だ) instead of exploding into どら
+  "dr":"d","tr":"t","cl":"cl","pau":"","sil":"sil","br":"",
+};
+/* default vowel inserted after a stranded consonant */
+const EN2JA_EPENTHESIS = { "t":"o","d":"o","ch":"i","j":"i","sh":"u","dh":"u","th":"u" };
+
+/* English -> Japanese mora, done the way loanwords actually work.
+
+   The naive rule (every consonant gets its own epenthetic vowel) produces
+   "でぃすいず" for [dh ih s ih z] and "どらぐあんどどろっぷ" for
+   [dr ae g ax n d dr aa p]. That is not how these are heard.
+
+   What actually happens is that a coda consonant RESYLLABIFIES onto the next
+   vowel across the word boundary:
+        dh ih | s ih z   ->  dhi + shi + zu   ->  でぃしず
+        dr ae | g ax | n d | dr aa p          ->  だ  が  ん  だ(ぷ)
+   So: walk the phoneme stream, and whenever a consonant is directly followed
+   by a vowel, bind them into one mora -- regardless of where the original
+   word boundary was. Only a consonant with no following vowel needs an
+   epenthetic one, and a nasal before a consonant becomes moraic ん.
+
+   The vowels are the anchors (the user's point: "ae, ax, aa are long, use
+   them as the axis"), so we key the whole process off vowel positions. */
+function svEnToSvJa(tokens) {
+  // 1. map every English phoneme to its Japanese counterpart(s)
+  const seq = [];   // {type:'V'|'C', toks:[...]}
+  for (const t of tokens) {
+    if (EN2JA_VOWEL[t]) { seq.push({ type: "V", toks: EN2JA_VOWEL[t].slice() }); continue; }
+    const c = EN2JA_CONS[t];
+    if (c === undefined || c === "") continue;
+    for (const part of c.split(" ")) seq.push({ type: "C", toks: [part] });
+  }
+  // 2. bind C+V, resolve stranded consonants
+  const out = [];
+  for (let i = 0; i < seq.length; i++) {
+    const cur = seq[i];
+    if (cur.type === "V") { out.push(...cur.toks); continue; }
+    const c = cur.toks[0];
+    const next = seq[i + 1];
+    /* Post-vocalic /r/ ("more", "car") is not pronounced as a mora in
+       Japanese; it lengthens the preceding vowel. */
+    if (c === "r" && !(next && next.type === "V") && out.length) {
+      const last = out[out.length - 1];
+      if (["a","i","u","e","o"].includes(last)) { out.push(last); continue; }
+    }
+    if (next && next.type === "V") {
+      // consonant + vowel -> one mora; palatalise before /i/ where Japanese does
+      const v = next.toks[0];
+      out.push(...adaptCV(c, v), ...next.toks.slice(1));
+      i++;                       // consumed the vowel
+      continue;
+    }
+    // stranded consonant
+    if (c === "N" || c === "cl") { out.push(c); continue; }
+    // a nasal with no following vowel is the moraic ん, wherever it sits
+    if (c === "n" || c === "m") { out.push("N"); continue; }
+    /* A plosive that is followed by another consonant is heard as a geminate
+       ("drop dr..." -> どらっ+だ). A word-FINAL plosive with nothing after it
+       must be spelled out, otherwise "light" becomes らいっ with no /t/. */
+    if ((c === "p" || c === "t" || c === "k") && next && next.type === "C" && out.length) {
+      out.push("cl"); continue;
+    }
+    out.push(...adaptCV(c, EN2JA_EPENTHESIS[c] || "u"));
+  }
+  return out;
+}
+
+/* Japanese has no /si/, /ti/, /tu/, /zi/, /hu/ -- pick the real mora. */
+function adaptCV(c, v) {
+  const fix = {
+    // Loanword readings: modern Japanese keeps ティ/トゥ/ディ rather than
+    // collapsing them to チ/ツ/ジ the way native vocabulary does.
+    "s i": ["sh", "i"],
+    "z i": ["j", "i"],  "d u": ["d", "o"],
+    "h u": ["f", "u"],  "y i": ["i"],       "y e": ["i", "e"],
+    "w i": ["w", "i"],  "w u": ["u"],
+  };
+  const k = c + " " + v;
+  return fix[k] || [c, v];
+}
+
+/* ================= public API ============================================ */
+
+/**
+ * Resolve one note into SynthV phoneme tokens.
+ * Priority: hand-edited phonemes > lyric conversion.
+ * Returns { tokens, lang, source } or null.
+ */
+function noteToSvPhonemes(note) {
+  /* The .svp tells us the language of every note explicitly:
+       attributes.languageOverride : "japanese" | "english"
+       attributes.phonesetOverride : "romaji"   | "arpabet"
+     Trust that instead of inspecting the lyric text -- a note can be English
+     with a kana lyric, or Japanese with a latin lyric. */
+  const attr = note.attributes || {};
+  const declared = attr.languageOverride === "english" ? "en"
+                 : attr.languageOverride === "japanese" ? "ja"
+                 : (attr.phonesetOverride === "arpabet" ? "en"
+                 : (attr.phonesetOverride === "romaji" ? "ja" : null));
+
+  const manual = String(note.phonemes || "").trim();
+  if (manual) {
+    const toks = manual.split(/\s+/).filter(Boolean);
+    if (toks.length) {
+      return { tokens: toks, lang: declared || svPhonemeLang(toks) || "ja",
+               source: "manual" };
+    }
+  }
+  const lyric = String(note.lyrics || "").trim();
+  if (!lyric) return null;
+
+  // explicit markers used as lyrics
+  const low = lyric.toLowerCase();
+  if (low === "sil" || low === "pau" || low === "br" || low === "cl")
+    return { tokens: [low], lang: "ja", source: "marker" };
+  if (lyric === "+" || lyric === "-" || lyric === "ー")
+    return { tokens: ["-"], lang: "ja", source: "extend" };
+
+  // English note (declared by the file, or latin text with no declaration)
+  if (declared === "en" || (declared === null && /^[A-Za-z][A-Za-z'\-\.]*$/.test(lyric))) {
+    const t = englishToSvEn(lyric);
+    if (t) return { tokens: t, lang: "en", source: "english" };
+  }
+
+  /* Latin text on a note the file declares as Japanese (e.g. "a", "ha" typed
+     directly). SV reads these with the Japanese phoneset, so romanised kana
+     is the right interpretation -- not English. */
+  if (/^[A-Za-z][A-Za-z'\-\.]*$/.test(lyric)) {
+    const romaji = romajiToSvJa(lyric.toLowerCase());
+    if (romaji) return { tokens: romaji, lang: "ja", source: "romaji" };
+    const t = englishToSvEn(lyric);
+    if (t) return { tokens: t, lang: "en", source: "english" };
+  }
+
+  // kana
+  const moras = splitMoras(lyric);
+  const toks = [];
+  let prevVowel = null, ok = false;
+  for (const m of moras) {
+    const t = moraToSvJa(m, prevVowel);
+    if (!t) continue;
+    ok = true;
+    toks.push(...t);
+    for (let i = t.length - 1; i >= 0; i--)
+      if (SV_JA_VOWELS.includes(t[i])) { prevVowel = t[i]; break; }
+  }
+  if (ok && toks.length) return { tokens: toks, lang: "ja", source: "kana" };
+  return null;
+}
+
+/**
+ * Split SynthV tokens into one unit per output note.
+ *
+ * VOCALOID4 (and VoiSona) allocate ONE syllable nucleus per note. Verified
+ * empirically: a VSQX round-tripped through VOCALOID4 Editor keeps
+ *   "N\"  "?"  "k a"  "t e"          (single nucleus)
+ * but silently replaces with "a"
+ *   "e N\"  "k a N\"  "m o ?"  "4 a ?"   (nucleus + moraic N / geminate cl)
+ * So the moraic nasal N and the geminate stop cl are their OWN notes -- which
+ * is also how Japanese mora timing works. `N` and `cl` therefore always start
+ * a new unit; they never ride along with the preceding vowel.
+ */
+function syllabify(tokens, lang) {
+  const isVowel = t => lang === "en" ? SV_EN_VOWELS.has(t)
+                                     : (SV_JA_VOWELS.includes(t) && t !== "N");
+  const units = [];
+  let cur = [];
+  for (const t of tokens) {
+    if (t === "N" || t === "cl" || t === "q") {
+      /* Moraic nasal / geminate. It is its own mora ONLY when something has
+         already been sung in this unit. A pending onset consonant (e.g. the
+         hand-edited "y N" that SV writes on a nasalised ん) belongs WITH it:
+         splitting there produced a literal "い" + "ん" = "い～ん". */
+      if (cur.length) { cur.push(t); units.push(cur); cur = []; }
+      else units.push([t]);
+      continue;
+    }
+    cur.push(t);
+    if (isVowel(t)) { units.push(cur); cur = []; }
+  }
+  if (cur.length) {
+    // trailing consonants with no vowel (English codas): attach to the last
+    // unit, since they cannot sound on their own.
+    if (units.length) units[units.length - 1].push(...cur);
+    else units.push(cur);
+  }
+  return units;
+}
+
+/** Convert SynthV tokens to a target alphabet.
+ *  target: "vocaloid" | "openutau" | "voisona"
+ *  outLang: "ja" | "en"
+ *  Returns { tokens, approximated:bool } */
+function svToTarget(tokens, srcLang, target, outLang) {
+  let toks = tokens.slice();
+  let approx = false;
+
+  /* Cross-language handling.
+
+     A note that SV marked as English keeps its English phonemes. Turning
+     "light" [l ay t] into katakana [r a i t o] is not a conversion, it is a
+     rewrite of the performance -- and VOCALOID/OpenUTAU English banks accept
+     the English phonemes directly. Only fold English into Japanese when the
+     target physically cannot say it (VoiSona ships Japanese banks only), and
+     say so in the report. */
+  if (srcLang === "en" && outLang === "ja") {
+    /* A Japanese voicebank physically cannot sing the English-only phonemes.
+       Proven by round-tripping through VOCALOID4 with MIKU_V4X (a Japanese
+       bank): notes containing O: { r br1 came back as "a", while notes whose
+       phonemes happened to be JA-legal (l aI t / w aI) survived.
+       So when the target bank is Japanese we must fold English into the
+       Japanese inventory -- for every target, not just VoiSona. */
+    toks = svEnToSvJa(toks);
+    approx = true;
+  }
+  else if (srcLang === "ja" && outLang === "en") {
+    // Japanese phonemes inside an English bank: the romaji set is close enough
+    // for consonants; map the vowels onto ARPABET.
+    const JA2EN = { "a":"aa","i":"iy","u":"uw","e":"eh","o":"ow","N":"ng",
+                    "sh":"sh","ch":"ch","ts":"t s","j":"jh","f":"f","h":"hh",
+                    "r":"r","y":"y","w":"w","cl":"cl","q":"cl",
+                    "ky":"k y","gy":"g y","ny":"n y","hy":"hh y","by":"b y",
+                    "py":"p y","my":"m y","ry":"r y","ty":"t y","dy":"d y",
+                    "v":"v","kw":"k w","gw":"g w","z":"z","pau":"pau","sil":"sil","br":"br" };
+    toks = toks.flatMap(t => (JA2EN[t] || t).split(" "));
+    approx = true;
+  }
+
+  /* Pick the table by the language of the TOKENS we are about to write, not
+     by the file-wide setting: an English note inside a Japanese project must
+     be looked up in the English table. */
+  const tokLang = (srcLang === "en" && !(target === "voisona" && outLang === "ja"))
+                  ? "en" : outLang;
+  const table = target === "vocaloid" ? (tokLang === "en" ? SV2VOCA_EN : SV2VOCA_JA)
+              : target === "voisona"  ? SV2VOISONA_JA
+              : (tokLang === "en" ? SV2OU_EN : SV2OU_JA);
+
+  const out = [];
+  for (const t of toks) {
+    let v = table[t];
+    if (v === undefined) {
+      // OpenUTAU passes unknown tokens through; the others must approximate
+      if (target === "openutau") { out.push(t); continue; }
+      approx = true;
+      v = target === "voisona" ? (SV2VOISONA_JA[t] !== undefined ? SV2VOISONA_JA[t] : "a")
+        : (tokLang === "en" ? (SV2VOCA_EN[t] || SV2VOCA_JA[t] || "a")
+                            : (SV2VOCA_JA[t] || "a"));
+    }
+    if (v === "") continue;
+    out.push(...String(v).split(" "));
+  }
+  return { tokens: out, approximated: approx };
+}
+
+/* VoiSona wants commas, the others spaces. */
+function joinPhonemes(tokens, target) {
+  return target === "voisona" ? tokens.join(",") : tokens.join(" ");
+}
+
+/* ============================================================================
+   vocaloid_lyrics.js -- write a LYRIC that spells the phonemes we want.
+
+   Why this exists
+   ---------------
+   VOCALOID4 does NOT trust the <p> phoneme field we write. Proven by
+   round-tripping a generated VSQX through the VOCALOID4 Editor and diffing:
+
+       lyric "て"   + phoneme "t e"  -> kept  "t e"
+       lyric "てっ"  + phoneme "t e"  -> replaced with "a"
+       lyric "ら"   + phoneme "4 a"  -> kept
+       lyric "らっ"  + phoneme "4 a"  -> replaced with "a"
+       lyric "cl"  + phoneme "?"    -> replaced with "a"
+       lyric "っ"   + phoneme "?"    -> kept
+
+   Same phoneme string, different verdict, decided purely by the lyric text.
+   VOCALOID re-derives the reading from the lyric and, when the lyric does not
+   parse to the phonemes we supplied, throws ours away and falls back to "a".
+
+   So the lyric must SPELL the phonemes. We therefore go phoneme -> kana,
+   never lyric -> phoneme. The original lyric text is irrelevant here and is
+   deliberately not consulted.
+   ==========================================================================*/
+
+/* Exact kana for a SynthV JA phoneme unit (consonant + vowel, or a single
+   moraic phoneme). Built as the inverse of the kana->phoneme table so the two
+   can never drift apart. */
+const SV_UNIT_TO_KANA = (() => {
+  const m = {};
+  const put = (toks, kana) => { const k = toks.join(" "); if (!(k in m)) m[k] = kana; };
+  // singles first so they win over digraph spellings of the same sound
+  for (const [kana, ph] of Object.entries(KANA_SV_1)) put(ph.split(" "), kana);
+  for (const [kana, ph] of Object.entries(KANA_SV_2)) put(ph.split(" "), kana);
+  // moraic units that are their own note
+  m["N"] = "ん";
+  m["cl"] = "っ";
+  m["q"] = "っ";
+  m["a"] = "あ"; m["i"] = "い"; m["u"] = "う"; m["e"] = "え"; m["o"] = "お";
+  // lone glides written by hand-edited phonemes ("y N" on ん)
+  // glide + moraic nasal: SV writes "y N" for a nasalised ん. It is one mora.
+  m["y N"] = "ん"; m["w N"] = "ん";
+  return m;
+})();
+
+/* Fallback: consonant + vowel spelled out, for combinations with no single
+   kana (e.g. "s i" -> すぃ). */
+const CONS_ROW = {
+  k:"かきくけこ", g:"がぎぐげご", s:"さしすせそ", sh:"しゃしゃしゅしぇしょ",
+  z:"ざじずぜぞ", j:"じゃじじゅじぇじょ", t:"たちつてと", ch:"ちゃちちゅちぇちょ",
+  ts:"つぁつぃつつぇつぉ", d:"だぢづでど", n:"なにぬねの",
+  h:"はひふへほ", f:"ふぁふぃふふぇふぉ", b:"ばびぶべぼ", p:"ぱぴぷぺぽ",
+  m:"まみむめも", y:"やいゆいぇよ", r:"らりるれろ", w:"わうぃううぇを",
+  v:"ゔぁゔぃゔゔぇゔぉ",
+  ky:"きゃきぃきゅきぇきょ", gy:"ぎゃぎぃぎゅぎぇぎょ",
+  ny:"にゃにぃにゅにぇにょ", hy:"ひゃひぃひゅひぇひょ",
+  by:"びゃびぃびゅびぇびょ", py:"ぴゃぴぃぴゅぴぇぴょ",
+  my:"みゃみぃみゅみぇみょ", ry:"りゃりぃりゅりぇりょ",
+  ty:"てゃてぃてゅてぇてょ", dy:"でゃでぃでゅでぇでょ",
+  kw:"くゎくぃくぅくぇくぉ", gw:"ぐゎぐぃぐぅぐぇぐぉ",
+};
+const VOWEL_IDX = { a:0, i:1, u:2, e:3, o:4 };
+
+/** SynthV JA phoneme unit -> a kana string VOCALOID will read back the same. */
+function svUnitToKana(tokens) {
+  const key = tokens.join(" ");
+  if (SV_UNIT_TO_KANA[key]) return SV_UNIT_TO_KANA[key];
+
+  // consonant + vowel
+  if (tokens.length === 2) {
+    const [c, v] = tokens;
+    const row = CONS_ROW[c];
+    if (row && VOWEL_IDX[v] !== undefined) {
+      // rows are written as 5 entries, but digraph rows use 2-char cells
+      const cells = row.match(/[ぁ-ゖー][ぁぃぅぇぉゃゅょ]?/g) || [];
+      const cell = cells[VOWEL_IDX[v]];
+      if (cell) return cell;
+    }
+  }
+  // bare vowel or unknown: fall back to the vowel itself
+  for (let i = tokens.length - 1; i >= 0; i--) {
+    const t = tokens[i];
+    if (SV_UNIT_TO_KANA[t]) return SV_UNIT_TO_KANA[t];
+  }
+  return null;
+}
+
+/* English: VOCALOID EN reads the lyric as a word. We cannot spell arbitrary
+   ARPABET with English orthography reliably, so write the phoneme string as
+   the lyric in VOCALOID's own bracket syntax, which the editor accepts as an
+   explicit reading and does not re-derive. */
+function svEnUnitToLyric(vocaTokens) {
+  return "[" + vocaTokens.join(" ") + "]";
+}
+
+/* ============================================================================
+   lyrics.js -- turn SV notes into target notes, splitting multi-syllable notes
+
+   A single SV note often carries a whole word ("はい", "じょう", "wanna").
+   Every target here is one-syllable-per-note, so singing that correctly needs
+   the note to be divided at syllable boundaries. The pitch curve is NOT
+   touched: it is a continuous parameter over time, so the sound stays put --
+   only the note grid gains extra boundaries.
+
+   Duration is shared proportionally to how "heavy" each syllable is
+   (a syllable with an onset consonant needs a little more room than a bare
+   vowel), with a floor so nothing becomes unsingable.
+   ==========================================================================*/
+
+/* No artificial minimum. The original note timing is what the user wrote and
+   what the pitch curve was rendered against; stretching a piece "so it can be
+   heard" desynchronises everything after it. The only floor is 1 tick, which
+   is a hard format limit, not a musical judgement. */
+const MIN_PIECE_TICKS = 1;
+
+/* Decide the LYRIC text for one output note.
+
+   VOCALOID re-derives the reading from the lyric and discards our <p> when the
+   two disagree, so the lyric has to spell the phonemes we want. We therefore
+   generate it FROM the phonemes and never reuse the source lyric text.
+   OpenUTAU and VoiSona take the phoneme field at face value, so there we keep
+   a human-readable label. */
+function targetLyric(unit, lang, converted, o, note) {
+  if (o.target === "vocaloid") {
+    const kana = svUnitToKana(unit);
+    if (kana) return kana;
+    /* Silence / breath markers: VOCALOID reads "sil" as a lyric fine (proven
+       in the round-trip); anything else with no kana spelling falls back to
+       the vowel so it at least sounds, rather than to a bracket syntax we
+       have not verified. */
+    const t = converted.tokens;
+    if (t.length === 1 && (t[0] === "Sil" || t[0] === "Asp")) return "sil";
+    if (lang === "en") return svEnUnitToLyric(t);
+    return "あ";
+  }
+  /* OpenUTAU in presamp mode (JA VCV & CVVC) derives everything from the
+     LYRIC, so it must be clean kana -- "ん" and "っ" included. In DEFAULT
+     mode the lyric is the sample alias, and the phoneme hint carries the
+     detail, so a readable kana label is still the right choice. */
+  const kana = (lang === "ja") ? svUnitToKana(unit) : null;
+  if (kana) return kana;
+  if (o.target === "openutau" && o.utauMode === "presamp"){
+    /* UTAU's rest convention is "R" (see JapaneseCVVCPhonemizer's nonVowels
+       list and the Korean phonemizers' rest checks). "sil" is a SynthV token
+       and has no sample in a UTAU bank. */
+    if (unit.length === 1 && (unit[0] === "sil" || unit[0] === "pau")) return "R";
+    // no kana spelling: fall back to the vowel so the bank still has a sample
+    const t = unit[unit.length - 1];
+    const V = { a:"あ", i:"い", u:"う", e:"え", o:"お", N:"ん", cl:"っ", q:"っ" };
+    if (V[t]) return V[t];
+    return "あ";
+  }
+  return note.lyrics || "a";
+}
+
+/**
+ * @param notes   [{onset,duration,pitch,lyrics,phonemes,musicalType}]
+ * @param opts    { target, outLang, split, genPhonemes }
+ * @returns { notes:[...], stats:{ split, approximated, manual, failed, english } }
+ */
+function prepareNotes(notes0, opts) {
+  let notes = notes0;
+  const tempoBpm = (opts && opts.tempoBpm) || 120;
+  const o = Object.assign({ target: "vocaloid", outLang: "ja",
+                            split: true, genPhonemes: true }, opts || {});
+  const out = [];
+  const stats = { split: 0, approximated: 0, manual: 0, failed: 0,
+                  english: 0, extended: 0, notesIn: notes.length };
+  const failedLyrics = new Set();
+  const approxLyrics = new Set();
+  let lastVowel = null;   // for "+" extension notes
+
+  /* Real projects sometimes contain exact duplicate notes (same onset, same
+     duration, same lyric) -- SV tolerates it, but writing both produces an
+     "overlapping notes" error in VOCALOID / OpenUTAU. Drop the repeats. */
+  const seenKey = new Set();
+  const deduped = [];
+  for (const n of notes) {
+    const k = n.onset + "/" + n.duration + "/" + n.pitch + "/" + (n.lyrics || "");
+    if (seenKey.has(k)) { stats.duplicates = (stats.duplicates || 0) + 1; continue; }
+    seenKey.add(k); deduped.push(n);
+  }
+  notes = deduped;
+
+  /* Cross-note English resyllabification.
+
+     SV spreads an English phrase over several notes ("this" | "is"), and each
+     note's coda binds onto the NEXT note's onset vowel when they are adjacent:
+        this=[dh ih s]  is=[ih z]   ->  でぃ・し・ず   (not でぃす + いず)
+     So hand a trailing consonant run to the following note before converting.
+     Only do this between notes that actually touch, and only for English. */
+  const pre = notes.map(n => noteToSvPhonemes(n));
+  for (let i = 0; i < notes.length - 1; i++) {
+    const a = pre[i], b = pre[i + 1];
+    if (!a || !b || a.lang !== "en" || b.lang !== "en") continue;
+    if (notes[i].onset + notes[i].duration !== notes[i + 1].onset) continue;
+    // trailing consonants of a, leading vowel of b?
+    let k = a.tokens.length;
+    while (k > 0 && !SV_EN_VOWELS.has(a.tokens[k - 1])) k--;
+    if (k === 0 || k === a.tokens.length) continue;
+    if (!SV_EN_VOWELS.has(b.tokens[0])) continue;
+    const moved = a.tokens.slice(k);
+    a.tokens = a.tokens.slice(0, k);
+    b.tokens = moved.concat(b.tokens);
+    stats.resyllabified = (stats.resyllabified || 0) + 1;
+  }
+
+  for (let ni = 0; ni < notes.length; ni++) {
+    const n = notes[ni];
+    const res = pre[ni];
+
+    if (!res || !res.tokens.length) {
+      // nothing usable: keep the note, let the host fill in the reading
+      out.push(Object.assign({}, n, { phonemeOut: "", lyricOut: n.lyrics || "a" }));
+      if ((n.lyrics || "").trim()) { stats.failed++; failedLyrics.add(n.lyrics); }
+      continue;
+    }
+    if (res.source === "manual") stats.manual++;
+    if (res.lang === "en") stats.english++;
+
+    /* "+" / "-" extension notes hold the previous vowel. OpenUTAU understands
+       "+" natively; VOCALOID and VoiSona need a real phoneme, so repeat the
+       last vowel we emitted instead of writing an empty phoneme (which the
+       hosts reject). */
+    if (res.tokens.length === 1 && res.tokens[0] === "-") {
+      stats.extended++;
+      if (o.target === "openutau") {
+        out.push(Object.assign({}, n, { phonemeOut: "", lyricOut: "+" }));
+      } else {
+        const v = lastVowel || "a";
+        const c = svToTarget([v], "ja", o.target, o.outLang);
+        out.push(Object.assign({}, n, {
+          phonemeOut: joinPhonemes(c.tokens, o.target),
+          lyricOut: n.lyrics === "+" ? "-" : (n.lyrics || "-") }));
+      }
+      continue;
+    }
+
+    for (let i = res.tokens.length - 1; i >= 0; i--) {
+      const t = res.tokens[i];
+      if (SV_JA_VOWELS.includes(t) && t !== "N") { lastVowel = t; break; }
+      if (SV_EN_VOWELS.has(t)) { lastVowel = (EN2JA_VOWEL[t] || ["a"])[0]; break; }
+    }
+
+    /* Fold cross-language phonemes BEFORE syllabifying: an English word in a
+       Japanese bank becomes Japanese mora, and each of those mora needs its
+       own note. Syllabifying the English form first would give the wrong
+       note count (e.g. "drag" -> 1 unit instead of ど|ら|ぐ). */
+    let workTokens = res.tokens, workLang = res.lang;
+    if (res.lang === "en" && o.outLang === "ja") {
+      workTokens = svEnToSvJa(res.tokens);
+      workLang = "ja";
+      stats.approximated++; approxLyrics.add(n.lyrics);
+    }
+    const syls = o.split ? syllabify(workTokens, workLang) : [workTokens];
+
+    if (syls.length <= 1) {
+      const c = svToTarget(workTokens, workLang, o.target, o.outLang);
+      if (c.approximated && workLang !== "ja") { stats.approximated++; approxLyrics.add(n.lyrics); }
+      /* Markers with no equivalent in the target (VoiSona has no breath
+         phoneme) would leave an empty phoneme, which the host rejects.
+         Drop the note entirely instead -- a breath note carries no melody. */
+      if (!c.tokens.length) {
+        /* OpenUTAU has a rest note: lyric "R". Keep the silence as a real
+           note there instead of dropping it, so the timing of the following
+           notes is not disturbed. Other targets drop it. */
+        if (o.target === "openutau"){
+          out.push(Object.assign({}, n, { phonemeOut: "", lyricOut: "R" }));
+          continue;
+        }
+        if (res.source === "marker") { stats.droppedMarkers = (stats.droppedMarkers||0)+1; continue; }
+        out.push(Object.assign({}, n, { phonemeOut: "", lyricOut: n.lyrics || "a" }));
+        continue;
+      }
+      out.push(Object.assign({}, n, {
+        phonemeOut: joinPhonemes(c.tokens, o.target),
+        lyricOut: targetLyric(syls[0], workLang, c, o, n)
+      }));
+      continue;
+    }
+
+    // ---- split across syllables ----
+    stats.split++;
+
+    const startTick = Math.round(n.onset / BPT);
+    const endTick = Math.round((n.onset + n.duration) / BPT);
+    const totalTicks = endTick - startTick;
+
+    /* Boundaries.
+
+       SV stores the real phoneme timing in attributes.phonemes[k].leftOffset
+       (seconds from the note onset). Use it: dividing the note evenly is a
+       guess, and a wrong one -- "えんっ" is not e|N|cl at 80/80/80, SV renders
+       it 131|70|39. Fall back to an even split only when the file has no
+       timing for this note.
+
+       phTiming has one entry PER PHONEME, our units have one entry per note,
+       so map unit -> its first phoneme index. */
+    let lensT = null;
+    const secPerTick = 60 / (tempoBpm || 120) / 480;
+    const tim = n.phTiming;
+    if (tim && tim.length && secPerTick > 0) {
+      /* Index of the NUCLEUS (vowel / moraic N) of each unit, not of its
+         first phoneme.
+
+         VOCALOID sounds a note's VOWEL at the note onset and pushes the onset
+         consonant back into the previous note's tail. SV's leftOffset is the
+         start of each phoneme, so cutting at the consonant makes the vowel
+         arrive early -- audibly wrong on e.g. "なる" (n a | r u): r starts at
+         379 but u only at 443, so cutting at 379 fired る 64 ticks early.
+         Cut at the vowel instead and let VOCALOID place the consonant. */
+      const nucIdx = []; let acc = 0;
+      for (const u of syls) {
+        let k = 0;
+        for (let j = u.length - 1; j >= 0; j--) {
+          const t = u[j];
+          const isNuc = (workLang === "en") ? SV_EN_VOWELS.has(t)
+                      : (SV_JA_VOWELS.includes(t) || t === "cl" || t === "q");
+          if (isNuc) { k = j; break; }
+        }
+        nucIdx.push(acc + k); acc += u.length;
+      }
+      if (acc === tim.length) {
+        const bTick = [];
+        let okTiming = true;
+        for (let i = 1; i < syls.length; i++) {
+          const e = tim[nucIdx[i]];
+          const off = e && typeof e.leftOffset === "number" ? e.leftOffset : null;
+          if (off === null) { okTiming = false; break; }
+          bTick.push(Math.round(off / secPerTick));
+        }
+        if (okTiming) {
+          const cuts = [0, ...bTick, totalTicks]
+            .map(v => Math.max(0, Math.min(totalTicks, v)));
+          for (let i = 1; i < cuts.length; i++)
+            if (cuts[i] < cuts[i-1] + 1) cuts[i] = cuts[i-1] + 1;
+          if (cuts[cuts.length-1] <= totalTicks) {
+            lensT = [];
+            for (let i = 1; i < cuts.length; i++) lensT.push(cuts[i] - cuts[i-1]);
+            stats.timedSplit = (stats.timedSplit || 0) + 1;
+          }
+        }
+      }
+    }
+    if (!lensT && totalTicks >= syls.length) {
+      lensT = syls.map((_, i) =>
+        Math.round(totalTicks * (i + 1) / syls.length) -
+        Math.round(totalTicks * i / syls.length));
+      stats.evenSplit = (stats.evenSplit || 0) + 1;
+    }
+    // too short to divide: emit one note
+    if (!lensT) {
+      const c = svToTarget(workTokens, workLang, o.target, o.outLang);
+      out.push(Object.assign({}, n, {
+        phonemeOut: joinPhonemes(c.tokens, o.target),
+        lyricOut: targetLyric(syls[0], workLang, c, o, n) }));
+      stats.split--;
+      continue;
+    }
+
+    let curTick = startTick;
+    syls.forEach((syl, i) => {
+      const c = svToTarget(syl, workLang, o.target, o.outLang);
+      if (c.approximated && workLang !== "ja") { stats.approximated++; approxLyrics.add(n.lyrics); }
+      out.push(Object.assign({}, n, {
+        onset: curTick * BPT, duration: lensT[i] * BPT,
+        phonemeOut: joinPhonemes(c.tokens, o.target),
+        lyricOut: targetLyric(syl, workLang, c, o, n),
+        splitIndex: i, splitCount: syls.length
+      }));
+      curTick += lensT[i];
+    });
+  }
+
+  stats.notesOut = out.length;
+  stats.failedLyrics = [...failedLyrics].slice(0, 12);
+  stats.approxLyrics = [...approxLyrics].slice(0, 12);
+  return { notes: out, stats };
+}
+
+/* ===== extra formats ===== */
+/* ============================================================================
+   formats.js -- additional export targets for svp2vsqx
+     * USTX   (OpenUTAU)          -- YAML, pitd curve in 1/10 cents
+     * TSSLN  (VoiSona host file) -- JUCE ValueTree binary + LogF0
+     * TSSPRJ (VoiSona song file) -- same ValueTree container
+   Reference: sdercolin/utaformatix3 (Ustx.kt, Tssln.kt),
+              sevenc-nanashi/valuetree-ts, SoulMelody/LibreSVIP (tssln plugin).
+
+   Shared input shape (produced by engine.js parseProject):
+     track = { name, notes:[{onset,duration,pitch,lyrics,phonemes}], curve:[[blick,midi]] }
+   BPQ (705600000 blicks per quarter) and BPT are defined in engine.js.
+   ==========================================================================*/
+
+/* ---------------------------------------------------------------- helpers */
+
+/* Deviation of the pitch curve from each note's own key, in semitones,
+   sampled on a tick grid. This is the common intermediate for every target.
+   Returns [[tick, semitoneDeviation], ...] limited to sounding notes. */
+function relativePitchTicks(track, stepTicks) {
+  stepTicks = stepTicks || 5;
+  if (!track.curve.length || !track.notes.length) return [];
+  const base = noteBaseFn(track.notes);
+  const notes = track.notes;
+
+  let lastB = track.curve[track.curve.length - 1][0];
+  for (const n of notes) lastB = Math.max(lastB, n.onset + n.duration);
+  const t0 = Math.floor(Math.min(track.curve[0][0], notes[0].onset) / BPT);
+  const t1 = Math.ceil(lastB / BPT);
+
+  const set = new Set();
+  for (let t = t0; t <= t1; t += stepTicks) set.add(t);
+  for (const n of notes) {
+    set.add(Math.round(n.onset / BPT));
+    set.add(Math.round((n.onset + n.duration) / BPT));
+  }
+  const ticks = [...set].filter(t => t >= t0 && t <= t1).sort((a, b) => a - b);
+
+  const out = [];
+  for (const tk of ticks) {
+    const b = tk * BPT;
+    // only inside a note: outside, the host has nothing to bend
+    let inside = false;
+    for (const n of notes) {
+      if (b >= n.onset && b < n.onset + n.duration) { inside = true; break; }
+    }
+    if (!inside) continue;
+    const bp = base(b);
+    const v = sampleCurve(track.curve, b, base);
+    if (v === null || bp === null) continue;
+    out.push([tk, v - bp]);
+  }
+  return out;
+}
+
+/* Absolute pitch curve in Hz, sampled at a fixed tick step, with gaps
+   (unvoiced) preserved as nulls. Used by VoiSona LogF0. */
+function absolutePitchTicks(track, stepTicks) {
+  stepTicks = stepTicks || 5;
+  if (!track.curve.length || !track.notes.length) return [];
+  const notes = track.notes;
+  const baseFn = noteBaseFn(notes);
+  let lastB = track.curve[track.curve.length - 1][0];
+  for (const n of notes) lastB = Math.max(lastB, n.onset + n.duration);
+  const t0 = Math.floor(Math.min(track.curve[0][0], notes[0].onset) / BPT);
+  const t1 = Math.ceil(lastB / BPT);
+  const out = [];
+  for (let tk = t0; tk <= t1; tk += stepTicks) {
+    const b = tk * BPT;
+    let inside = false;
+    for (const n of notes) {
+      if (b >= n.onset && b < n.onset + n.duration) { inside = true; break; }
+    }
+    const v = inside ? sampleCurve(track.curve, b, baseFn) : null;
+    out.push([tk, v]);   // v = MIDI float or null
+  }
+  return out;
+}
+
+function midiToHz(m) { return 440 * Math.pow(2, (m - 69) / 12); }
+
+/* ============================================================== USTX =====*/
+/* OpenUTAU .ustx is YAML. Pitch lives in a part-level curve with abbr "pitd",
+   whose unit is 1/10 cent... actually OpenUtau stores pitd in cents*10? No:
+   UtaFormatix multiplies semitone deviation by 100 -> cents, and the
+   expression declares min/max -1200..1200, i.e. plain cents. */
+
+function yamlEscape(s) {
+  s = String(s === undefined || s === null ? "" : s);
+  if (s === "") return "''";
+  if (/^[A-Za-z0-9_\-. ]+$/.test(s) && !/^\s|\s$/.test(s)) return s;
+  return "'" + s.split("'").join("''") + "'";
+}
+
+const USTX_EXPRESSIONS = `expressions:
+  dyn:
+    name: dynamics (curve)
+    abbr: dyn
+    type: Curve
+    min: -240
+    max: 120
+    default_value: 0
+    is_flag: false
+    flag: ''
+  pitd:
+    name: pitch deviation (curve)
+    abbr: pitd
+    type: Curve
+    min: -1200
+    max: 1200
+    default_value: 0
+    is_flag: false
+    flag: ''
+  clr:
+    name: voice color
+    abbr: clr
+    type: Options
+    min: 0
+    max: -1
+    default_value: 0
+    is_flag: false
+    options: []
+  eng:
+    name: resampler engine
+    abbr: eng
+    type: Options
+    min: 0
+    max: 1
+    default_value: 0
+    is_flag: false
+    options:
+    - ''
+    - worldline
+  vel:
+    name: velocity
+    abbr: vel
+    type: Numerical
+    min: 0
+    max: 200
+    default_value: 100
+    is_flag: false
+    flag: ''
+  vol:
+    name: volume
+    abbr: vol
+    type: Numerical
+    min: 0
+    max: 200
+    default_value: 100
+    is_flag: false
+    flag: ''
+  atk:
+    name: attack
+    abbr: atk
+    type: Numerical
+    min: 0
+    max: 200
+    default_value: 100
+    is_flag: false
+    flag: ''
+  dec:
+    name: decay
+    abbr: dec
+    type: Numerical
+    min: 0
+    max: 100
+    default_value: 0
+    is_flag: false
+    flag: ''
+  gen:
+    name: gender
+    abbr: gen
+    type: Numerical
+    min: -100
+    max: 100
+    default_value: 0
+    is_flag: true
+    flag: g
+  genc:
+    name: gender (curve)
+    abbr: genc
+    type: Curve
+    min: -100
+    max: 100
+    default_value: 0
+    is_flag: false
+    flag: ''
+  bre:
+    name: breath
+    abbr: bre
+    type: Numerical
+    min: 0
+    max: 100
+    default_value: 0
+    is_flag: true
+    flag: B
+  brec:
+    name: breathiness (curve)
+    abbr: brec
+    type: Curve
+    min: -100
+    max: 100
+    default_value: 0
+    is_flag: false
+    flag: ''
+  lpf:
+    name: lowpass
+    abbr: lpf
+    type: Numerical
+    min: 0
+    max: 100
+    default_value: 0
+    is_flag: true
+    flag: H
+  mod:
+    name: modulation
+    abbr: mod
+    type: Numerical
+    min: 0
+    max: 100
+    default_value: 0
+    is_flag: false
+    flag: ''
+  alt:
+    name: alternate
+    abbr: alt
+    type: Numerical
+    min: 0
+    max: 16
+    default_value: 0
+    is_flag: false
+    flag: ''
+  shft:
+    name: tone shift
+    abbr: shft
+    type: Numerical
+    min: -36
+    max: 36
+    default_value: 0
+    is_flag: false
+    flag: ''
+  shfc:
+    name: tone shift (curve)
+    abbr: shfc
+    type: Curve
+    min: -1200
+    max: 1200
+    default_value: 0
+    is_flag: false
+    flag: ''
+  tenc:
+    name: tension (curve)
+    abbr: tenc
+    type: Curve
+    min: -100
+    max: 100
+    default_value: 0
+    is_flag: false
+    flag: ''
+  voic:
+    name: voicing (curve)
+    abbr: voic
+    type: Curve
+    min: 0
+    max: 100
+    default_value: 100
+    is_flag: false
+    flag: ''`;
+
+function buildUstx(tempos, meters, tracks, opts) {
+  const o = Object.assign({
+    convertPitch: true, genPhonemes: true, stepTicks: 5,
+    seqName: "New Project", preMeasure: 1
+  }, opts || {});
+
+  const nu = meters[0][1], de = meters[0][2];
+  const measureTicks = Math.round(TPQ * 4 * nu / de);
+  const preTicks = o.preMeasure * measureTicks;
+
+  const L = [], ap = s => L.push(s);
+  ap("name: " + yamlEscape(o.seqName));
+  ap("comment: ''");
+  ap("output_dir: Vocal");
+  ap("cache_dir: UCache");
+  ap("ustx_version: '0.6'");
+  ap("resolution: " + TPQ);
+  ap("bpm: " + tempos[0][1]);
+  ap("beat_per_bar: " + nu);
+  ap("beat_unit: " + de);
+  ap("time_signatures:");
+  for (const [mi, mnu, mde] of meters) {
+    ap("  - bar_position: " + mi);
+    ap("    beat_per_bar: " + mnu);
+    ap("    beat_unit: " + mde);
+  }
+  ap("tempos:");
+  tempos.forEach(([pos, bpm], i) => {
+    ap("  - position: " + (i === 0 ? 0 : Math.round(pos / BPT) + preTicks));
+    ap("    bpm: " + bpm);
+  });
+  ap(USTX_EXPRESSIONS);
+
+  ap("tracks:");
+  for (const tr of tracks) {
+    ap("- singer: ''");
+    /* The phonemizer field holds the .NET *full type name* (UTrack.cs:203
+       `phonemizer = Phonemizer.GetType().FullName`). Two very different modes:
+
+         DEFAULT  -> OpenUtau.Core.DefaultPhonemizer
+                     "Simply pass the lyric as phoneme" -- the lyric IS the
+                     sample alias. Works for CV banks like 足立レイ.
+
+         JA VCV & CVVC -> OpenUtau.Plugin.Builtin.JapanesePresampPhonemizer
+                     Reads presamp.ini and builds "- あ" / "a あ" / VC pairs
+                     itself. Needs PLAIN KANA and no phonetic hint. */
+    ap("  phonemizer: " + (o.utauMode === "presamp"
+        ? "OpenUtau.Plugin.Builtin.JapanesePresampPhonemizer"
+        : "OpenUtau.Core.DefaultPhonemizer"));
+    /* WORLDLINE-R is the built-in resampler-free renderer; naming it avoids
+       OpenUTAU falling back to an external resampler that may not exist. */
+    ap("  renderer_settings:");
+    ap("    renderer: " + yamlEscape(o.utauRenderer || "WORLDLINE-R"));
+    ap("  track_name: " + yamlEscape(tr.name));
+    ap("  mute: false");
+    ap("  solo: false");
+    ap("  volume: 0");
+    ap("  pan: 0");
+  }
+
+  const report = [];
+  ap("voice_parts:");
+  tracks.forEach((tr0, ti) => {
+    const prep = prepareNotes(tr0.notes, { target:"openutau", outLang:o.outLang || "ja",
+                                           split:o.splitNotes !== false, tempoBpm: tempos[0][1],
+                                           utauMode: o.utauMode,
+                                           genPhonemes:o.genPhonemes });
+    const tr = { name: tr0.name, notes: prep.notes, curve: tr0.curve };
+    ap("- name: " + yamlEscape(tr.name));
+    ap("  comment: ''");
+    ap("  track_no: " + ti);
+    ap("  position: " + preTicks);
+    ap("  notes:");
+    let prev = null;
+    for (const n of tr.notes) {
+      const pos = Math.round(n.onset / BPT);
+      const dur = Math.max(1, Math.round(n.duration / BPT));
+      // OpenUtau's per-note portamento: first control point carries the
+      // transition from the previous note when they are adjacent.
+      const firstY = (prev && Math.round((prev.onset + prev.duration) / BPT) === pos)
+        ? (prev.pitch - n.pitch) * 10 : 0;
+      /* A "[...]" section in the lyric becomes UNote.phoneticHint
+         (UNote.cs:12 `new Regex(@"\[(.*)\]")`). JapanesePresampPhonemizer
+         treats a hint as a literal alias to look up in the oto -- and "s u"
+         is not a sample name in a VCV/CVVC bank, so the note stays silent.
+         That is exactly why 足立レイ (CV) worked and ナースロボ_タイプT
+         (VCV/CVVC) did not.
+
+         So: only attach the hint in DEFAULT mode, where the lyric really is
+         the alias. In presamp mode send bare kana and let the phonemizer
+         build the aliases from presamp.ini. */
+      let lyric = n.lyricOut || n.lyrics || "a";
+      const ph = (n.phonemeOut !== undefined) ? n.phonemeOut : (n.phonemes || "").trim();
+      if (o.utauMode !== "presamp" && o.genPhonemes && ph && lyric !== "+")
+        lyric += " [" + ph + "]";
+      ap("  - position: " + pos);
+      ap("    duration: " + dur);
+      ap("    tone: " + Math.max(0, Math.min(127, Math.round(n.pitch))));
+      ap("    lyric: " + yamlEscape(lyric));
+      ap("    pitch:");
+      ap("      data:");
+      ap("      - {x: -40, y: " + firstY + ", shape: io}");
+      ap("      - {x: 0, y: 0, shape: io}");
+      ap("      snap_first: true");
+      ap("    vibrato: {length: 0, period: 175, depth: 25, in: 10, out: 10, shift: 0, drift: 0, vol_link: 0}");
+      ap("    phoneme_expressions: []");
+      ap("    phoneme_overrides: []");
+      prev = n;
+    }
+
+    let pitd = [];
+    if (o.convertPitch) {
+      const rel = relativePitchTicks(tr, o.stepTicks);
+      // cents, de-duplicated
+      for (const [tk, semi] of rel) {
+        const y = Math.round(semi * 100);
+        if (pitd.length && pitd[pitd.length - 1][1] === y &&
+            pitd.length > 1 && pitd[pitd.length - 2][1] === y) {
+          pitd[pitd.length - 1] = [tk, y];   // keep run endpoints only
+        } else {
+          pitd.push([tk, y]);
+        }
+      }
+    }
+    if (pitd.length) {
+      ap("  curves:");
+      ap("  - xs: [" + pitd.map(p => p[0]).join(", ") + "]");
+      ap("    ys: [" + pitd.map(p => p[1]).join(", ") + "]");
+      ap("    abbr: pitd");
+    } else {
+      ap("  curves: []");
+    }
+    report.push({ name: tr.name, notes: tr.notes.length, pitchPoints: pitd.length,
+                  lyrics: prep.stats });
+  });
+  ap("wave_parts: []");
+  return { text: L.join("\n") + "\n", report };
+}
+
+/* ====================================================== JUCE ValueTree ==*/
+/* Binary container used by VoiSona (.tssln / .tssprj) and other JUCE apps.
+   Layout:  string(type) cint(nAttrs) [string(key) variant]* cint(nChildren) [tree]*
+   variant: cint(byteLen) u8(typeId) payload
+   cint: u8(nBytes) then little-endian bytes.                              */
+
+const JUCE_VT = { int: 1, boolTrue: 2, boolFalse: 3, double: 4, string: 5,
+                  int64: 6, array: 7, binary: 8, undefined: 9 };
+const JUCE_VT_REV = { 1:"int",2:"boolTrue",3:"boolFalse",4:"double",5:"string",
+                      6:"int64",7:"array",8:"binary",9:"undefined" };
+
+class ByteWriter {
+  constructor() { this.parts = []; this.len = 0; }
+  raw(u8) { this.parts.push(u8); this.len += u8.length; }
+  u8(v) { this.raw(new Uint8Array([v & 0xff])); }
+  bytes(arr) { this.raw(arr instanceof Uint8Array ? arr : new Uint8Array(arr)); }
+  str(s) {
+    const e = new TextEncoder().encode(String(s));
+    this.raw(e); this.u8(0);
+  }
+  i32(v) { const b = new Uint8Array(4); new DataView(b.buffer).setInt32(0, v, true); this.raw(b); }
+  f64(v) { const b = new Uint8Array(8); new DataView(b.buffer).setFloat64(0, v, true); this.raw(b); }
+  i64(v) { const b = new Uint8Array(8); new DataView(b.buffer).setBigInt64(0, BigInt(v), true); this.raw(b); }
+  cint(v) {
+    const by = [];
+    let x = v >>> 0;
+    while (x > 0) { by.push(x & 0xff); x = Math.floor(x / 256); }
+    this.u8(by.length); this.bytes(by);
+  }
+  toUint8Array() {
+    const out = new Uint8Array(this.len);
+    let o = 0;
+    for (const p of this.parts) { out.set(p, o); o += p.length; }
+    return out;
+  }
+}
+
+class ByteReader {
+  constructor(u8) { this.b = u8; this.i = 0; this.dv = new DataView(u8.buffer, u8.byteOffset, u8.byteLength); }
+  u8() { return this.b[this.i++]; }
+  bytes(n) { const v = this.b.subarray(this.i, this.i + n); this.i += n; return v; }
+  str() {
+    let j = this.i;
+    while (j < this.b.length && this.b[j] !== 0) j++;
+    const s = new TextDecoder("utf-8").decode(this.b.subarray(this.i, j));
+    this.i = j + 1; return s;
+  }
+  cint() {
+    const n = this.u8(); let v = 0;
+    for (let k = 0; k < n; k++) v += this.u8() * Math.pow(256, k);
+    return v;
+  }
+  i32() { const v = this.dv.getInt32(this.i, true); this.i += 4; return v; }
+  f64() { const v = this.dv.getFloat64(this.i, true); this.i += 8; return v; }
+  i64() { const v = this.dv.getBigInt64(this.i, true); this.i += 8; return v; }
+}
+
+function readVariant(r) {
+  const n = r.cint();
+  const t = JUCE_VT_REV[r.u8()];
+  switch (t) {
+    case "int": return { type: t, value: r.i32() };
+    case "boolTrue": return { type: t, value: true };
+    case "boolFalse": return { type: t, value: false };
+    case "double": return { type: t, value: r.f64() };
+    case "string": return { type: t, value: r.str() };
+    case "int64": return { type: t, value: r.i64() };
+    case "array": {
+      const L = r.cint(), a = [];
+      for (let i = 0; i < L; i++) a.push(readVariant(r));
+      return { type: t, value: a };
+    }
+    case "binary": return { type: t, value: r.bytes(n - 1) };
+    default: return { type: "undefined", value: undefined };
+  }
+}
+
+function writeVariant(w, v) {
+  const sub = new ByteWriter();
+  sub.u8(JUCE_VT[v.type]);
+  switch (v.type) {
+    case "int": sub.i32(v.value); break;
+    case "boolTrue": case "boolFalse": case "undefined": break;
+    case "double": sub.f64(v.value); break;
+    case "string": sub.str(v.value); break;
+    case "int64": sub.i64(v.value); break;
+    case "array":
+      sub.cint(v.value.length);
+      for (const it of v.value) writeVariant(sub, it);
+      break;
+    case "binary": sub.bytes(v.value); break;
+  }
+  const u = sub.toUint8Array();
+  w.cint(u.length); w.bytes(u);
+}
+
+function parseValueTree(u8) {
+  const r = new ByteReader(u8);
+  return readTree(r);
+}
+function readTree(r) {
+  const type = r.str();
+  const nA = r.cint();
+  const attributes = {};
+  for (let i = 0; i < nA; i++) { const k = r.str(); attributes[k] = readVariant(r); }
+  const nC = r.cint();
+  const children = [];
+  for (let i = 0; i < nC; i++) children.push(readTree(r));
+  return { type, attributes, children };
+}
+function dumpValueTree(t) {
+  const w = new ByteWriter();
+  writeTree(w, t);
+  return w.toUint8Array();
+}
+function writeTree(w, t) {
+  w.str(t.type);
+  const keys = Object.keys(t.attributes);
+  w.cint(keys.length);
+  for (const k of keys) { w.str(k); writeVariant(w, t.attributes[k]); }
+  w.cint(t.children.length);
+  for (const c of t.children) writeTree(w, c);
+}
+
+const vInt = v => ({ type: "int", value: v | 0 });
+const vDbl = v => ({ type: "double", value: v });
+const vStr = v => ({ type: "string", value: String(v) });
+const vBin = v => ({ type: "binary", value: v });
+
+/* ============================================================ VoiSona ===*/
+/* Two different VoiSona project files, confirmed against REAL exports
+   (VoiSona 1.17.1.0) supplied by the user:
+
+     .tssln   root = "TSSolution"   -> Tracks > Track > PluginData(binary)
+                                        -> StateInformation > Song / Parameter
+     .tssprj  root = "StateInformation"  -- i.e. exactly the *inner* tree,
+                                        stored directly with NO outer wrapper
+                                        and NO PluginData indirection.
+
+   That difference is why the first attempt did not load: we wrote a
+   TSSolution wrapper into a .tssprj.
+
+   Pitch, as actually written by VoiSona (NOT what UtaFormatix/LibreSVIP
+   emit -- they use a plain "LogF0" node which real VoiSona does not produce):
+
+     Parameter > LogF0CTick { Length }
+       Data { Index?, Repeat?, Value }
+         Value  = ln(Hz);  -1e10 marks an unvoiced frame
+         Index  = frame number, omitted when contiguous with the previous run
+         Repeat = run length, omitted when 1
+         clock  = Index * 10        <-- verified: 81% of frames land inside
+                                        notes, median error 0.081 semitone
+     Length     = last frame + padding
+
+   Note key: PitchOctave is (key/12 - 1), i.e. key = (PitchOctave+1)*12 + Step.
+   Clock unit is tick*2 (TICK_RATE) as in .tssln.                          */
+
+const VOISONA_TICK_RATE = 2;
+const VOISONA_CTICK_PER_CLOCK = 10;   // clock = ctick index * 10
+const VOISONA_UNVOICED = -1e10;
+const VOISONA_MIN_DATA_LENGTH = 500;
+
+/* Build Parameter > LogF0CTick from the track curve. */
+function buildLogF0CTick(track, preTicks, stepTicks) {
+  if (!track.curve.length || !track.notes.length) return null;
+
+  const clockOf = tick => (tick + preTicks) * VOISONA_TICK_RATE;
+  const notes = track.notes;
+  let lastB = track.curve[track.curve.length - 1][0];
+  for (const n of notes) lastB = Math.max(lastB, n.onset + n.duration);
+
+  const firstClock = clockOf(Math.min(track.curve[0][0], notes[0].onset) / BPT);
+  const lastClock = clockOf(lastB / BPT);
+  const i0 = Math.max(0, Math.floor(firstClock / VOISONA_CTICK_PER_CLOCK));
+  const i1 = Math.ceil(lastClock / VOISONA_CTICK_PER_CLOCK);
+  if (!(i1 > i0)) return null;
+
+  // frame index -> ln(Hz) or unvoiced
+  const frames = [];
+  for (let i = i0; i <= i1; i++) {
+    const tick = i * VOISONA_CTICK_PER_CLOCK / VOISONA_TICK_RATE - preTicks;
+    const b = tick * BPT;
+    let inside = false;
+    for (const n of notes) {
+      if (b >= n.onset && b < n.onset + n.duration) { inside = true; break; }
+    }
+    if (!inside) { frames.push(null); continue; }
+    const midi = sampleCurve(track.curve, b);
+    frames.push(midi === null ? null : Math.log(midiToHz(midi)));
+  }
+
+  // run-length encode; only emit Index when the run is not contiguous
+  const data = [];
+  let nextIdx = null, k = 0;
+  while (k < frames.length) {
+    const v = frames[k];
+    let run = 1;
+    while (k + run < frames.length &&
+           ((v === null && frames[k + run] === null) ||
+            (v !== null && frames[k + run] !== null &&
+             Math.abs(frames[k + run] - v) < 1e-12))) run++;
+    const idx = i0 + k;
+    const attrs = {};
+    if (nextIdx === null || idx !== nextIdx) attrs.Index = vInt(idx);
+    if (run > 1) attrs.Repeat = vInt(run);
+    attrs.Value = vDbl(v === null ? VOISONA_UNVOICED : v);
+    data.push({ type: "Data", attributes: attrs, children: [] });
+    nextIdx = idx + run;
+    k += run;
+  }
+  // drop a trailing unvoiced run -- VoiSona just ends the curve instead
+  while (data.length && data[data.length - 1].attributes.Value.value === VOISONA_UNVOICED)
+    data.pop();
+  if (!data.length) return null;
+
+  return {
+    type: "LogF0CTick",
+    attributes: { Length: vInt(i1 + VOISONA_MIN_DATA_LENGTH) },
+    children: data
+  };
+}
+
+/* Fill Song (Tempo/Beat/Score) + Parameter of a StateInformation tree. */
+function fillStateInformation(stateTree, tempos, meters, track, o) {
+  const preTicks = o.preTicks || 0;
+  const song = stateTree.children.find(c => c.type === "Song");
+  if (!song) throw new Error("VoiSona テンプレートが壊れています (Song なし)");
+
+  const tempoTree = song.children.find(c => c.type === "Tempo");
+  const beatTree = song.children.find(c => c.type === "Beat");
+  const scoreTree = song.children.find(c => c.type === "Score");
+
+  if (tempoTree) {
+    tempoTree.children = tempos.map(([pos, bpm], i) => ({
+      type: "Sound",
+      attributes: {
+        Clock: vInt(i === 0 ? 0 : Math.round((pos / BPT + preTicks) * VOISONA_TICK_RATE)),
+        Tempo: vDbl(bpm)
+      },
+      children: []
+    }));
+  }
+  if (beatTree) {
+    let currentBeat = 0, currentMeasure = 0, beatLength = 4;
+    beatTree.children = meters.map(([mi, mnu, mde]) => {
+      currentBeat += (mi - currentMeasure) * beatLength;
+      beatLength = mnu / mde * 4;
+      currentMeasure = mi;
+      return {
+        type: "Time",
+        attributes: {
+          Clock: vInt(Math.round(currentBeat * TPQ * VOISONA_TICK_RATE)),
+          Beats: vInt(mnu), BeatType: vInt(mde)
+        },
+        children: []
+      };
+    });
+  }
+  let lyricStats = null;
+  if (scoreTree) {
+    const keep = scoreTree.children.filter(c => c.type === "Key" || c.type === "Dynamics");
+    const prep = prepareNotes(track.notes, { target:"voisona", outLang:"ja",
+                                             split:o.splitNotes !== false, tempoBpm: tempos[0][1],
+                                             genPhonemes:o.genPhonemes });
+    lyricStats = prep.stats;
+    const notes = prep.notes.map(n => {
+      const key = Math.max(0, Math.min(127, Math.round(n.pitch)));
+      const ph = (n.phonemeOut !== undefined && n.phonemeOut !== "")
+        ? n.phonemeOut : voisonaPhoneme(n);
+      // Attribute order matches real VoiSona output.
+      return {
+        type: "Note",
+        attributes: {
+          Clock: vInt(Math.round((n.onset / BPT + preTicks) * VOISONA_TICK_RATE)),
+          Duration: vInt(Math.round((n.duration / BPT) * VOISONA_TICK_RATE)),
+          PitchStep: vInt(key % 12),
+          PitchOctave: vInt(Math.floor(key / 12) - 1),
+          Lyric: vStr(n.lyricOut || n.lyrics || "a"),
+          Syllabic: vInt(0),
+          NoteLanguage: vInt(1),               // 1 = Japanese
+          Phoneme: vStr(ph),
+          AnalyzedNoteLanguage: vInt(1),
+          DefaultPhoneme: vStr(ph),
+          PastAnalyzedPhoneme: vStr(ph)
+        },
+        children: []
+      };
+    });
+    scoreTree.children = keep.concat(notes);
+  }
+
+  let pitchPoints = 0;
+  let param = stateTree.children.find(c => c.type === "Parameter");
+  if (!param) {
+    param = { type: "Parameter", attributes: { VocoderLogF0: vDbl(0) }, children: [] };
+    stateTree.children.push(param);
+  }
+  param.children = param.children.filter(c => c.type !== "LogF0CTick" && c.type !== "LogF0");
+  if (o.convertPitch !== false) {
+    const lf = buildLogF0CTick(track, preTicks, o.stepTicks);
+    if (lf) { param.children.push(lf); pitchPoints = lf.children.length; }
+  }
+  return { pitchPoints, lyricStats };
+}
+
+/* VoiSona uses its own romaji phoneme set (sh/ch/ts/j/y/N), comma separated --
+   NOT the VOCALOID X-SAMPA set our VSQX path emits. Always regenerate from the
+   lyric so the two targets don't leak each other's notation. */
+function voisonaPhoneme(n) {
+  const gen = voisonaLyricToPhoneme(n.lyrics);
+  if (gen) return gen;
+  const ph = (n.phonemes || "").trim();
+  return ph ? ph.split(/\s+/).join(",") : "";
+}
+
+function cloneTree(t) {
+  return {
+    type: t.type,
+    attributes: Object.fromEntries(Object.entries(t.attributes).map(([k, v]) =>
+      [k, v.type === "binary" ? { type: "binary", value: new Uint8Array(v.value) }
+                              : { type: v.type, value: v.value }])),
+    children: t.children.map(cloneTree)
+  };
+}
+
+function voisonaOpts(meters, opts) {
+  const o = Object.assign({ convertPitch: true, stepTicks: 5, preMeasure: 1 }, opts || {});
+  const measureTicks = Math.round(TPQ * 4 * meters[0][1] / meters[0][2]);
+  o.preTicks = o.preMeasure * measureTicks;
+  return o;
+}
+
+/* ---- .tssln : TSSolution wrapper, one Track per project track ---------- */
+function buildVoisona(templateBytes, tempos, meters, tracks, opts) {
+  const o = voisonaOpts(meters, opts);
+  const root = parseValueTree(templateBytes);
+  const tracksTree = root.children.find(c => c.type === "Tracks");
+  if (!tracksTree) throw new Error("VoiSona テンプレートが壊れています (Tracks なし)");
+  const baseTrack = tracksTree.children.find(
+    c => c.attributes.Type && c.attributes.Type.value === 0) || tracksTree.children[0];
+
+  const out = [], report = [];
+  for (const tr of tracks) {
+    const trackTree = cloneTree(baseTrack);
+    trackTree.attributes.Name = vStr(tr.name);
+    const pd = trackTree.attributes.PluginData.value;
+    const state = parseValueTree(pd instanceof Uint8Array ? pd : new Uint8Array(pd));
+    const fi = fillStateInformation(state, tempos, meters, tr, o);
+    trackTree.attributes.PluginData = vBin(dumpValueTree(state));
+    out.push(trackTree);
+    report.push({ name: tr.name, notes: tr.notes.length,
+                  pitchPoints: fi.pitchPoints, lyrics: fi.lyricStats });
+  }
+  if (out.length) tracksTree.children = out;
+  return { bytes: dumpValueTree(root), report };
+}
+
+/* ---- .tssprj : bare StateInformation, single track --------------------- */
+/* Real VoiSona .tssprj files store the StateInformation tree at the ROOT with
+   no TSSolution wrapper and no PluginData blob, and they hold exactly one
+   track (VoiSona exports "the selected track"). Verified against four real
+   exports. */
+function buildTssprj(templateBytes, tempos, meters, tracks, opts) {
+  const o = voisonaOpts(meters, opts);
+  const state = parseValueTree(templateBytes);
+  if (state.type !== "StateInformation")
+    throw new Error(".tssprj テンプレートの root が StateInformation ではありません");
+  const tr = tracks[0];
+  const fi = fillStateInformation(state, tempos, meters, tr, o);
+  return {
+    bytes: dumpValueTree(state),
+    report: [{ name: tr.name, notes: tr.notes.length,
+               pitchPoints: fi.pitchPoints, lyrics: fi.lyricStats }],
+    extraTracks: tracks.length - 1
+  };
+}
+
+/* ===== match + zip ===== */
+/* ============================================================================
+   match.js -- pair dropped .wav files with the tracks inside one .svp
+
+   Synthesizer V renders one WAV per track and names them
+       <project>_<TrackName>.wav       e.g. nyaho.svp -> nyaho_Track 2.wav
+   (spaces are commonly replaced with underscores: nyaho_Track_2.wav)
+
+   Users also rename things, so matching is layered and never silently wrong:
+     1. exact  "<project>_<track>"        (after normalisation)
+     2. suffix "<anything>_<track>"       (project renamed)
+     3. the WAV name contains the track name, or vice versa
+     4. trailing number match: "Track 2" <-> "..._2.wav"
+     5. single track + single wav -> pair them
+   Anything unresolved is reported so the UI can ask the user.
+   ==========================================================================*/
+
+function normalizeName(s) {
+  return String(s || "")
+    .toLowerCase()
+    .replace(/\.[a-z0-9]+$/, "")      // drop extension
+    .replace(/[\s_\-\u3000]+/g, "")   // spaces / underscores / hyphens
+    .replace(/[（(\[].*?[)）\]]/g, ""); // bracketed suffixes like (1)
+}
+
+function trailingNumber(s) {
+  const m = String(s || "").replace(/\.[a-z0-9]+$/i, "").match(/(\d+)\s*$/);
+  return m ? m[1] : null;
+}
+
+/**
+ * @param tracks  [{name}, ...] from parseProject
+ * @param wavs    [{name, file}, ...] dropped wav files
+ * @param svpName project file name
+ * @returns { pairs: Map trackIndex -> wavEntry, unmatchedTracks:[i], unusedWavs:[w], how:{} }
+ */
+function matchWavsToTracks(tracks, wavs, svpName) {
+  const proj = normalizeName(svpName);
+  const used = new Set();
+  const pairs = new Map();
+  const how = {};
+
+  const tryAssign = (ti, wi, reason) => {
+    if (pairs.has(ti) || used.has(wi)) return false;
+    pairs.set(ti, wavs[wi]); used.add(wi); how[ti] = reason;
+    return true;
+  };
+
+  // pass 1: exact "<project><track>"
+  tracks.forEach((tr, ti) => {
+    const want = proj + normalizeName(tr.name);
+    wavs.forEach((w, wi) => {
+      if (normalizeName(w.name) === want) tryAssign(ti, wi, "project_track 完全一致");
+    });
+  });
+
+  // pass 2: wav ends with the track name
+  tracks.forEach((tr, ti) => {
+    const t = normalizeName(tr.name);
+    if (!t) return;
+    wavs.forEach((w, wi) => {
+      if (normalizeName(w.name).endsWith(t)) tryAssign(ti, wi, "トラック名で後方一致");
+    });
+  });
+
+  // pass 3: containment either way
+  tracks.forEach((tr, ti) => {
+    const t = normalizeName(tr.name);
+    if (t.length < 2) return;
+    wavs.forEach((w, wi) => {
+      const n = normalizeName(w.name);
+      if (n.includes(t) || t.includes(n)) tryAssign(ti, wi, "トラック名を含む");
+    });
+  });
+
+  // pass 4: trailing number ("Track 2" <-> "nyaho_2.wav")
+  tracks.forEach((tr, ti) => {
+    const tn = trailingNumber(tr.name);
+    if (!tn) return;
+    wavs.forEach((w, wi) => {
+      if (trailingNumber(w.name) === tn) tryAssign(ti, wi, "末尾の番号が一致");
+    });
+  });
+
+  // pass 5: the unambiguous 1:1 case
+  if (tracks.length === 1 && wavs.length === 1) tryAssign(0, 0, "1トラック1WAV");
+
+  const unmatchedTracks = [];
+  tracks.forEach((_, ti) => { if (!pairs.has(ti)) unmatchedTracks.push(ti); });
+  const unusedWavs = wavs.filter((_, wi) => !used.has(wi));
+
+  return { pairs, unmatchedTracks, unusedWavs, how };
+}
+
+/* ============================================================================
+   zip.js -- minimal ZIP writer (STORE, no compression), dependency free.
+   Enough to hand back several VoiSona files as one download. Our payloads are
+   small and the browser download is local, so skipping DEFLATE keeps this a
+   few dozen lines instead of pulling in a compression library.
+   ==========================================================================*/
+
+const CRC_TABLE = (() => {
+  const t = new Uint32Array(256);
+  for (let n = 0; n < 256; n++) {
+    let c = n;
+    for (let k = 0; k < 8; k++) c = (c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1);
+    t[n] = c >>> 0;
+  }
+  return t;
+})();
+
+function crc32(buf) {
+  let c = 0xFFFFFFFF;
+  for (let i = 0; i < buf.length; i++) c = CRC_TABLE[(c ^ buf[i]) & 0xFF] ^ (c >>> 8);
+  return (c ^ 0xFFFFFFFF) >>> 0;
+}
+
+/** entries: [{ name, data:Uint8Array }] -> Uint8Array (a .zip) */
+function makeZip(entries) {
+  const enc = new TextEncoder();
+  const chunks = [];
+  const central = [];
+  let offset = 0;
+
+  const u16 = v => [v & 0xff, (v >>> 8) & 0xff];
+  const u32 = v => [v & 0xff, (v >>> 8) & 0xff, (v >>> 16) & 0xff, (v >>> 24) & 0xff];
+
+  // DOS timestamp: fixed value keeps output deterministic
+  const dosTime = 0, dosDate = ((2020 - 1980) << 9) | (1 << 5) | 1;
+
+  for (const e of entries) {
+    const nameBytes = enc.encode(e.name);
+    const data = e.data;
+    const crc = crc32(data);
+    const local = [].concat(
+      u32(0x04034b50), u16(20), u16(0x0800), u16(0), u16(dosTime), u16(dosDate),
+      u32(crc), u32(data.length), u32(data.length),
+      u16(nameBytes.length), u16(0)
+    );
+    chunks.push(new Uint8Array(local), nameBytes, data);
+    central.push({ nameBytes, crc, size: data.length, offset });
+    offset += local.length + nameBytes.length + data.length;
+  }
+
+  const centralStart = offset;
+  for (const c of central) {
+    const hdr = [].concat(
+      u32(0x02014b50), u16(20), u16(20), u16(0x0800), u16(0),
+      u16(dosTime), u16(dosDate), u32(c.crc), u32(c.size), u32(c.size),
+      u16(c.nameBytes.length), u16(0), u16(0), u16(0), u16(0), u32(0), u32(c.offset)
+    );
+    chunks.push(new Uint8Array(hdr), c.nameBytes);
+    offset += hdr.length + c.nameBytes.length;
+  }
+
+  const end = [].concat(
+    u32(0x06054b50), u16(0), u16(0), u16(central.length), u16(central.length),
+    u32(offset - centralStart), u32(centralStart), u16(0)
+  );
+  chunks.push(new Uint8Array(end));
+
+  let total = 0;
+  for (const c of chunks) total += c.length;
+  const outBuf = new Uint8Array(total);
+  let p = 0;
+  for (const c of chunks) { outBuf.set(c, p); p += c.length; }
+  return outBuf;
+}
+
+/* ===== FL Studio (midi + fsc) ===== */
+/* ============================================================================
+   midi.js -- Standard MIDI File reader / writer, plus FL Studio pitch export.
+
+   Goal: take the user's own FL Studio MIDI (notes only) and give it the pitch
+   MOVEMENT that Synthesizer V produced, without touching their notes.
+
+   Two hard facts about FL Studio, both verified:
+
+   1. FL's piano-roll "Export as MIDI" writes NO pitch bend at all. The sample
+      file supplied (pitch.mid) contains 36 note-on/off pairs and zero 0xEx
+      events. So the curve cannot come from the MIDI the user exported -- we
+      have to synthesise it from the .svp.
+
+   2. FL's MIDI *import* maps the whole 14-bit pitch-bend range to a FIXED
+      ±2 semitones and ignores the RPN 0 (pitch bend sensitivity) message.
+      This is a long-standing, still-open issue on the Image-Line forum.
+      Therefore we write PB scaled to ±2 semitones, and clamp beyond that,
+      instead of writing a wider range that FL would silently squash.
+
+   Because ±2 semitones is often not enough, we also emit an .fsc automation
+   file (see fsc.js) whose range is set by FL's own Pitch knob.
+   ==========================================================================*/
+
+/* ------------------------------------------------------------------ read -- */
+
+function readMidi(buf) {
+  const d = new Uint8Array(buf);
+  const dv = new DataView(d.buffer, d.byteOffset, d.byteLength);
+  const str = (o, n) => String.fromCharCode(...d.subarray(o, o + n));
+  if (str(0, 4) !== "MThd") throw new Error("MIDI ファイルではありません (MThd がありません)");
+
+  const hlen = dv.getUint32(4);
+  const format = dv.getUint16(8);
+  const ntrk = dv.getUint16(10);
+  const division = dv.getUint16(12);
+  if (division & 0x8000) throw new Error("SMPTE タイムコードの MIDI は未対応です");
+
+  let pos = 8 + hlen;
+  const tracks = [];
+  const tempos = [];      // [{tick, usPerQuarter}]
+  let timeSig = null;
+
+  for (let t = 0; t < ntrk; t++) {
+    if (str(pos, 4) !== "MTrk") break;
+    const len = dv.getUint32(pos + 4);
+    let i = pos + 8;
+    const end = i + len;
+    let tick = 0, running = null;
+    const events = [];
+    const open = {};          // key -> [{tick, vel, ch}]
+    const notes = [];
+    let name = "";
+
+    const vlq = () => {
+      let v = 0;
+      for (;;) { const c = d[i++]; v = (v << 7) | (c & 0x7f); if (!(c & 0x80)) break; }
+      return v;
+    };
+
+    while (i < end) {
+      tick += vlq();
+      let st = d[i];
+      if (st & 0x80) { running = st; i++; } else { st = running; }
+      if (st === 0xFF) {
+        const mt = d[i++]; const L = vlq();
+        const data = d.subarray(i, i + L); i += L;
+        if (mt === 0x51 && L === 3)
+          tempos.push({ tick, us: (data[0] << 16) | (data[1] << 8) | data[2] });
+        else if (mt === 0x58 && L >= 2 && !timeSig)
+          timeSig = { num: data[0], den: 1 << data[1] };
+        else if (mt === 0x03) name = new TextDecoder().decode(data);
+        events.push({ tick, type: "meta", meta: mt, data: data.slice() });
+      } else if (st === 0xF0 || st === 0xF7) {
+        const L = vlq(); i += L;
+      } else {
+        const hi = st & 0xF0, ch = st & 0x0F;
+        const n = (hi === 0xC0 || hi === 0xD0) ? 1 : 2;
+        const a = d[i], b = n === 2 ? d[i + 1] : 0; i += n;
+        if (hi === 0x90 && b > 0) {
+          (open[a] = open[a] || []).push({ tick, vel: b, ch });
+        } else if (hi === 0x80 || (hi === 0x90 && b === 0)) {
+          const o = open[a] && open[a].shift();
+          if (o) notes.push({ tick: o.tick, dur: Math.max(1, tick - o.tick),
+                              key: a, vel: o.vel, ch: o.ch });
+        }
+        events.push({ tick, type: "ch", status: st, a, b });
+      }
+    }
+    pos = end;
+    notes.sort((x, y) => x.tick - y.tick || x.key - y.key);
+    tracks.push({ name, events, notes });
+  }
+
+  if (!tempos.length) tempos.push({ tick: 0, us: 500000 });
+  tempos.sort((a, b) => a.tick - b.tick);
+  return { format, division, tracks, tempos, timeSig: timeSig || { num: 4, den: 4 } };
+}
+
+/* ----------------------------------------------------------------- write -- */
+
+function vlqBytes(v) {
+  const out = [v & 0x7f];
+  v >>= 7;
+  while (v > 0) { out.unshift((v & 0x7f) | 0x80); v >>= 7; }
+  return out;
+}
+
+function buildMidi(mid, opts) {
+  const o = Object.assign({ pbTracks: null, pbRangeSemitones: 2, writeRpn: true },
+                          opts || {});
+  const out = [];
+  const push = (...b) => out.push(...b);
+  const u16 = v => [(v >> 8) & 0xff, v & 0xff];
+  const u32 = v => [(v >>> 24) & 0xff, (v >>> 16) & 0xff, (v >>> 8) & 0xff, v & 0xff];
+
+  push(0x4D, 0x54, 0x68, 0x64, ...u32(6), ...u16(mid.format),
+       ...u16(mid.tracks.length), ...u16(mid.division));
+
+  mid.tracks.forEach((tr, ti) => {
+    /* Rebuild the event list, injecting pitch bend for this track. */
+    const evs = tr.events.map(e => Object.assign({}, e, { _ord: 1 }));
+    const pb = o.pbTracks && o.pbTracks[ti];
+    if (pb && pb.length) {
+      const ch = (tr.notes[0] && tr.notes[0].ch) || 0;
+      if (o.writeRpn) {
+        /* RPN 0 = pitch bend sensitivity. FL ignores it, but every other DAW
+           honours it, so the file stays correct elsewhere. */
+        const r = Math.max(1, Math.min(24, Math.round(o.pbRangeSemitones)));
+        const t0 = pb[0].tick;
+        for (const [cc, v] of [[101, 0], [100, 0], [6, r], [38, 0]])
+          evs.push({ tick: t0, type: "ch", status: 0xB0 | ch, a: cc, b: v, _ord: 0 });
+      }
+      for (const p of pb) {
+        const val = Math.max(0, Math.min(16383, Math.round(p.value + 8192)));
+        evs.push({ tick: p.tick, type: "ch", status: 0xE0 | ch,
+                   a: val & 0x7f, b: (val >> 7) & 0x7f, _ord: 0 });
+      }
+    }
+    evs.sort((a, b) => a.tick - b.tick || a._ord - b._ord);
+
+    const body = [];
+    let last = 0;
+    for (const e of evs) {
+      if (e.type === "meta" && e.meta === 0x2F) continue;      // re-added below
+      body.push(...vlqBytes(e.tick - last)); last = e.tick;
+      if (e.type === "meta") {
+        body.push(0xFF, e.meta, ...vlqBytes(e.data.length), ...e.data);
+      } else {
+        const n = ((e.status & 0xF0) === 0xC0 || (e.status & 0xF0) === 0xD0) ? 1 : 2;
+        body.push(e.status, e.a); if (n === 2) body.push(e.b);
+      }
+    }
+    body.push(0x00, 0xFF, 0x2F, 0x00);
+    push(0x4D, 0x54, 0x72, 0x6B, ...u32(body.length), ...body);
+  });
+  return new Uint8Array(out);
+}
+
+/* ------------------------------------------------- SV curve -> pitch bend -- */
+
+/**
+ * Transplant the SV pitch movement onto the user's MIDI notes.
+ *
+ * We take the DEVIATION of the SV curve from the SV note it belongs to, then
+ * apply that deviation to whatever note the user has at the same musical
+ * position. Their melody is never altered -- only the expression on top of it.
+ *
+ * @param svTrack  {notes, curve} from parseProject (blick domain)
+ * @param midiNotes user's notes in MIDI ticks
+ * @param division MIDI ticks per quarter
+ * @returns { events:[{tick,value}], stats }
+ */
+function svCurveToPitchBend(svTrack, midiNotes, division, opts) {
+  const o = Object.assign({ rangeSemitones: 2, stepTicks: 4, offsetTicks: 0 },
+                          opts || {});
+  if (!svTrack.curve.length || !midiNotes.length) return { events: [], stats: null };
+
+  const base = noteBaseFn(svTrack.notes);
+  const blickPerMidiTick = BPQ / division;
+
+  // note coverage in MIDI ticks
+  const spans = midiNotes.map(n => [n.tick, n.tick + n.dur]);
+  const inNote = t => {
+    for (const [a, b] of spans) if (t >= a && t < b) return true;
+    return false;
+  };
+
+  const first = midiNotes[0].tick;
+  const lastT = Math.max(...midiNotes.map(n => n.tick + n.dur));
+
+  const events = [];
+  let clipped = 0, maxDev = 0;
+  const scale = 8191 / o.rangeSemitones;
+  let prev = null;
+
+  for (let t = first; t <= lastT; t += o.stepTicks) {
+    if (!inNote(t)) {
+      if (prev !== 0) { events.push({ tick: t, value: 0 }); prev = 0; }
+      continue;
+    }
+    const b = (t - o.offsetTicks) * blickPerMidiTick;
+    const v = sampleCurve(svTrack.curve, b, base);
+    const bp = base(b);
+    if (v === null || bp === null) continue;
+    const dev = v - bp;
+    maxDev = Math.max(maxDev, Math.abs(dev));
+    let val = Math.round(dev * scale);
+    if (val > 8191 || val < -8192) clipped++;
+    val = Math.max(-8192, Math.min(8191, val));
+    if (val !== prev) { events.push({ tick: t, value: val }); prev = val; }
+  }
+  // return to centre so later notes are not left bent
+  if (events.length && events[events.length - 1].value !== 0)
+    events.push({ tick: lastT, value: 0 });
+
+  return { events, stats: { points: events.length, clipped, maxDev } };
+}
+
+/* ============================================================================
+   fsc.js -- FL Studio Score file (.fsc) containing Channel Pitch automation.
+
+   Why this exists
+   ---------------
+   FL Studio's MIDI importer clamps pitch bend to a fixed ±2 semitones and
+   ignores the RPN that says otherwise (open issue on the Image-Line forum).
+   A vocal pitch curve routinely exceeds that, so the MIDI route alone loses
+   the extremes.
+
+   FL's own automation has no such limit: the range is whatever the Pitch knob
+   is set to (2 … 48 semitones). Automation can be loaded from a Score file:
+       Event Editor menu > Open Automation
+   so we emit one.
+
+   Container format (FLhd / FLdt), documented by Ben Rogalski's teardown of
+   Project-Bones .fsc files:
+
+       "FLhd" u32(6) u16(fmt) u16(nChannels) u16(ppq)
+       "FLdt" u32(len) <events...>
+
+   Event encoding inside FLdt is FL's own event stream, shared with .flp:
+       id  <  64  : 1 byte  value
+       id  < 128  : 2 byte  value
+       id  < 192  : 4 byte  value
+       id >= 192  : varint length + payload
+
+   Automation points live in event id 233 (0xE9, ChannelEvent "Automation
+   Data"), whose payload layout is (from pyflp's AutomationEvent):
+
+       4  bytes  unknown (always 1)
+       4  bytes  lfo.amount (i32)
+       1  byte   unknown
+       2  bytes  unknown
+       2  bytes  unknown (always 0)
+       4  bytes  unknown
+       4  bytes  point count (u32)
+       then per point, 24 bytes:
+           f64  offset from the previous point, in PPQ units
+           f64  value, 0.0 .. 1.0  (0.5 == knob centre)
+           f32  tension  (0 = linear)
+           4    bytes tied to tension
+       trailing bytes
+
+   NOTE: this is a community-reverse-engineered layout, not a published spec.
+   We therefore always ship the MIDI route as well, and label the .fsc as the
+   wide-range option so the user has a guaranteed fallback.
+   ==========================================================================*/
+
+const FSC_AUTOMATION_EVENT_ID = 233;
+
+function fscWriteEvent(out, id, payload) {
+  out.push(id);
+  if (id < 64) out.push(payload[0] & 0xff);
+  else if (id < 128) out.push(payload[0] & 0xff, payload[1] & 0xff);
+  else if (id < 192) out.push(...payload.slice(0, 4));
+  else { out.push(...vlqLE(payload.length)); out.push(...payload); }
+}
+
+/* FL uses a little-endian 7-bit varint for event payload lengths. */
+function vlqLE(v) {
+  const out = [];
+  do { let b = v & 0x7f; v >>>= 7; if (v) b |= 0x80; out.push(b); } while (v);
+  return out;
+}
+
+function f64le(v) {
+  const b = new Uint8Array(8);
+  new DataView(b.buffer).setFloat64(0, v, true);
+  return Array.from(b);
+}
+function f32le(v) {
+  const b = new Uint8Array(4);
+  new DataView(b.buffer).setFloat32(0, v, true);
+  return Array.from(b);
+}
+function u32le(v) {
+  return [v & 0xff, (v >>> 8) & 0xff, (v >>> 16) & 0xff, (v >>> 24) & 0xff];
+}
+function u16le(v) { return [v & 0xff, (v >>> 8) & 0xff]; }
+
+/**
+ * @param points  [{tick, value}] value = -1..1 as a fraction of the knob range
+ * @param ppq     ticks per quarter used by `tick`
+ */
+function buildFsc(points, ppq, opts) {
+  const o = Object.assign({ tension: 0 }, opts || {});
+  const pts = points.slice().sort((a, b) => a.tick - b.tick);
+
+  const payload = [];
+  payload.push(1, 0, 0, 0);                 // _u1, always 1
+  payload.push(...u32le(0));                // lfo.amount
+  payload.push(0);                          // _u2
+  payload.push(0, 0);                       // _u3
+  payload.push(0, 0);                       // _u4 always 0
+  payload.push(0, 0, 0, 0);                 // _u5
+  payload.push(...u32le(pts.length));       // point count
+
+  let prevTick = 0;
+  for (const p of pts) {
+    const delta = (p.tick - prevTick) / ppq;   // offset in QUARTERS
+    prevTick = p.tick;
+    // knob value: 0..1 with 0.5 as centre
+    const v = Math.max(0, Math.min(1, 0.5 + p.value * 0.5));
+    payload.push(...f64le(delta));
+    payload.push(...f64le(v));
+    payload.push(...f32le(o.tension));
+    payload.push(0, 0, 0, 0);
+  }
+  payload.push(...u32le(0));                // trailing
+
+  const data = [];
+  fscWriteEvent(data, FSC_AUTOMATION_EVENT_ID, payload);
+
+  const out = [];
+  const ascii = s => Array.from(s, c => c.charCodeAt(0));
+  out.push(...ascii("FLhd"), ...u32le(6), ...u16le(0), ...u16le(1), ...u16le(ppq));
+  out.push(...ascii("FLdt"), ...u32le(data.length), ...data);
+  return new Uint8Array(out);
+}
+
+/* A plain-text fallback the user can always read and re-enter by hand, and
+   which other tools can parse. Written alongside the binary .fsc. */
+function buildPitchCsv(points, ppq, rangeSemitones, bpm) {
+  const rows = ["# tick,quarter,seconds,semitones,knob(0-1)",
+                "# ppq=" + ppq + " range=+/-" + rangeSemitones + " semitones bpm=" + bpm];
+  for (const p of points) {
+    const q = p.tick / ppq;
+    rows.push([p.tick, q.toFixed(6), (q * 60 / bpm).toFixed(6),
+               (p.value * rangeSemitones).toFixed(4),
+               (0.5 + p.value * 0.5).toFixed(6)].join(","));
+  }
+  return rows.join("\n") + "\n";
+}
+
+
+/* ===== UI ===== */
+const $ = s => document.querySelector(s);
+const drop = $("#drop"), fileInput = $("#file"), out = $("#out"), flist = $("#filelist");
+let pending = { svp:null, wavs:[], mid:null };
+let assign = null;      // trackIndex -> wav name ("" = none), user editable
+/* YIN on a 4-minute WAV costs seconds. Cache the detected curve per
+   (wav name + track) so re-running after a manual octave edit is instant
+   instead of re-analysing every file. */
+const wavCurveCache = {};
+let lastProject = null; // cached parse so re-running is cheap
+
+["dragenter","dragover"].forEach(e=>drop.addEventListener(e,ev=>{
+  ev.preventDefault(); drop.classList.add("hot");}));
+["dragleave","drop"].forEach(e=>drop.addEventListener(e,ev=>{
+  ev.preventDefault(); if(e==="dragleave"&&drop.contains(ev.relatedTarget))return;
+  drop.classList.remove("hot");}));
+drop.addEventListener("drop", ev => handleFiles(ev.dataTransfer.files));
+drop.addEventListener("click", ()=>fileInput.click());
+fileInput.addEventListener("change", ()=>handleFiles(fileInput.files));
+document.querySelectorAll(".opts input,.opts select").forEach(el=>
+  el.addEventListener("change", ()=>{ if(pending.svp) run(); }));
+document.querySelectorAll('input[name="fmt"],input[name="lang"]').forEach(el=>
+  el.addEventListener("change", ()=>{ syncOpts(); if(pending.svp) run(); }));
+
+/* PBS is a VOCALOID-only concept; hide it for the other targets. */
+function syncOpts(hasRap){
+  const fmt = document.querySelector('input[name="fmt"]:checked').value;
+  // the FL route needs a .mid; grey it out until one is dropped
+  const flIn = document.querySelector('input[name="fmt"][value="flmidi"]');
+  if (flIn){
+    flIn.disabled = !pending.mid;
+    flIn.closest(".fmt").style.opacity = pending.mid ? 1 : .45;
+  }
+  $("#opt-pbs").style.display = (fmt === "vsqx") ? "" : "none";
+  const pbr = $("#opt-pbrange"); if (pbr) pbr.style.display = (fmt === "flmidi") ? "" : "none";
+  /* The FL route only transplants a pitch curve onto existing MIDI notes --
+     lyrics, phonemes and note splitting play no part in it. */
+  const isFL = (fmt === "flmidi");
+  /* JA VCV & CVVC derives phonemes from the lyric itself, so the phoneme-hint
+     option does nothing there -- hide it to avoid implying otherwise. */
+  const phOpt = $("#o-phon");
+  if (phOpt && phOpt.closest(".opt"))
+    phOpt.closest(".opt").style.display = (fmt === "ustxvcv") ? "none" : "";
+  for (const id of ["#o-phon", "#o-split"]){
+    const el = $(id); if (el && el.closest(".opt")) el.closest(".opt").style.display = isFL ? "none" : "";
+  }
+  const langBar = document.querySelector('input[name="lang"]');
+  if (langBar && langBar.closest(".fmtbar"))
+    langBar.closest(".fmtbar").style.display = isFL ? "none" : "";
+  // VoiSona ships Japanese voicebanks only -> the language switch is moot
+  const jaOnly = (fmt === "tssln" || fmt === "tssprj");   // VoiSona: JA banks only
+  document.querySelectorAll('input[name="lang"]').forEach(el=>{
+    el.disabled = jaOnly;
+    el.closest(".fmt").style.opacity = jaOnly ? .45 : 1;
+  });
+  if (jaOnly) document.querySelector('input[name="lang"][value="ja"]').checked = true;
+  // retuning only ever applies to rap notes -- don't offer it otherwise
+  if (hasRap !== undefined)
+    $("#opt-retune").style.display = hasRap ? "" : "none";
+}
+syncOpts();
+
+function handleFiles(files){
+  for (const f of files){
+    const n = f.name.toLowerCase();
+    if (n.endsWith(".wav")){
+      if (!pending.wavs.some(w => w.name === f.name)) pending.wavs.push(f);
+    } else if (n.endsWith(".mid") || n.endsWith(".midi")){
+      pending.mid = f;
+    } else pending.svp = f;
+  }
+  assign = null;                       // re-run auto matching
+  flist.innerHTML =
+    (pending.svp ? "svp: <span>"+pending.svp.name+"</span>" : "") +
+    (pending.wavs.length ? "　wav: <span>"+pending.wavs.length+"</span> 個" : "") +
+    (pending.mid ? "　mid: <span>"+pending.mid.name+"</span>" : "");
+  if (pending.svp){
+    for (const k in curveEdits) delete curveEdits[k];
+    for (const k in wavCurveCache) delete wavCurveCache[k];
+    // dropping a MIDI is an explicit request for the FL route
+    if (pending.mid){
+      const fl = document.querySelector('input[name="fmt"][value="flmidi"]');
+      if (fl){ fl.disabled = false; fl.checked = true; }
+    }
+    syncOpts();
+    run();
+  }
+  else msg("e",".svp ファイルをドロップしてください。");
+}
+function msg(kind, html){ out.innerHTML = '<div class="msg '+kind+'">'+html+"</div>"; }
+const readBuf = f => new Promise((res,rej)=>{
+  const r = new FileReader(); r.onload=()=>res(r.result); r.onerror=rej; r.readAsArrayBuffer(f);});
+const esc = s => String(s).replace(/[&<>"]/g, c =>
+  ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+
+/* Called from the per-track <select> elements. */
+function setAssign(ti, name){
+  assign[ti] = name;
+  run();
+}
+window.setAssign = setAssign;
+
+async function run(keepEdits){
+  out.innerHTML = '<div class="msg i">変換中…</div>'
+    + '<div class="prog"><i id="pbar"></i></div>';
+  await new Promise(r=>setTimeout(r,15));
+  const setProg = p => { const b=$("#pbar"); if(b) b.style.width=(p*100).toFixed(0)+"%"; };
+  try{
+    const fmt = document.querySelector('input[name="fmt"]:checked').value;
+    const opts = {
+      convertPitch: $("#o-pitch").checked,
+      genPhonemes:  $("#o-phon").checked,
+      stepTicks: +$("#o-step").value,
+      pbs: +$("#o-pbs").value || null,
+      preMeasure: +$("#o-pre").value,
+      outLang: document.querySelector('input[name="lang"]:checked').value,
+      splitNotes: $("#o-split").checked,
+      seqName: pending.svp.name.replace(/\.(svp|json)$/i,"")
+    };
+    const doc = loadSvp(await readBuf(pending.svp));
+    const P = parseProject(doc);
+    if (!P.tracks.length) throw new Error("この .svp にノートが見つかりません。");
+    lastProject = P;
+    syncOpts(P.info.rapNotes > 0);
+
+    const base = pending.svp.name.replace(/\.(svp|json)$/i,"");
+    const wavEntries = pending.wavs.map(f => ({ name:f.name, file:f }));
+
+    // ---- decide which wav belongs to which track ----
+    let how = {};
+    if (!assign){
+      const m = matchWavsToTracks(P.tracks, wavEntries, pending.svp.name);
+      assign = P.tracks.map((_,ti)=> m.pairs.has(ti) ? m.pairs.get(ti).name : "");
+      how = m.how;
+    }
+
+    // ---- per-track pitch recovery from wav where needed ----
+    const perTrack = [];
+    let usedWavCount = 0, totalRetuned = 0;
+    for (let ti=0; ti<P.tracks.length; ti++){
+      const tr = P.tracks[ti];
+      const info = { curveFromSvp: tr.curve.length, wav:null, retuned:0, off:0 };
+      const wname = assign[ti];
+      const needWav = tr.curve.length === 0 || P.info.rapNotes > 0;
+      if (wname && needWav){
+        const f = pending.wavs.find(w=>w.name===wname);
+        if (f){
+          const ck = wname + "|" + ti + "|" + ($("#o-retune").checked ? 1 : 0);
+          let hit = wavCurveCache[ck];
+          if (!hit){
+            const wav = decodeWav(await readBuf(f));
+            const est = estimateF0(wav.samples, wav.sampleRate, {hop:256, frame:2048});
+            const bpm = P.tempos[0][1];
+            const off = estimateOffset(est, bpm, tr.notes, 1.0);
+            let c = f0ToCurve(est, bpm, tr.notes, {offsetSec:off, maxDevSemi:12});
+            let retuned = 0;
+            /* Only rap notes may be retuned, and only when the user asks. */
+            if ($("#o-retune").checked && P.info.rapNotes > 0){
+              retuned = retuneNotesToCurve(tr.notes, c);
+              if (retuned) c = f0ToCurve(est, bpm, tr.notes, {offsetSec:off, maxDevSemi:12});
+            }
+            hit = wavCurveCache[ck] = {
+              curve: c, retuned,
+              pitches: tr.notes.map(x => x.pitch),
+              meta: { name:wname, sr:wav.sampleRate, dur:wav.duration, ch:wav.channels, off }
+            };
+          }
+          tr.curve = hit.curve.map(x => x.slice());
+          hit.pitches.forEach((pv, k) => { if (tr.notes[k]) tr.notes[k].pitch = pv; });
+          info.retuned = hit.retuned; totalRetuned += hit.retuned;
+          info.wav = hit.meta;
+          usedWavCount++;
+        }
+      }
+      perTrack.push(info);
+      setProg((ti+1)/(P.tracks.length+1));
+    }
+
+    /* Apply any manual octave corrections the user made on the graph, before
+       anything reads the curve. */
+    let editedCount = 0;
+    let flStats = null;
+    P.tracks.forEach((tr, ti) => {
+      const eds = curveEdits[ti];
+      if (!eds || !eds.length) return;
+      editedCount += eds.length;
+      tr.curve = tr.curve.map(([b, v]) => {
+        if (v === null) return [b, v];
+        let out = v;
+        for (const e of eds){
+          if (b < e.from || b > e.to) continue;
+          if (e.op === "up") out += 12;
+          else if (e.op === "down") out -= 12;
+          else if (e.op === "reset") out = null;
+        }
+        return [b, out];
+      });
+    });
+
+    const notes = P.tracks.reduce((a,t)=>a+t.notes.length,0);
+    const curvePts = P.tracks.reduce((a,t)=>a+t.curve.length,0);
+
+    // ---- build output file(s) ----
+    const files = [];   // {name, blob, report}
+    let report = [];
+    if (fmt === "vsqx"){
+      const r = buildVsqx(P.tempos, P.meters, P.tracks, opts);
+      report = r.report;
+      files.push({ name: base + "_to_V4X.vsqx",
+                   blob: new Blob([r.xml], {type:"application/xml"}) });
+    } else if (fmt === "ustx" || fmt === "ustxvcv"){
+      /* Two UTAU modes, because the phonemizer decides how the lyric is read:
+           ustx    -> DEFAULT phonemizer, lyric IS the sample alias  (CV banks)
+           ustxvcv -> JA VCV & CVVC (JapanesePresampPhonemizer), plain kana */
+      opts.utauMode = (fmt === "ustxvcv") ? "presamp" : "default";
+      const r = buildUstx(P.tempos, P.meters, P.tracks, opts);
+      report = r.report;
+      files.push({ name: base + (fmt === "ustxvcv" ? "_VCV.ustx" : ".ustx"),
+                   blob: new Blob([r.text], {type:"application/x-yaml"}) });
+    } else if (fmt === "flmidi"){
+      /* FL Studio route: keep the user's MIDI notes exactly as they are and
+         add the SV pitch movement on top.
+
+         Two deliverables, because FL's MIDI importer clamps pitch bend to a
+         fixed +/-2 semitones and ignores the RPN that says otherwise:
+           .mid  -- notes + pitch bend, scaled to the chosen range
+           .fsc  -- Channel Pitch automation, no range limit
+           .csv  -- the same curve as plain numbers, always readable        */
+      if (!pending.mid) throw new Error("FL Studio 用の .mid をドロップしてください。");
+      const midBuf = await readBuf(pending.mid);
+      const mid = readMidi(midBuf);
+      const rng = +$("#o-pbrange").value || 2;
+
+      // pair each MIDI track that has notes with an SV track, in order
+      const midiTrackIdx = [];
+      mid.tracks.forEach((t, i) => { if (t.notes.length) midiTrackIdx.push(i); });
+      if (!midiTrackIdx.length) throw new Error("この MIDI にノートがありません。");
+
+      const pbTracks = {};
+      flStats = { pairs: [], clipped: 0, points: 0, maxDev: 0,
+                  bpm: 60000000 / mid.tempos[0].us, division: mid.division };
+      let fscPoints = null, fscTick = null;
+
+      midiTrackIdx.forEach((mi, k) => {
+        const sv = P.tracks[Math.min(k, P.tracks.length - 1)];
+        if (!sv || !sv.curve.length) return;
+        const r = svCurveToPitchBend(sv, mid.tracks[mi].notes, mid.division,
+                                     { rangeSemitones: rng, stepTicks: opts.stepTicks });
+        if (!r.events.length) return;
+        pbTracks[mi] = r.events;
+        flStats.pairs.push({ midi: mid.tracks[mi].name || ("Track " + mi),
+                             sv: sv.name, notes: mid.tracks[mi].notes.length,
+                             points: r.stats.points, clipped: r.stats.clipped,
+                             maxDev: r.stats.maxDev });
+        flStats.clipped += r.stats.clipped;
+        flStats.points += r.stats.points;
+        flStats.maxDev = Math.max(flStats.maxDev, r.stats.maxDev);
+        if (!fscPoints){
+          fscPoints = r.events.map(e => ({ tick: e.tick, value: e.value / 8191 }));
+          fscTick = mid.division;
+        }
+      });
+      if (!flStats.pairs.length)
+        throw new Error("ピッチカーブがありません。SV2 でレンダリングした .svp か .wav を一緒にドロップしてください。");
+
+      const outMid = buildMidi(mid, { pbTracks, pbRangeSemitones: rng });
+      files.push({ name: base + "_pitch.mid",
+                   blob: new Blob([outMid], {type:"audio/midi"}), bytes: outMid });
+      const fsc = buildFsc(fscPoints, fscTick, {});
+      files.push({ name: base + "_ChannelPitch.fsc",
+                   blob: new Blob([fsc], {type:"application/octet-stream"}), bytes: fsc });
+      const csv = buildPitchCsv(fscPoints, fscTick, rng, flStats.bpm);
+      const csvBytes = new TextEncoder().encode(csv);
+      files.push({ name: base + "_pitch.csv",
+                   blob: new Blob([csv], {type:"text/csv"}), bytes: csvBytes });
+      report = [];
+    } else {
+      // VoiSona: one file per track (the format holds a single track)
+      for (const tr of P.tracks){
+        const one = [tr];
+        const r = (fmt === "tssprj")
+          ? buildTssprj(tssprjTemplateBytes(), P.tempos, P.meters, one, opts)
+          : buildVoisona(tsslnTemplateBytes(), P.tempos, P.meters, one, opts);
+        report = report.concat(r.report);
+        const safe = String(tr.name).replace(/[\\/:*?"<>|]/g, "_");
+        const nm = (P.tracks.length === 1) ? base + "." + fmt
+                                           : base + "_" + safe + "." + fmt;
+        files.push({ name: nm, blob: new Blob([r.bytes], {type:"application/octet-stream"}),
+                     bytes: r.bytes });
+      }
+    }
+    setProg(1);
+
+    // ---------------- render ----------------
+    const srcPill = (usedWavCount && curvePts)
+      ? '<span class="pill p-info">WAV 音高推定 (YIN)</span>'
+      : P.info.pitchSource === "pitchControls"
+        ? '<span class="pill p-ok">pitchControls (SV2 AI ピッチ)</span>'
+        : P.info.pitchSource === "pitchDelta"
+          ? '<span class="pill p-ok">pitchDelta (SV1 マニュアル)</span>'
+          : '<span class="pill p-err">なし</span>';
+    const FMTNAME = { vsqx:"VSQX (VOCALOID4)", ustx:"USTX 単独音 (OpenUTAU)",
+                      ustxvcv:"USTX 連続音 (JA VCV & CVVC)",
+                      tssln:"TSSLN (VoiSona)", tssprj:"TSSPRJ (VoiSona)",
+                      flmidi:"MIDI + ピッチ (FL Studio)" };
+
+    let html = '<div class="card"><h3>解析結果 '
+      + '<span class="pill '+(P.info.format==="SV2"?"p-info":"p-ok")+'">'+P.info.format+'</span>'
+      + '<span class="pill p-info">version '+P.info.version+'</span></h3><table>'
+      + '<tr><td>ピッチ取得元</td><td>'+srcPill+'</td></tr>'
+      + '<tr><td>トラック / ノート</td><td>'+P.tracks.length+' / '+notes+'</td></tr>'
+      + '<tr><td>ピッチ点数</td><td>'+curvePts.toLocaleString()+'</td></tr>'
+      + '<tr><td>テンポ</td><td>'+P.tempos[0][1]+' BPM　拍子 '+P.meters[0][1]+'/'+P.meters[0][2]+'</td></tr>'
+      + '<tr><td>出力フォーマット</td><td><span class="pill p-info">'+FMTNAME[fmt]+'</span></td></tr>';
+    if (P.info.rapNotes) html += '<tr><td>rap ノート</td><td>'+P.info.rapNotes+' 個</td></tr>';
+    if (editedCount) html += '<tr><td>手動ピッチ補正</td><td>'+editedCount
+      + ' 箇所 <span style="color:var(--dim)">（グラフ上で範囲選択して編集）</span></td></tr>';
+    if (totalRetuned) html += '<tr><td>音程を復元した rap ノート</td><td>'+totalRetuned
+      + ' 個 <span style="color:var(--dim)">（歌唱ノートは変更していません）</span></td></tr>';
+    html += '</table>';
+
+    // ---- per-track table with wav assignment ----
+    const wavOptions = ti => {
+      let o = '<option value=""'+(assign[ti]?"":" selected")+'>— 使わない —</option>';
+      for (const w of pending.wavs)
+        o += '<option value="'+esc(w.name)+'"'+(assign[ti]===w.name?" selected":"")+'>'
+           + esc(w.name)+'</option>';
+      return o;
+    };
+    html += '<div class="card"><h3>トラック</h3><table class="trk"><tr>'
+         + '<th>#</th><th>トラック名</th><th>ノート</th><th>ピッチ</th>'
+         + (pending.wavs.length ? '<th>WAV（ピッチ抽出元）</th>' : '') + '</tr>';
+    P.tracks.forEach((tr, ti) => {
+      const inf = perTrack[ti];
+      const r = report[ti] || {};
+      let pitchCell;
+      if (inf.wav) pitchCell = '<span class="pill p-info">WAV</span> '
+        + (inf.wav.off*1000).toFixed(0)+'ms 補正'+(inf.retuned?'・rap '+inf.retuned+'音復元':'');
+      else if (inf.curveFromSvp) pitchCell = '<span class="pill p-ok">svp</span> '
+        + inf.curveFromSvp.toLocaleString()+' 点';
+      else pitchCell = '<span class="pill p-err">なし</span>';
+      const detail = (fmt === "vsqx") ? ('PBS '+(r.pbs==null?"—":r.pbs))
+                   : (fmt === "ustx") ? ('pitd '+(r.pitchPoints||0))
+                   : ('LogF0 '+(r.pitchPoints||0));
+      html += '<tr><td>'+(ti+1)+'</td><td class="nm">'+esc(tr.name)+'</td>'
+           +  '<td>'+tr.notes.length+'</td><td>'+pitchCell+'　<span style="color:var(--dim)">'+detail+'</span></td>';
+      if (pending.wavs.length)
+        html += '<td><select onchange="setAssign('+ti+',this.value)">'+wavOptions(ti)+'</select></td>';
+      html += '</tr>';
+    });
+    html += '</table>';
+    const autoMatched = Object.keys(how).length;
+    if (autoMatched)
+      html += '<div class="doc" style="margin-top:8px">ファイル名から '+autoMatched
+           +  ' 件を自動割り当てしました。違う場合は上のプルダウンで変更できます。</div>';
+    html += '</div>';
+
+    // ---- FL Studio report ----
+    if (flStats){
+      html += '<div class="card"><h3>FL Studio 出力</h3><table>'
+        + '<tr><td>MIDI</td><td>' + esc(pending.mid.name)
+        + ' <span style="color:var(--dim)">(' + flStats.division + ' ticks/4分音符, '
+        + flStats.bpm.toFixed(2) + ' BPM)</span></td></tr>'
+        + '<tr><td>ピッチ点数</td><td>' + flStats.points.toLocaleString() + '</td></tr>'
+        + '<tr><td>最大の振れ幅</td><td>' + flStats.maxDev.toFixed(2) + ' 半音</td></tr>';
+      for (const pr of flStats.pairs)
+        html += '<tr><td>' + esc(pr.midi) + ' ← ' + esc(pr.sv) + '</td><td>ノート '
+          + pr.notes + '　ピッチ点 ' + pr.points + (pr.clipped ? '　<span style="color:var(--warn)">クリップ ' + pr.clipped + '</span>' : '') + '</td></tr>';
+      html += '</table>';
+      if (flStats.clipped)
+        html += '<div class="msg w" style="margin-top:10px">ピッチベンド幅を超えた点が '
+          + flStats.clipped + ' 箇所あります（最大 ' + flStats.maxDev.toFixed(2)
+          + ' 半音）。上の「ピッチベンド幅」を広げ、FL 側の Pitch ノブも同じ値にしてください。'
+          + 'または範囲制限のない <b>.fsc</b> を使ってください。</div>';
+      html += '<div class="doc" style="margin-top:10px">'
+        + '<b>FL Studio への読み込み方</b><br>'
+        + '① <code>_pitch.mid</code> … <b>Alt を押しながら</b> Channel Rack にドラッグすると'
+        + 'フル MIDI インポートになり、ピッチベンドも読み込まれます'
+        + '（ピアノロールの通常インポートでは落ちます）。<br>'
+        + '② <code>_ChannelPitch.fsc</code> … Pitch ノブを右クリック →「Edit events」→'
+        + 'Event Editor のメニュー →「Open automation」で読み込み。'
+        + '幅の制限が無いのでこちらが確実です。<br>'
+        + '③ <code>_pitch.csv</code> … 数値そのもの（tick / 秒 / 半音）。確認や他ツール用。'
+        + '</div></div>';
+    }
+
+    // ---- lyric & phoneme report ----
+    const LS = report.map(r=>r.lyrics).filter(Boolean);
+    if (LS.length){
+      const sum = k => LS.reduce((a,x)=>a+(x[k]||0),0);
+      const inN = sum("notesIn"), outN = sum("notesOut");
+      const rows = [];
+      if (outN !== inN)
+        rows.push(['ノート分割', inN+' → '+outN+' 個 <span style="color:var(--dim)">（'
+          + sum("split")+' ノートを音節ごとに分割）</span>']);
+      if (sum("manual")) rows.push(['手動指定の音素', sum("manual")+' 個をそのまま使用']);
+      if (sum("english")) rows.push(['英語の歌詞', sum("english")+' 個']);
+      if (sum("approximated"))
+        rows.push(['近似した音素', sum("approximated")+' 個 <span style="color:var(--dim)">'
+          + '（出力先に無い音を最も近い音に置換）</span>']);
+      if (sum("duplicates")) rows.push(['重複ノートを除去', sum("duplicates")+' 個']);
+      if (sum("droppedMarkers")) rows.push(['ブレス等の除去', sum("droppedMarkers")+' 個']);
+      if (sum("failed"))
+        rows.push(['<span style="color:var(--warn)">変換できず</span>',
+          sum("failed")+' 個 <span style="color:var(--dim)">'
+          + LS.flatMap(x=>x.failedLyrics||[]).slice(0,8).map(esc).join(' ')+'</span>']);
+      if (rows.length){
+        html += '<div class="card"><h3>歌詞・音素</h3><table>';
+        for (const [a,b] of rows) html += '<tr><td>'+a+'</td><td>'+b+'</td></tr>';
+        html += '</table>';
+        const ax = [...new Set(LS.flatMap(x=>x.approxLyrics||[]))].slice(0,14);
+        if (ax.length) html += '<div class="doc" style="margin-top:8px">近似した歌詞: '
+          + ax.map(esc).join('、') + '</div>';
+        html += '</div>';
+      }
+    }
+
+    // ---- warnings ----
+    const noPitch = P.tracks.filter((t,i)=>t.curve.length===0);
+    if (noPitch.length){
+      const names = noPitch.map(t=>esc(t.name)).join("、");
+      html += '<div class="msg w">'
+        + (P.info.rapNotes
+            ? 'この .svp は <b>musicalType="rap"</b> を含み、SV は仕様上ラップのピッチを保存しません。'
+            : 'ピッチデータが無いトラックがあります（SV2 で一度レンダリングしてから保存し直してください）。')
+        + ' <b>'+names+'</b> は SV2 で書き出した .wav を一緒にドロップすると移植できます。</div>';
+    }
+    if (fmt === "vsqx" || fmt === "ustx" || fmt === "ustxvcv"){
+      if (P.tracks.length > 1)
+        html += '<div class="msg i">'+P.tracks.length+' トラックを 1 つの '
+             + fmt.toUpperCase()+' にまとめました（各トラックに個別のピッチを書き込み済み）。</div>';
+    } else if (P.tracks.length > 1){
+      html += '<div class="msg i">VoiSona は 1 ファイル 1 トラックの形式のため、'
+           +  P.tracks.length+' 個のファイルを生成しました。</div>';
+    }
+    /* A few frames right at note transitions can exceed PBS. We size PBS on the
+       99.5th percentile on purpose (see buildPit) so those rare frames clip
+       instead of halving the resolution of the whole track; measured
+       reconstruction error stays well under a cent either way. Only mention it
+       when it is a large share of the data. */
+    const clippedTotal = report.reduce((a,r)=>a+(r.clipped||0),0);
+    const pitTotal = report.reduce((a,r)=>a+(r.pitPoints||0),0);
+    if (clippedTotal && pitTotal && clippedTotal/pitTotal > 0.02)
+      html += '<div class="msg w">ノートの変わり目 '+clippedTotal
+           +  ' 点がピッチベンド範囲を超えクリップしました（全体の '
+           +  (clippedTotal/pitTotal*100).toFixed(1)+'%）。気になる場合は PBS を上げてください。</div>';
+
+    // ---- download buttons ----
+    html += '<div class="card"><h3>ダウンロード</h3><div class="dlrow">';
+    for (const f of files){
+      const url = URL.createObjectURL(f.blob);
+      html += '<a class="btn sm" href="'+url+'" download="'+esc(f.name)+'">⬇ '+esc(f.name)+'</a>';
+    }
+    if (files.length > 1){
+      const zipEntries = files.map(f => ({ name: f.name, data: f.bytes }));
+      const zip = makeZip(zipEntries);
+      const zurl = URL.createObjectURL(new Blob([zip], {type:"application/zip"}));
+      html += '<a class="btn sm" href="'+zurl+'" download="'+esc(base)+'_'+fmt+'.zip">'
+           +  '⬇ すべて ZIP でまとめて ('+files.length+' ファイル)</a>';
+    }
+    html += '<button class="btn sec sm" onclick="location.reload()">クリア</button>';
+    html += '</div></div>';
+
+    if (curvePts){
+      html += '<div class="card"><h3>ピッチカーブ</h3>';
+      P.tracks.forEach((tr,ti)=>{
+        if (!tr.curve.length) return;
+        html += '<div style="font-size:12px;color:var(--dim);margin:10px 0 4px;font-family:var(--mono)">'
+             +  esc(tr.name)+'</div><canvas id="cv'+ti+'" width="1600" height="240"></canvas>'
+             +  '<div class="rangebar" id="rb'+ti+'"></div>';
+      });
+      html += '<div class="legend"><span class="dotc" style="background:#4b9fff"></span>AI ピッチ'
+           +  '　<span class="dotc" style="background:#8b949e"></span>ノート音程'
+           +  '　<span style="color:var(--dim)">— グラフ上をドラッグで範囲選択 → オクターブ補正</span></div></div>';
+    }
+    out.innerHTML = html;
+    P.tracks.forEach((tr,ti)=>{
+      if (!tr.curve.length) return;
+      draw(tr, "cv"+ti, ti);
+      const cv = document.getElementById("cv"+ti);
+      if (cv) makeEditable(cv, tr, ti);
+    });
+  }catch(err){
+    msg("e","<b>エラー:</b> "+esc(err.message));
+    console.error(err);
+  }
+}
+
+/* ============================================================================
+   Pitch curve view + range editor.
+
+   Automatic f0 detection can still lock a whole note to the wrong octave.
+   Rather than pretend that never happens, let the user fix it: drag across the
+   bad region on the graph and press an octave button. Edits apply to the live
+   curve and the files are rebuilt immediately.
+   ==========================================================================*/
+const curveEdits = {};      // trackIndex -> [{from,to,op}]  (blick range)
+
+function applyEdits(tr, ti){
+  const eds = curveEdits[ti];
+  if (!eds || !eds.length) return tr.curve;
+  return tr.curve.map(([b, v]) => {
+    if (v === null) return [b, v];
+    let out = v;
+    for (const e of eds){
+      if (b < e.from || b > e.to) continue;
+      if (e.op === "up") out += 12;
+      else if (e.op === "down") out -= 12;
+      else if (e.op === "reset") out = null;   // fall back to the note pitch
+    }
+    return [b, out];
+  });
+}
+
+const viewState = {};       // cvId -> {t0,t1,lo,hi,X,Y}
+
+function draw(tr, cvId, ti){
+  const cv = document.getElementById(cvId || "cv"); if(!cv) return;
+  const g = cv.getContext("2d"), W = cv.width, H = cv.height;
+  const curve = (ti === undefined) ? tr.curve : applyEdits(tr, ti);
+  g.clearRect(0,0,W,H);
+  let t0 = Infinity, t1 = 0, lo = Infinity, hi = -Infinity;
+  for (const n of tr.notes){ t0=Math.min(t0,n.onset); t1=Math.max(t1,n.onset+n.duration);
+                             lo=Math.min(lo,n.pitch); hi=Math.max(hi,n.pitch); }
+  for (const [b,m] of curve){ if(m===null) continue;
+    t0=Math.min(t0,b); t1=Math.max(t1,b); lo=Math.min(lo,m); hi=Math.max(hi,m); }
+  lo-=1.5; hi+=1.5;
+  const X = b => (b-t0)/(t1-t0)*(W-20)+10;
+  const Y = m => H-10-(m-lo)/(hi-lo)*(H-20);
+  viewState[cvId] = { t0, t1, lo, hi, W, H };
+
+  g.strokeStyle="#2d3748"; g.lineWidth=1;
+  for (let m=Math.ceil(lo); m<=hi; m++){
+    g.globalAlpha = m%12===0?.9:.35; g.beginPath(); g.moveTo(0,Y(m)); g.lineTo(W,Y(m)); g.stroke();
+  }
+  g.globalAlpha=1;
+
+  // highlight edited ranges
+  for (const e of (curveEdits[ti] || [])){
+    g.fillStyle = e.op==="up" ? "rgba(63,185,80,.13)"
+                : e.op==="down" ? "rgba(210,153,34,.13)" : "rgba(248,81,73,.13)";
+    g.fillRect(X(e.from), 0, Math.max(2, X(e.to)-X(e.from)), H);
+  }
+  // live selection
+  const sel = cv._sel;
+  if (sel){
+    g.fillStyle = "rgba(75,159,255,.20)";
+    g.fillRect(Math.min(sel.a,sel.b), 0, Math.abs(sel.b-sel.a), H);
+  }
+
+  g.fillStyle="rgba(139,148,158,.35)"; g.strokeStyle="#8b949e"; g.lineWidth=2;
+  for (const n of tr.notes){
+    const x=X(n.onset), w=X(n.onset+n.duration)-x, y=Y(n.pitch);
+    g.fillRect(x,y-5,w,10); g.beginPath(); g.moveTo(x,y); g.lineTo(x+w,y); g.stroke();
+  }
+  g.strokeStyle="#4b9fff"; g.lineWidth=2.2; g.beginPath();
+  let pen=false, prev=null;
+  for (const [b,m] of curve){
+    if (m===null){ pen=false; prev=b; continue; }
+    const x=X(b), y=Y(m);
+    if (prev!==null && b-prev > (t1-t0)/60) pen=false;
+    if (!pen){ g.moveTo(x,y); pen=true; } else g.lineTo(x,y);
+    prev=b;
+  }
+  g.stroke();
+}
+
+/* Attach drag-select to a canvas. */
+function makeEditable(cv, tr, ti){
+  if (cv._wired) return; cv._wired = true;
+  cv.style.cursor = "crosshair";
+  const pxToBlick = px => {
+    const v = viewState[cv.id]; if (!v) return 0;
+    const rect = cv.getBoundingClientRect();
+    const x = px / rect.width * v.W;
+    return v.t0 + (x - 10) / (v.W - 20) * (v.t1 - v.t0);
+  };
+  const localX = ev => {
+    const rect = cv.getBoundingClientRect();
+    return (ev.clientX - rect.left) / rect.width * (viewState[cv.id] ? viewState[cv.id].W : cv.width);
+  };
+  let dragging = false;
+  cv.addEventListener("mousedown", ev => {
+    dragging = true;
+    const x = localX(ev);
+    cv._sel = { a:x, b:x, ax: ev.clientX - cv.getBoundingClientRect().left };
+    draw(tr, cv.id, ti);
+  });
+  cv.addEventListener("mousemove", ev => {
+    if (!dragging) return;
+    cv._sel.b = localX(ev);
+    draw(tr, cv.id, ti);
+  });
+  const finish = ev => {
+    if (!dragging) return;
+    dragging = false;
+    const rect = cv.getBoundingClientRect();
+    const v = viewState[cv.id];
+    const toB = px => v.t0 + (px - 10) / (v.W - 20) * (v.t1 - v.t0);
+    const a = toB(Math.min(cv._sel.a, cv._sel.b));
+    const b = toB(Math.max(cv._sel.a, cv._sel.b));
+    if (Math.abs(cv._sel.b - cv._sel.a) < 4){ cv._sel = null; draw(tr, cv.id, ti); return; }
+    cv._pending = { from:a, to:b };
+    showRangeBar(cv, tr, ti);
+    draw(tr, cv.id, ti);
+  };
+  cv.addEventListener("mouseup", finish);
+  cv.addEventListener("mouseleave", finish);
+}
+
+function showRangeBar(cv, tr, ti){
+  const bar = document.getElementById("rb"+ti);
+  if (!bar) return;
+  const p = cv._pending;
+  if (!p){ bar.innerHTML = ""; return; }
+  const bpm = (lastProject && lastProject.tempos[0][1]) || 120;
+  const sec = b => b / BPQ * (60/bpm);
+  bar.innerHTML =
+    '<span class="selinfo">選択 ' + sec(p.from).toFixed(2) + 's – ' + sec(p.to).toFixed(2) + 's</span>'
+    + '<button class="btn sm" onclick="editRange('+ti+',\'up\')">▲ オクターブ上げ</button>'
+    + '<button class="btn sm" onclick="editRange('+ti+',\'down\')">▼ オクターブ下げ</button>'
+    + '<button class="btn sm sec" onclick="editRange('+ti+',\'reset\')">✕ この範囲のピッチを取消</button>'
+    + '<button class="btn sm sec" onclick="clearSel('+ti+')">選択解除</button>'
+    + ((curveEdits[ti]||[]).length
+        ? '<button class="btn sm sec" onclick="undoEdit('+ti+')">↶ 直前の編集を戻す ('+curveEdits[ti].length+')</button>'
+        : '');
+}
+
+function editRange(ti, op){
+  const cv = document.getElementById("cv"+ti);
+  if (!cv || !cv._pending) return;
+  (curveEdits[ti] = curveEdits[ti] || []).push({ from:cv._pending.from, to:cv._pending.to, op });
+  cv._sel = null; cv._pending = null;
+  rerender();
+}
+function clearSel(ti){
+  const cv = document.getElementById("cv"+ti);
+  if (cv){ cv._sel=null; cv._pending=null; showRangeBar(cv,null,ti); draw(lastProject.tracks[ti], "cv"+ti, ti); }
+}
+function undoEdit(ti){
+  if (curveEdits[ti]) curveEdits[ti].pop();
+  rerender();
+}
+window.editRange = editRange; window.clearSel = clearSel; window.undoEdit = undoEdit;
+
+/* Re-run the conversion with the current edits applied. */
+function rerender(){ if (pending.svp) run(true); }
+</script>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a2341dd1b8cfaff1',t:'MTc4NTQxMTkxOQ=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script><script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a4338eaad9340af0',t:'MTc5MDc3NDc2NQ=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script><script type="module" src="https://static.cloudflareinsights.com/beacon.min.js/v31edd6df95cf4e85bb4c19e7a9bdbcba1788362987495" integrity="sha512-iIg7k2xntmwu6/uSb5tpc/hySgZc4eoL31yB29W6tJFo2akwjPWcEqnCEdJvGexCL0KEQwVYv5BlowfhVz26hg==" data-cf-beacon='{"version":"2024.11.0","token":"1954b47c125f43f8b4338b3c4f804e4f","spa":2}' crossorigin="anonymous"></script>
+</body>
+</html>
