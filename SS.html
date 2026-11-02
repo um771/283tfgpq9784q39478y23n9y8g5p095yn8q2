@@ -350,7 +350,7 @@ footer { text-align: center; color: #5b6378; font-size: 11px; padding: 24px 0 40
         <tr><td>マルコフ連鎖</td><td>USE_MARKOV_MODE</td></tr>
         <tr><td>視点モード</td><td>HERO_MODE</td></tr>
         <tr><td>視点キャラ固定（上級）</td><td>—（SS.html独自機能。py版には無い。全モードで「今回の視点は～」を1名に確定。-1/3では所属txtの採用を確認、不採用ならリトライ。優先度順序は不変。「group:◯◯」指定でグループから1名をクリックごとに抽選）</td></tr>
-        <tr><td>テーマ提示（最後の1行）</td><td>USE_LAST_MARKOV_LINE_MODE</td></tr>
+        <tr><td>題材断片の提示</td><td>USE_LAST_MARKOV_LINE_MODE</td></tr>
         <tr><td>特殊視点レート（％）</td><td>SPECIAL_HERO_RATE</td></tr>
         <tr><td>視点キャラ2人レート（％）</td><td>DOUBLE_HERO_RATE</td></tr>
         <tr><td>視点なしレート（％）</td><td>NO_HERO_RATE</td></tr>
@@ -1698,7 +1698,7 @@ var SkeletonEngine = (function () {
   };
 
   // 物語の内容を持つ軸と、タグに出すときの呼び名。
-  // 値は軸値そのものではなく、文中に現れた語句をそのまま出す。
+  // 値は文中に現れた語句をそのまま出す。軸値自体は出さない。
   var NARRATIVE = [
     { axis: '壊れ方', label: '問題', cut: ['発生時点', '発生場所'] },
     { axis: '逸脱', label: '異変', cut: [] },
@@ -1786,8 +1786,7 @@ var NovelGen = (function () {
   }
 
   // 未設定・不正値のときは既定値へフォールバックする数値取得
-  // （旧バージョンの保存設定を読み込んだ場合に後から追加された確率系
-  //   パラメータが undefined になり、確率判定が常に false になるのを防ぐ）
+  // （保存設定に確率系の項目がない場合、undefined になると確率判定が常に false になるのを防ぐ）
   function numOr(v, fallback) {
     var n = Number(v);
     if (v === null || v === undefined || v === '' || isNaN(n)) return fallback;
@@ -1971,7 +1970,7 @@ var NovelGen = (function () {
   }
 
   // ★ 冒頭／終盤パターンの「注入レートを外した」場合の代替文。
-  //   冒頭.txt／終盤.txt は使わず、テーマ1行（これがテーマの話を書け）と
+  //   冒頭.txt／終盤.txt は使わず、題材断片の注記（THEME_NOTE）と
   //   まったく同じアルゴリズム（マルコフ.txt・精度4固定の1行マルコフ）で
   //   文を作り、「冒頭は、〜」「終盤は、〜」の形式で返す（括弧は付けない）。
   function generateFlowFallbackLine(prefix, markovText, charLimit, P, cacheKey) {
@@ -1991,14 +1990,34 @@ var NovelGen = (function () {
   //   （markov）を添える。「冒頭は、〜」「終盤は、〜」行自体は、骨格レートを
   //   外した場合・骨格生成に失敗した場合も必ずマルコフ代替で入る。
   // ============================================================
+  // 題材断片の注記。書式は本文へ写さず、語ごとに対応物へ割り当てて状態を移す。
+  var THEME_NOTE = '↑\nこれは題材断片。語ごとに対応物を割り当て、位置、所有、形状、可否を場面ごとに移す。注記、区切り、語と値の組は書式として扱い、本文へ写さない。主題や教訓として書かない。';
+  var DATA_NOTE = 'これは題材断片。語ごとに対応物を割り当て、状態を場面ごとに移す。注記、区切り、語と値の組は書式として扱い、本文へ写さない。';
+
+  // 1行マルコフが空を返したときの題材断片。語を必ず1行分プロンプトへ渡す。
+  var FALLBACK_THEME_LINE = '人物と物と場所を一つずつ置き、その位置と所有を次の場面で変える。';
+  function fallbackThemeFragment(text, limit) {
+    var n = Math.max(1, limit);
+    if (text) {
+      var lines = text.split(/\r?\n/).map(function (l) { return l.trim(); }).filter(function (l) { return l; });
+      if (lines.length) {
+        var line = lines[Math.floor(Math.random() * lines.length)];
+        return line.slice(0, Math.max(1, Math.min(n, line.length)));
+      }
+    }
+    return FALLBACK_THEME_LINE.slice(0, Math.max(1, Math.min(n, FALLBACK_THEME_LINE.length)));
+  }
+
   var FLOW_NOTE = {
     '冒頭': {
-      skel:   '↑\nこれが冒頭の流れ。文の直後の［ ］は、この冒頭に課された物語機能の指定（骨格カード）である。タグの全項目を厳守して書き、どれも外さないこと。指定文とタグの値は物語機能の指定であり、その語をそのまま本文の語彙・固有名詞として置かない。値が指す事柄は、本編の人物・物・行動として本文中に置き、読者がその場面を読むだけで何が起きているかを追える形にする。特に犠牲・喪失・トラブルの指定は勝手な回避・軽減・後出しの撤回を禁止する。冒頭の流れを、本編の人物、対象、行動、条件として具体化する。その場面の知覚や会話を担う要素と、後の出来事の根拠に使う要素を分ける。後に使う要素は、初出の性質と利用条件から接続する。全ての言及へ後の回収を割り当てない。',
-      markov: '↑\nこれが冒頭の流れ。読み取れる人物、対象、動作、条件を選び、本編で成立する具体的な場面を作る。解釈できない接続を、伏線や主題として本文に持ち込まない。'
+      skel:   '↑\nこれが冒頭の流れ。文の直後の［ ］は、この冒頭に課された物語機能の指定である。タグの全項目を厳守して書き、どれも外さないこと。指定文とタグの値は書式として扱い、その語を本文の語彙・固有名詞として置かない。値が指す事柄を語ごとに対応物へ割り当て、本編の人物、物、行動、条件として本文中に置き、読者がその場面を読むだけで何が起きているかを追える形にする。対応物の位置、所有、形状、可否を場面ごとに移し、前の場面と同じ状態のまま話題に出る場面を作らない。特に犠牲、喪失、トラブルの指定は回避、軽減、後出しの撤回を禁止する。後に使う要素は、初出の性質と利用条件から接続する。全ての言及へ後の回収を割り当てない。本文の1行目にこの文を書かない。1行目は、人物が誰かへ働きかける発話か、その働きかけへの反応から始める。状況の要約、時刻や場所の説明、人物紹介から始めない。',
+      slot:   '↑\nこれが冒頭の流れ。文の直後の［ ］は、この冒頭に課された物語機能の指定である。タグの全項目を厳守して書き、どれも外さないこと。指定文とタグの値は書式として扱い、その語を本文の語彙・固有名詞として置かない。値が指す事柄を語ごとに対応物へ割り当て、本編の人物、物、行動、条件として本文中に置き、読者がその場面を読むだけで何が起きているかを追える形にする。対応物の位置、所有、形状、可否を場面ごとに移し、前の場面と同じ状態のまま話題に出る場面を作らない。特に犠牲、喪失、トラブルの指定は回避、軽減、後出しの撤回を禁止する。後に使う要素は、初出の性質と利用条件から接続する。全ての言及へ後の回収を割り当てない。本文の1行目にこの文を書かない。1行目は、人物が誰かへ働きかける発話か、その働きかけへの反応から始める。状況の要約、時刻や場所の説明、人物紹介から始めない。',
+      markov: '↑\nこれが冒頭の流れ。接続が意味を確定しない場合も、読み取れる人物、対象、動作、条件の語ごとに対応物を割り当て、本編で成立する具体的な場面を作る。対応物の位置、所有、形状、可否を場面ごとに移す。解釈できない接続を、伏線、主題、不条理、人物の分からないという発言へ移さない。本文の1行目にこの文を書かず、人物の働きかけか反応から始める。'
     },
     '終盤': {
-      skel:   '↑\nこれが終盤の流れ。文の直後の［ ］は、この結末に課された物語機能の指定（骨格カード）である。タグの全項目を厳守して書き、どれも外さないこと。指定文とタグの値は物語機能の指定であり、その語をそのまま本文の語彙・固有名詞として置かない。値が指す事柄は、本編の人物・物・行動として本文中に置き、読者がその場面を読むだけで何が起きているかを追える形にする。特に犠牲が「死亡」の場合は、指定された死因のまま必ず死亡エンドとして直接描け。死亡のぼかし・生存へのすり替え・直前の回避は禁止する。終盤の結果を、本文で成立した条件、人物の知識、行動から実現する。伏線を使う場合は、初出時の性質と利用条件を保つ。語句や数値の再登場だけで決着の根拠にしない。',
-      markov: '↑\nこれが終盤の流れ。読み取れる結果を、本編の人物、行動、条件から成立させる。意味を確定できない語句を決着の根拠として使わない。'
+      skel:   '↑\nこれが終盤の流れ。文の直後の［ ］は、この結末に課された物語機能の指定である。タグの全項目を厳守して書き、どれも外さないこと。指定文とタグの値は書式として扱い、その語を本文の語彙・固有名詞として置かない。値が指す事柄を語ごとに対応物へ割り当て、本編の人物、物、行動として本文中に置く。特に犠牲に死亡が指定された場合は、その死因のまま必ず死亡エンドとして直接描け。死亡のぼかし、生存へのすり替え、直前の回避は禁止する。終盤の結果を、本文で成立した条件、人物の知識、行動から実現する。中心課題の結果を対応物の最終状態として確定し、別の物を指す構成にしない。対応物の状態は場面ごとに異ならせ、初出の性質と利用条件を保つ。語句や数値の再登場だけで決着の根拠にしない。本文の最終行は人物の発話行とし、この文をそのまま書かない。結末の要約、主題、教訓として書かない。',
+      slot:   '↑\nこれが終盤の流れ。文の直後の［ ］は、この結末に課された物語機能の指定である。タグの全項目を厳守して書き、どれも外さないこと。指定文とタグの値は書式として扱い、その語を本文の語彙・固有名詞として置かない。値が指す事柄を語ごとに対応物へ割り当て、本編の人物、物、行動として本文中に置く。特に犠牲に死亡が指定された場合は、その死因のまま必ず死亡エンドとして直接描け。死亡のぼかし、生存へのすり替え、直前の回避は禁止する。終盤の結果を、本文で成立した条件、人物の知識、行動から実現する。中心課題の結果を対応物の最終状態として確定し、別の物を指す構成にしない。対応物の状態は場面ごとに異ならせ、初出の性質と利用条件を保つ。語句や数値の再登場だけで決着の根拠にしない。本文の最終行は人物の発話行とし、この文をそのまま書かない。結末の要約、主題、教訓として書かない。',
+      markov: '↑\nこれが終盤の流れ。意味を確定できない語句も、語ごとに対応物を割り当て、対応物同士の因果を本編の人物、行動、条件から成立させる。中心課題の結果を対応物の最終状態として確定する。本文の最終行は人物の発話行とする。'
     }
   };
 
@@ -2029,7 +2048,7 @@ var NovelGen = (function () {
   //   形式の構造タグ行として同じブロックに同梱する。
   //   プロンプトを受ける執筆AIは物語機能の指定から逃げられなくなり、
   //   特に犠牲=死亡を勝手に回避できなくなる。
-  //   失敗・不発時は テーマ行（これがテーマの話を書け）とまったく同じ
+  //   失敗・不発時は 題材断片の注記（THEME_NOTE）とまったく同じ
   //     マルコフ.txt・精度4固定の1行マルコフで代用する（「冒頭は、」「終盤は、」の形）。
   //   ※ 冒頭.txt／終盤.txt をコーパスにするマルコフは冒頭・終盤行には使わない。
   // ============================================================
@@ -2126,7 +2145,7 @@ var NovelGen = (function () {
   // ============================================================
   // キャラ資料の細分化と優先度選出
   // ============================================================
-  // -1 / 3 では、旧「ブーン・モナー・他の人」の三択を使わない。
+  // -1 / 3 では、三択の固定グループを使わない。
   // ここに並ぶ11資料のキャラ（計29名）を毎回シャッフルし、キャラの
   // 所属資料（txt）を上から順にプロンプト先頭へ加える。
   // 採用キャラ資料の合計文字数下限（パラメータ minCharMaterialChars の既定値。0=チェック無し）
@@ -2273,7 +2292,7 @@ var NovelGen = (function () {
       var en = heroEntryName(all[i]);
       if (en === search || en === name) return all[i];
     }
-    // フォールバック：従来の部分一致
+    // フォールバック：部分一致
     for (j = 0; j < all.length; j++) {
       if (entryHasName(all[j], search)) return all[j];
     }
@@ -2284,9 +2303,9 @@ var NovelGen = (function () {
   // 特殊視点の候補キャラ（キャラテンプレ.txt参照）
   // 特殊視点「[ ラベル：AA 名前 ]」のAA 名前部分は、キャラテンプレ.txtの
   // 表（キャラ／代表AA列）から「AA　名前」形式で毎回組み立てる。
-  // テンプレに行を追加・修正すれば候補へ自動反映される。旧来の固定リスト
+  // テンプレの行が候補へ自動反映される。内蔵の固定リスト
   // DATA.bugai はテンプレ欠落時（未取得・空・破損）のフォールバックとして残す。
-  // 形式は現行維持：代表AA ＋ 全角スペース ＋ キャラ名（（…）以降を除去）。
+  // 形式は代表AA ＋ 全角スペース ＋ キャラ名（（…）以降を除去）。
   // 表の分割は buildCharTemplate とは別実装（\| をAAの一部とみなす）。
   // ★ 採用資料に登場するキャラは資料側の名前を優先する（例：超加速採用時、
   // テンプレ「杉浦ロマネスク」→資料名「ロマネスク」。資料と特殊視点の
@@ -2377,7 +2396,7 @@ var NovelGen = (function () {
       var entry = aa + '　' + (over || core);
       if (!seen[entry]) { seen[entry] = true; out.push(entry); }
     }
-    // テンプレが無い・空・壊れている場合は旧固定リストを使う（生成破綻防止）
+    // テンプレが無い・空・壊れている場合は内蔵の固定リストを使う（生成破綻防止）
     if (!out.length) out = (DATA.bugai || []).slice();
     return out;
   }
@@ -2413,7 +2432,7 @@ var NovelGen = (function () {
 
     var mode = currentHeroMode;
     if (!suppressHero && Math.random() * 100 < P.specialHeroRate) {
-      // ★ 特殊視点の候補はキャラテンプレ.txt参照（欠落時のみ旧固定リスト）
+      // ★ 特殊視点の候補はキャラテンプレ.txt参照（欠落時のみ内蔵の固定リスト）
       var spCands = specialHeroCandidates(files, fileIds);
       if (spCands.length) {
         heroText = '今回の視点は[ ' + choice(DATA.specialLabels) + '：' + choice(spCands) + ' ]です';
@@ -2499,7 +2518,7 @@ var NovelGen = (function () {
             var generated1 = generateMarkovText(combined, MARKOV_ORDER, randint(effectiveMin, actualMax), left, P, '__priority_c1');
             if (generated1) {
               if (!addBase(generated1)) return null;
-              if (!addBase('---\nこれは資料です')) return null;
+              if (!addBase('---\n' + DATA_NOTE)) return null;
               sealBase();
             }
           }
@@ -2510,7 +2529,7 @@ var NovelGen = (function () {
             var generated2 = generateMarkovText(files.markov, MARKOV_ORDER, randint(effectiveMin, actualMax), left2, P, 'markov');
             if (generated2) {
               if (!addBase(generated2)) return null;
-              if (!addBase('---\nこれは資料です')) return null;
+              if (!addBase('---\n' + DATA_NOTE)) return null;
               sealBase();
             }
           }
@@ -2521,7 +2540,7 @@ var NovelGen = (function () {
           var generated3 = generateMarkovText(files.markov, MARKOV_ORDER, randint(effectiveMin, actualMax), left3, P, 'markov');
           if (generated3) {
             if (!addBase(generated3)) return null;
-            if (!addBase('↑\nこれは本編の資料です。軽度な改変はOK')) return null;
+            if (!addBase('↑\n' + DATA_NOTE)) return null;
             sealBase();
           }
         }
@@ -2537,8 +2556,8 @@ var NovelGen = (function () {
     var templateBlockIdx = baseBlocks.length;
 
     // ★ 冒頭フロー指定（骨格カード → マルコフ.txtの1行マルコフの順で合成）
-    //   最後.txtの直後・テーマ提示の直前に置く。
-    //   「冒頭は、～～なる。」→「↑ これが冒頭の流れ」→ テーマ1行 →「↑ これがテーマの話を書け」の順。
+    //   最後.txtの直後・題材断片の提示の直前に置く。
+    //   「冒頭は、～～なる。」→ 冒頭の注記 → 題材断片 → THEME_NOTE の順。
     if (P.useOpeningMarkovMode === 1) {
       var remO = maxChar - baseLen;
       if (remO > 0) {
@@ -2549,7 +2568,7 @@ var NovelGen = (function () {
           opFromSkel = !!op;
         }
         // ★ 骨格レートを外した（または骨格生成に失敗した）場合でも文面を消さず、
-        //   「これがテーマの話を書け」と同じアルゴリズム（マルコフ.txtの1行マルコフ）
+        //   THEME_NOTE と同じアルゴリズム（マルコフ.txtの1行マルコフ）
         //   で作った文を「冒頭は、〜」の形式で代わりに入れる。
         if (!op) op = generateFlowFallbackLine('冒頭は、', files.markov, Math.min(160, remO), P, '__one_opening_fb');
         if (op) {
@@ -2573,7 +2592,7 @@ var NovelGen = (function () {
           enFromSkel = !!en;
         }
         // ★ 骨格レートを外した（または骨格生成に失敗した）場合でも文面を消さず、
-        //   「これがテーマの話を書け」と同じアルゴリズム（マルコフ.txtの1行マルコフ）
+        //   THEME_NOTE と同じアルゴリズム（マルコフ.txtの1行マルコフ）
         //   で作った文を「終盤は、〜」の形式で代わりに入れる。
         if (!en) en = generateFlowFallbackLine('終盤は、', files.markov, Math.min(160, remE), P, '__one_ending_fb');
         if (en) {
@@ -2586,13 +2605,14 @@ var NovelGen = (function () {
 
     if (P.useLastMarkovLineMode === 1) {
       var left4 = maxChar - baseLen;
-      if (left4 > 0) {
-        var oneLine = generateMarkovOneLiner(files.markov, MARKOV_ORDER, Math.min(120, left4), P);
-        if (oneLine) {
-          if (!addBase(oneLine + '\n↑\nこれがテーマの話を書け')) return null;
-          sealBase();
-        }
-      }
+      var fragLimit = Math.max(1, Math.min(120, left4 - THEME_NOTE.length - 1));
+      var oneLine = generateMarkovOneLiner(files.markov, MARKOV_ORDER, fragLimit, P);
+      if (!oneLine) oneLine = fallbackThemeFragment(files.markov, fragLimit);
+      var themeBlock = oneLine + '\n' + THEME_NOTE;
+      // 残りが枯渇しても必ず挿入する。上限を断片分だけ繰り上げ、後続の固定ブロックも守る。
+      if (left4 < themeBlock.length + 2) maxChar = baseLen + themeBlock.length + 2;
+      if (!addBase(themeBlock)) return null;
+      sealBase();
     }
 
     var allToneNames = files.tone ? files.tone.split(/\r?\n/).map(function (l) { return l.trim(); }).filter(function (l) { return l; }) : [];
@@ -2680,7 +2700,7 @@ var NovelGen = (function () {
       //   視点行「今回の視点は[ ～ ]です」の直後（空行なし・同じブロック内で改行直結）に
       //   「一人称視点の形式で書くこと」を追加する。
       //   ヒット時は視点なしレート・視点モード0による「視点なし」を無視して視点行を
-      //   必ず出す（suppressHero時＝続き.txtによる視点抑止中は従来どおり視点なしのまま）。
+      //   必ず出す（suppressHero時＝続き.txtによる視点抑止中は視点なしのまま）。
       var fpHit = Math.random() * 100 < numOr(P.firstPersonRate, 0);
       // ★ 視点固定時は視点モード・視点なしレート・suppressを無視して必ず視点を付ける
       if (fixedNamePri && heroInfo.heroText) {
@@ -2708,10 +2728,10 @@ var NovelGen = (function () {
     var finalTailBlocks = makeFinalTailBlocks();
 
     // 視点・文字数も上限に含める。関係ルールと汎用キャラクター一覧は
-    // 「余白があれば」ではなく必ず入れる。ベース生成の揺らぎで超えた
+    // 上限に空きがあるかどうかにかかわらず必ず入れる。ベース生成の揺らぎで超えた
     // 場合は優先度の末尾のキャラ資料から戻す。
     function extraLen(blocks) { return blocks.reduce(function (n, x) { return n + (x ? x.length + 2 : 0); }, 0); }
-    // ★ 関係ルールと汎用キャラクター一覧は「余白があれば」ではなく必ず入れる。
+    // ★ 関係ルールと汎用キャラクター一覧は上限に空きがあるかどうかにかかわらず必ず入れる。
     //    モード3などで上限ぎりぎりのときに弾かれる事故を防ぐため、
     //    その分をキャラ資料の収容チェックに織り込んでおく。
     function tailLen() {
@@ -2738,9 +2758,9 @@ var NovelGen = (function () {
     // 上のwhileでキャラ資料を削ってでも確保する。それでも無理なら
     // 下の判定で生成自体をやり直す）。
     // ★ 汎用キャラクター一覧も保護ブロックとして必ず載せるが、場所は
-    //   関係ルールの直後ではなく最後.txtの直後（プロンプト末尾寄り）。
+    //   挿入位置は最後.txtの直後（プロンプト末尾寄り）。
     //   真ん中に置くと重要度が下がり、AIが資料外のオリキャラ（名前付きの
-    //   即席人物）を出す原因になるため移動した。最後.txtの検査項目
+    //   即席人物）を出す原因になるため、最後.txtの直後に置く。最後.txtの検査項目
     //   「10. オリキャラの使用」とセットで機能する。
     // 先頭ブロック群：採用キャラ資料グループ（各txt内の人物順はシャッフル済み、txt間は優先度順）→ 関係ルール。
     // これらは通常「プロンプト先頭」に来るが、ブロックランダム順モードでは
@@ -2848,7 +2868,7 @@ var NovelGen = (function () {
       sealBlock();
     }
 
-    // ---- ファイル収集（この旧経路はモード2の互換処理でのみ使用） ----
+    // ---- ファイル収集（モード2の互換処理で使用する経路） ----
     var fileOrder = (shuryoMode === 2) ? ['shiryou'] : ['shiryou', 'ss'];
 
     // 資料.txt を1%でマルコフ化
@@ -2908,7 +2928,7 @@ var NovelGen = (function () {
     // 汎用キャラクター一覧（キャラテンプレ.txt の動的出力）
     // ★ 出力位置は最後.txtの直後（プロンプト末尾寄り）。真ん中に置くと
     //   重要度が下がり、AIが資料外のオリキャラ（名前付きの即席人物）を
-    //   出す原因になるため移動した。最後.txtの検査項目
+    //   出す原因になるため、最後.txtの直後に置く。最後.txtの検査項目
     //   「10. オリキャラの使用」とセットで機能する。
     var charaTemplate = buildCharTemplate(chosen, heroText, shuryoMode, files, P);
 
@@ -2942,7 +2962,7 @@ var NovelGen = (function () {
             var mText1 = generateMarkovText(combinedText1, MARKOV_ORDER, mLines, remaining, P, '__c1');
             if (mText1) {
               if (!addToContents(mText1)) return null;
-              if (!addToContents('---\nこれは資料です')) return null;
+              if (!addToContents('---\n' + DATA_NOTE)) return null;
               sealBlock();
             }
           }
@@ -2956,7 +2976,7 @@ var NovelGen = (function () {
             var mText2 = generateMarkovText(markovText2, MARKOV_ORDER, mLines2, remaining2, P, 'markov');
             if (mText2) {
               if (!addToContents(mText2)) return null;
-              if (!addToContents('---\nこれは資料です')) return null;
+              if (!addToContents('---\n' + DATA_NOTE)) return null;
               sealBlock();
             }
           }
@@ -2968,7 +2988,7 @@ var NovelGen = (function () {
           var mText3 = generateMarkovText(files.markov, MARKOV_ORDER, mLines3, remaining3, P, 'markov');
           if (mText3) {
             if (!addToContents(mText3)) return null;
-            if (!addToContents('↑\nこれは本編の資料です。軽度な改変はOK')) return null;
+            if (!addToContents('↑\n' + DATA_NOTE)) return null;
             sealBlock();
           }
         }
@@ -2996,8 +3016,8 @@ var NovelGen = (function () {
     }
 
     // ★ 冒頭フロー指定（骨格カード → マルコフ.txtの1行マルコフの順で合成）
-    //   最後.txtの直後・テーマ提示の直前に置く。
-    //   「冒頭は、～～なる。」→「↑ これが冒頭の流れ」→ テーマ1行 →「↑ これがテーマの話を書け」の順。
+    //   最後.txtの直後・題材断片の提示の直前に置く。
+    //   「冒頭は、～～なる。」→ 冒頭の注記 → 題材断片 → THEME_NOTE の順。
     if (P.useOpeningMarkovMode === 1) {
       var remO = maxChar - currentLen;
       if (remO > 0) {
@@ -3008,7 +3028,7 @@ var NovelGen = (function () {
           opFromSkel = !!op;
         }
         // ★ 骨格レートを外した（または骨格生成に失敗した）場合でも文面を消さず、
-        //   「これがテーマの話を書け」と同じアルゴリズム（マルコフ.txtの1行マルコフ）
+        //   THEME_NOTE と同じアルゴリズム（マルコフ.txtの1行マルコフ）
         //   で作った文を「冒頭は、〜」の形式で代わりに入れる。
         if (!op) op = generateFlowFallbackLine('冒頭は、', files.markov, Math.min(160, remO), P, '__one_opening_fb');
         if (op) {
@@ -3032,7 +3052,7 @@ var NovelGen = (function () {
           enFromSkel = !!en;
         }
         // ★ 骨格レートを外した（または骨格生成に失敗した）場合でも文面を消さず、
-        //   「これがテーマの話を書け」と同じアルゴリズム（マルコフ.txtの1行マルコフ）
+        //   THEME_NOTE と同じアルゴリズム（マルコフ.txtの1行マルコフ）
         //   で作った文を「終盤は、〜」の形式で代わりに入れる。
         if (!en) en = generateFlowFallbackLine('終盤は、', files.markov, Math.min(160, remE), P, '__one_ending_fb');
         if (en) {
@@ -3043,16 +3063,17 @@ var NovelGen = (function () {
       }
     }
 
-    // テーマ提示（最後.txtの後にマルコフ1行とテーマ指定）
+    // テーマ提示（最後.txtの後に題材断片1行と注記）
     if (P.useLastMarkovLineMode === 1) {
       var remaining4 = maxChar - currentLen;
-      if (remaining4 > 0) {
-        var oneLine = generateMarkovOneLiner(files.markov, MARKOV_ORDER, Math.min(120, remaining4), P);
-        if (oneLine) {
-          if (!addToContents(oneLine + '\n↑\nこれがテーマの話を書け')) return null;
-          sealBlock();
-        }
-      }
+      var fragLimit2 = Math.max(1, Math.min(120, remaining4 - THEME_NOTE.length - 1));
+      var oneLine = generateMarkovOneLiner(files.markov, MARKOV_ORDER, fragLimit2, P);
+      if (!oneLine) oneLine = fallbackThemeFragment(files.markov, fragLimit2);
+      var themeBlock2 = oneLine + '\n' + THEME_NOTE;
+      // 残りが枯渇しても必ず挿入する。上限を断片分だけ繰り上げ、後続の固定ブロックも守る。
+      if (remaining4 < themeBlock2.length + 2) maxChar = currentLen + themeBlock2.length + 2;
+      if (!addToContents(themeBlock2)) return null;
+      sealBlock();
     }
 
     // ---- ジャンル・トーン提示 ----
@@ -3110,7 +3131,7 @@ var NovelGen = (function () {
     var fixedEntryTail = fixedNameTail ? heroEntryForName(fixedNameTail) : '';
     // ★ 一人称視点指定レート（firstPersonRate％・全モード共通）：ヒット時は視点行に
     //   一人称指示を改行で直結（空行なし）し、視点なしを無視して必ず視点行を出す。
-    //   suppressHero時＝続き.txtによる視点抑止中は従来どおり視点なしのまま。
+    //   suppressHero時＝続き.txtによる視点抑止中は視点なしのまま。
     var fpHitM2 = Math.random() * 100 < numOr(P.firstPersonRate, 0);
     function heroLineM2() {
       if (!heroText) return heroText;
@@ -3488,8 +3509,7 @@ var NovelGen = (function () {
     // 一覧全体をそのまま出すと、体数が増えるほどプロンプトを圧迫し、
     // AIがモブを無秩序に登場させて破綻する。毎回ここで上限体数を引く。
     function pickCount(poolSize) {
-      // ★ 修正: 旧版はここが未渡入の P を参照しており、生成のたびに
-      //   ReferenceError（P is not defined）で落ちていた。params として受け取る。
+      // ★ P は params として受け取る。未渡入の参照は ReferenceError になる。
       var a = intOr(params && params.charTemplateMin, 12), b = intOr(params && params.charTemplateMax, 40);
       var lo = Math.max(1, Math.min(a, b));
       var hi = Math.max(lo, Math.max(a, b));
@@ -3539,9 +3559,9 @@ var NovelGen = (function () {
       var sp = splitHero(filtered);
       var heroRows = sp[0], rest = sp[1];
       // 残りから提示数ぶんだけ抽出する。
-      // 旧実装は keepRate による確率間引きだったため、一覧が
-      // 大きくなるほど提示体数の期待値も比例して増えてしまい、
-      // 体数を追加した分そのままプロンプトが膨張していた。
+      // keepRate による確率間引きでは、一覧が
+      // 大きくなるほど提示体数の期待値も比例して増え、
+      // 体数を増やした分そのままプロンプトが膨張する。
       shuffle(rest);
       var slots = pickCount(heroRows.length + rest.length) - heroRows.length;
       var thinned = rest.slice(0, Math.max(0, slots));
@@ -3624,7 +3644,7 @@ var NovelGen = (function () {
       return { result: null, attempt: -1, pattern: '', chosen: {}, selectedCharFiles: [], charPriority: priority, shuryoMode: shuryoMode };
     }
 
-    // モード2（AIオリジナル設定）は従来どおり。キャラ資料の優先度選出は行わない。
+    // モード2（AIオリジナル設定）はキャラ資料の優先度選出を行わない。
     // ★ ただし視点固定時はモード2でも固定視点を適用する（資料なし＋視点固定の整合はテンプレで担保）。
     var fixedNameM2 = fixedHeroName(P);
     var fixedEntryM2 = fixedNameM2 ? heroEntryForName(fixedNameM2) : '';
@@ -3646,7 +3666,7 @@ var NovelGen = (function () {
         heroText = '今回の視点は[ ' + hero1 + ' ]です';
       }
       if (Math.random() * 100 < P.specialHeroRate) {
-        // ★ 特殊視点の候補はキャラテンプレ.txt参照（欠落時のみ旧固定リスト）
+        // ★ 特殊視点の候補はキャラテンプレ.txt参照（欠落時のみ内蔵の固定リスト）
         // モード2は詳細資料なし＝テンプレが唯一の典拠のためテンプレ名のまま
         var spCandsM2 = specialHeroCandidates(files, []);
         if (spCandsM2.length) {
@@ -3946,7 +3966,7 @@ var NovelGen = (function () {
       return { error: '外側 ' + P.maxOuterRetry + ' 回×内側 ' + P.maxRetry + ' 回、すべて失敗しました。' };
     }
 
-    // -1 / 3 は tail も上限計算済み。従来モード2だけ従来位置に追加する。
+    // -1 / 3 は tail も上限計算済み。モード2だけ既定位置に追加する。
     if (tail && finalShuryoMode === 2) finalResult = finalResult + '\n\n' + tail;
 
     var split = writeSplitFiles(finalSelectedCharFiles, finalShuryoMode, files);
@@ -4049,7 +4069,7 @@ NovelGen.setNovelData(NOVEL_DATA);
     shuffleBlocksMode: 0,     // ブロックランダム順 0=OFF（固定順） / 1=ON（視点→文字数は常に最後固定）
     useMarkovMode: 1,         // 1=ON / 0=OFF
     heroMode: -1,             // -1=ランダム / 0=視点なし / 1=必ず視点
-    useLastMarkovLineMode: 1, // テーマ（最後の1行マルコフ） 1=ON / 0=OFF
+    useLastMarkovLineMode: 1, // 題材断片の提示 1=ON / 0=OFF
     useSkeletonEngine: 1,     // 冒頭／終盤の1行を 冒頭骨格.txt／終盤骨格.txt の骨格カード（構造層）で作る 1=ON / 0=OFF（OFFまたは辞書不備・失敗時はマルコフ代替）
     skeletonRate: 50,         // 冒頭／終盤フロー行が骨格カード由来になる率（％）。外れた場合・失敗時は テーマ行と同じマルコフ.txtの1行マルコフで代用（行自体は必ず入る）
     useOpeningMarkovMode: 1,  // 冒頭フロー行（骨格→スロット→マルコフ代替）を入れる 1=ON / 0=OFF
@@ -4087,7 +4107,7 @@ NovelGen.setNovelData(NOVEL_DATA);
     { key: 'useMarkovMode', label: 'マルコフ連鎖', type: 'select', options: [[1, '1: ON'], [0, '0: OFF']] },
     { key: 'heroMode', label: '視点モード', type: 'select',
       options: [[-1, '-1: ランダム（4/5で視点あり）'], [0, '0: 視点なし'], [1, '1: 必ず視点']] },
-    { key: 'useLastMarkovLineMode', label: 'テーマ提示（最後の1行）', type: 'select', options: [[1, '1: ON'], [0, '0: OFF']] },
+    { key: 'useLastMarkovLineMode', label: '題材断片の提示', type: 'select', options: [[1, '1: ON'], [0, '0: OFF']] },
     { key: 'useSkeletonEngine', label: '冒頭／終盤の骨格カード生成（スロットtxt内の骨格辞書／構造層）', type: 'select', options: [[1, '1: ON'], [0, '0: OFF']] },
     { key: 'skeletonRate', label: '骨格カード生成レート（％）＝フロー行が骨格由来になる率。外れ・失敗時はマルコフ代替（行は必ず入る）', type: 'number', min: 0, max: 100 },
     { key: 'useOpeningMarkovMode', label: '冒頭パターン指定（骨格→マルコフ代替）', type: 'select', options: [[1, '1: ON'], [0, '0: OFF']] },
@@ -4214,7 +4234,7 @@ NovelGen.setNovelData(NOVEL_DATA);
         if (state.slots[s.id].mode === 'github' && !state.slots[s.id].url) state.slots[s.id].url = slotUrl(s);
       });
       state.params = Object.assign({}, DEFAULT_PARAMS, data.params || {});
-      // 保存済みの旧設定が1000を超えていても、新仕様の上限へ正規化する。
+      // 保存済みの設定が1000を超えていても、上限へ正規化する。
       state.params.markovLinesMax = Math.min(1000, Math.max(1, parseInt(state.params.markovLinesMax, 10) || 1000));
       state.params.markovLinesMaxShuryo = Math.min(1000, Math.max(1, parseInt(state.params.markovLinesMaxShuryo, 10) || 1000));
       // モード1は欠番。保存済み設定に残っていたらランダムへ戻す。

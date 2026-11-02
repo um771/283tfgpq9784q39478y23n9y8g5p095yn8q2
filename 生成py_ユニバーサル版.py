@@ -2,8 +2,8 @@
 小説生成プロンプト ジェネレーター（Python版）
 SS.html の JavaScript エンジンと同等の出力をする。
 
-主な変更点（旧py → 新py）:
-  - キャラ資料を11ファイル（二次創作・超加速・ラボ組・学校組・またんき・フサギコ・ぃょぅ・ツン・渡辺さん・ハイン・でぃ）に細分化
+構成:
+  - キャラ資料は11ファイル（二次創作・超加速・ラボ組・学校組・またんき・フサギコ・ぃょぅ・ツン・渡辺さん・ハイン・でぃ）に分かれる
   - キャラ単位の優先度（29名を毎回シャッフル、所属txtを順次追加）
   - ブロックランダム順モード（shuffleBlocksMode）
   - 視点キャラ固定（fixedHero / group:◯◯）
@@ -14,7 +14,7 @@ SS.html の JavaScript エンジンと同等の出力をする。
   - キャラテンプレ提示数の制限（charTemplateMin/Max）
   - キャラブロック内シャッフル
   - ダブルヒーローの短縮版無関係宣言
-  - 横断接点の11資料対応更新
+  - 横断接点の11資料対応
   - 資料未提示の人物（名前だけが登場するキャラ）の捏造防止宣言
 """
 
@@ -1067,7 +1067,7 @@ _SKEL_INTERNAL_AXES = {
 }
 
 # 物語の内容を持つ軸と、タグに出すときの呼び名。
-# 値は軸値そのものではなく、文中に現れた語句をそのまま出す。
+# 値は文中に現れた語句をそのまま出す。軸値自体は出さない。
 _SKEL_NARRATIVE = [
     {"axis": "壊れ方", "label": "問題", "cut": ["発生時点", "発生場所"]},
     {"axis": "逸脱", "label": "異変", "cut": []},
@@ -1304,16 +1304,35 @@ def generate_flow_fallback_line(prefix: str, markov_text: str, char_limit: int, 
 # フロー指示文
 # ============================================================
 
+# 題材断片の注記。書式は本文へ写さず、語ごとに対応物へ割り当てて状態を移す。
+THEME_NOTE = "↑\nこれは題材断片。語ごとに対応物を割り当て、位置、所有、形状、可否を場面ごとに移す。注記、区切り、語と値の組は書式として扱い、本文へ写さない。主題や教訓として書かない。"
+DATA_NOTE = "これは題材断片。語ごとに対応物を割り当て、状態を場面ごとに移す。注記、区切り、語と値の組は書式として扱い、本文へ写さない。"
+
+
+FALLBACK_THEME_LINE = "人物と物と場所を一つずつ置き、その位置と所有を次の場面で変える。"
+
+
+def fallback_theme_fragment(text: str, limit: int) -> str:
+    """1行マルコフが空を返したときの題材断片。語を必ず1行分プロンプトへ渡す。"""
+    n = max(1, limit)
+    if text:
+        lines = [l.strip() for l in text.splitlines() if l.strip()]
+        if lines:
+            line = random.choice(lines)
+            return line[: max(1, min(n, len(line)))]
+    return FALLBACK_THEME_LINE[: max(1, min(n, len(FALLBACK_THEME_LINE)))]
+
+
 FLOW_NOTE = {
     "冒頭": {
-        "skel": "↑\nこれが冒頭の流れ。文の直後の［ ］は、この冒頭に課された物語機能の指定（骨格カード）である。タグの全項目を厳守して書き、どれも外さないこと。特に犠牲・喪失・トラブルの指定は勝手な回避・軽減・後出しの撤回を禁止する。冒頭の流れは場面の条件として使い、本編の人物、対象、行動として具体化する。本文の1行目にこの文を書かない。1行目は、人物が誰かへ働きかける発話か、その働きかけへの反応から始める。状況の要約、時刻や場所の説明、人物紹介から始めない。後に使う要素は、初出の性質と利用条件から接続し、全ての言及へ後の回収を割り当てない。",
-        "slot": "↑\nこれが冒頭の流れ。冒頭の流れは場面の条件として使い、本編の人物、対象、行動として具体化する。本文の1行目にこの文を書かない。1行目は、人物が誰かへ働きかける発話か、その働きかけへの反応から始める。状況の要約、時刻や場所の説明、人物紹介から始めない。後に使う要素は、初出の性質と利用条件から接続し、全ての言及へ後の回収を割り当てない。",
-        "markov": "↑\nこれが冒頭の流れ。読み取れる人物、対象、動作、条件から、本編で成立する具体的な場面を作る。本文の1行目にこの文を書かず、人物の働きかけか反応から始める。解釈できない接続を、伏線や主題として本文に持ち込まない。",
+        "skel": "↑\nこれが冒頭の流れ。文の直後の［ ］は、この冒頭に課された物語機能の指定である。タグの全項目を厳守して書き、どれも外さないこと。指定文とタグの値は書式として扱い、その語を本文の語彙・固有名詞として置かない。値が指す事柄を語ごとに対応物へ割り当て、本編の人物、物、行動、条件として本文中に置き、読者がその場面を読むだけで何が起きているかを追える形にする。対応物の位置、所有、形状、可否を場面ごとに移し、前の場面と同じ状態のまま話題に出る場面を作らない。特に犠牲、喪失、トラブルの指定は回避、軽減、後出しの撤回を禁止する。後に使う要素は、初出の性質と利用条件から接続する。全ての言及へ後の回収を割り当てない。本文の1行目にこの文を書かない。1行目は、人物が誰かへ働きかける発話か、その働きかけへの反応から始める。状況の要約、時刻や場所の説明、人物紹介から始めない。",
+        "slot": "↑\nこれが冒頭の流れ。文の直後の［ ］は、この冒頭に課された物語機能の指定である。タグの全項目を厳守して書き、どれも外さないこと。指定文とタグの値は書式として扱い、その語を本文の語彙・固有名詞として置かない。値が指す事柄を語ごとに対応物へ割り当て、本編の人物、物、行動、条件として本文中に置き、読者がその場面を読むだけで何が起きているかを追える形にする。対応物の位置、所有、形状、可否を場面ごとに移し、前の場面と同じ状態のまま話題に出る場面を作らない。特に犠牲、喪失、トラブルの指定は回避、軽減、後出しの撤回を禁止する。後に使う要素は、初出の性質と利用条件から接続する。全ての言及へ後の回収を割り当てない。本文の1行目にこの文を書かない。1行目は、人物が誰かへ働きかける発話か、その働きかけへの反応から始める。状況の要約、時刻や場所の説明、人物紹介から始めない。",
+        "markov": "↑\nこれが冒頭の流れ。接続が意味を確定しない場合も、読み取れる人物、対象、動作、条件の語ごとに対応物を割り当て、本編で成立する具体的な場面を作る。対応物の位置、所有、形状、可否を場面ごとに移す。解釈できない接続を、伏線、主題、不条理、人物の分からないという発言へ移さない。本文の1行目にこの文を書かず、人物の働きかけか反応から始める。",
     },
     "終盤": {
-        "skel": "↑\nこれが終盤の流れ。文の直後の［ ］は、この結末に課された物語機能の指定（骨格カード）である。タグの全項目を厳守して書き、どれも外さないこと。特に犠牲が「死亡する」の場合は、指定された死因のまま必ず死亡エンドとして直接描け。死亡のぼかし・生存へのすり替え・直前の回避は禁止する。終盤の流れは結末の条件として使い、本文で成立した条件、人物の知識、行動から実現する。本文の最終行は人物の発話行とし、この文をそのまま書かない。結末の要約、主題、教訓として書かない。伏線を使う場合は初出時の性質と利用条件を保ち、語句や数値の再登場だけで決着の根拠にしない。",
-        "slot": "↑\nこれが終盤の流れ。終盤の流れは結末の条件として使い、本文で成立した条件、人物の知識、行動から実現する。本文の最終行は人物の発話行とし、この文をそのまま書かない。結末の要約、主題、教訓として書かない。伏線を使う場合は初出時の性質と利用条件を保ち、語句や数値の再登場だけで決着の根拠にしない。",
-        "markov": "↑\nこれが終盤の流れ。読み取れる結果を、本編の人物、行動、条件から成立させる。本文の最終行は人物の発話行とする。意味を確定できない語句を決着の根拠として使わない。",
+        "skel": "↑\nこれが終盤の流れ。文の直後の［ ］は、この結末に課された物語機能の指定である。タグの全項目を厳守して書き、どれも外さないこと。指定文とタグの値は書式として扱い、その語を本文の語彙・固有名詞として置かない。値が指す事柄を語ごとに対応物へ割り当て、本編の人物、物、行動として本文中に置く。特に犠牲に死亡が指定された場合は、その死因のまま必ず死亡エンドとして直接描け。死亡のぼかし、生存へのすり替え、直前の回避は禁止する。終盤の結果を、本文で成立した条件、人物の知識、行動から実現する。中心課題の結果を対応物の最終状態として確定し、別の物を指す構成にしない。対応物の状態は場面ごとに異ならせ、初出の性質と利用条件を保つ。語句や数値の再登場だけで決着の根拠にしない。本文の最終行は人物の発話行とし、この文をそのまま書かない。結末の要約、主題、教訓として書かない。",
+        "slot": "↑\nこれが終盤の流れ。文の直後の［ ］は、この結末に課された物語機能の指定である。タグの全項目を厳守して書き、どれも外さないこと。指定文とタグの値は書式として扱い、その語を本文の語彙・固有名詞として置かない。値が指す事柄を語ごとに対応物へ割り当て、本編の人物、物、行動として本文中に置く。特に犠牲に死亡が指定された場合は、その死因のまま必ず死亡エンドとして直接描け。死亡のぼかし、生存へのすり替え、直前の回避は禁止する。終盤の結果を、本文で成立した条件、人物の知識、行動から実現する。中心課題の結果を対応物の最終状態として確定し、別の物を指す構成にしない。対応物の状態は場面ごとに異ならせ、初出の性質と利用条件を保つ。語句や数値の再登場だけで決着の根拠にしない。本文の最終行は人物の発話行とし、この文をそのまま書かない。結末の要約、主題、教訓として書かない。",
+        "markov": "↑\nこれが終盤の流れ。意味を確定できない語句も、語ごとに対応物を割り当て、対応物同士の因果を本編の人物、行動、条件から成立させる。中心課題の結果を対応物の最終状態として確定する。本文の最終行は人物の発話行とする。",
     },
 }
 
@@ -2121,7 +2140,7 @@ def build_contents_priority(files: dict, shuryo_mode: int, use_markov: bool,
                     if gen:
                         if not add_base(gen):
                             return None
-                        if not add_base("---\nこれは資料です"):
+                        if not add_base("---\n" + DATA_NOTE):
                             return None
                         seal_base()
             if files.get("markov"):
@@ -2132,7 +2151,7 @@ def build_contents_priority(files: dict, shuryo_mode: int, use_markov: bool,
                     if gen2:
                         if not add_base(gen2):
                             return None
-                        if not add_base("---\nこれは資料です"):
+                        if not add_base("---\n" + DATA_NOTE):
                             return None
                         seal_base()
         else:
@@ -2143,7 +2162,7 @@ def build_contents_priority(files: dict, shuryo_mode: int, use_markov: bool,
                 if gen:
                     if not add_base(gen):
                         return None
-                    if not add_base("↑\nこれは本編の資料です。軽度な改変はOK"):
+                    if not add_base("↑\n" + DATA_NOTE):
                         return None
                     seal_base()
 
@@ -2203,15 +2222,20 @@ def build_contents_priority(files: dict, shuryo_mode: int, use_markov: bool,
                     return None
                 seal_base()
 
-    # テーマ
+    # テーマ提示（題材断片1行と注記）
     if USE_LAST_MARKOV_LINE_MODE == 1:
         left = max_char - base_len
-        if left > 0:
-            one = generate_markov_one_liner(files.get("markov", ""), MARKOV_ORDER, min(120, left))
-            if one:
-                if not add_base(one + "\n↑\nこれは題材の断片。本文の条件として使い、主題や教訓として書かない"):
-                    return None
-                seal_base()
+        frag_limit = max(1, min(120, left - len(THEME_NOTE) - 1))
+        one = generate_markov_one_liner(files.get("markov", ""), MARKOV_ORDER, frag_limit)
+        if not one:
+            one = fallback_theme_fragment(files.get("markov", ""), frag_limit)
+        theme_block = one + "\n" + THEME_NOTE
+        # 残りが枯渇しても必ず挿入する。上限を断片分だけ繰り上げ、後続の固定ブロックも守る。
+        if left < len(theme_block) + 2:
+            max_char = base_len + len(theme_block) + 2
+        if not add_base(theme_block):
+            return None
+        seal_base()
 
     # トーン
     tone_raw = files.get("tone")
@@ -2402,7 +2426,7 @@ def build_contents(chosen: dict, use_markov: bool, hero_mode: int, hero_text: st
         return None
 
     if shuryo_mode != 2:
-        # モード2では旧3グループの関係ルールは使わない
+        # モード2では3グループの関係ルールは使わない
         selected_ids = []
         if chosen.get("ブーン"):
             selected_ids.append("nijisousaku")
@@ -2440,7 +2464,7 @@ def build_contents(chosen: dict, use_markov: bool, hero_mode: int, hero_text: st
                     if gen:
                         if not add(gen):
                             return None
-                        if not add("---\nこれは資料です"):
+                        if not add("---\n" + DATA_NOTE):
                             return None
             markov = files_global.get("markov")
             if markov:
@@ -2451,7 +2475,7 @@ def build_contents(chosen: dict, use_markov: bool, hero_mode: int, hero_text: st
                     if gen2:
                         if not add(gen2):
                             return None
-                        if not add("---\nこれは資料です"):
+                        if not add("---\n" + DATA_NOTE):
                             return None
         else:
             left = max_char - current_len
@@ -2461,7 +2485,7 @@ def build_contents(chosen: dict, use_markov: bool, hero_mode: int, hero_text: st
                 if gen:
                     if not add(gen):
                         return None
-                    if not add("↑\nこれは本編の資料です。軽度な改変はOK"):
+                    if not add("↑\n" + DATA_NOTE):
                         return None
 
     tsuzuki = files_global.get("tsuzuki")
@@ -2518,11 +2542,16 @@ def build_contents(chosen: dict, use_markov: bool, hero_mode: int, hero_text: st
 
     if USE_LAST_MARKOV_LINE_MODE == 1:
         left = max_char - current_len
-        if left > 0:
-            one = generate_markov_one_liner(files_global.get("markov", ""), MARKOV_ORDER, min(120, left))
-            if one:
-                if not add(one + "\n↑\nこれは題材の断片。本文の条件として使い、主題や教訓として書かない"):
-                    return None
+        frag_limit = max(1, min(120, left - len(THEME_NOTE) - 1))
+        one = generate_markov_one_liner(files_global.get("markov", ""), MARKOV_ORDER, frag_limit)
+        if not one:
+            one = fallback_theme_fragment(files_global.get("markov", ""), frag_limit)
+        theme_block = one + "\n" + THEME_NOTE
+        # 残りが枯渇しても必ず挿入する。上限を断片分だけ繰り上げ、後続の固定ブロックも守る。
+        if left < len(theme_block) + 2:
+            max_char = current_len + len(theme_block) + 2
+        if not add(theme_block):
+            return None
 
     tone_raw = files_global.get("tone")
     all_tone = [l.strip() for l in (tone_raw or "").splitlines() if l.strip()]
