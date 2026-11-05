@@ -1519,7 +1519,7 @@ var SkeletonEngine = (function () {
   //   {スロット名・@#軸名} … スロット名が「・」で終わるときは、解決した軸の値を
   //                   スロット名に連結して語彙プールを選ぶ
   //                   （被り名詞・@#被り対象 → スロット「被り名詞・道具」）
-  function renderParts(dict, card, parts, usedEntries, depth) {
+  function renderParts(dict, card, parts, usedEntries, depth, markovText, P) {
     depth = depth || 0;
     var out = '';
     for (var p = 0; p < parts.length; p++) {
@@ -1545,7 +1545,7 @@ var SkeletonEngine = (function () {
           var sub = null;
           for (var fi = 0; fi < list.length; fi++) {
             var before = usedEntries.length;
-            var r2 = renderParts(dict, card, list[fi], usedEntries, depth + 1);
+            var r2 = renderParts(dict, card, list[fi], usedEntries, depth + 1, markovText, P);
             if (r2 != null) { sub = r2; break; }
             usedEntries.length = before;   // 失敗したテンプレートの語彙は巻き戻す
           }
@@ -1618,12 +1618,18 @@ var SkeletonEngine = (function () {
       }
       var pick = weightedPick(cand);
       usedEntries.push(pick);
-      out += pick.text;
+      // @MALCOVタグを検出してマルコフ生成文に置換
+      if (pick.text === '@MALCOV' && markovText && P) {
+        var malcovSentence = generateMarkovOneLiner(markovText, 4, 50, P, '__serifu');
+        out += malcovSentence || pick.text;
+      } else {
+        out += pick.text;
+      }
     }
     return out;
   }
 
-  function realize(dict, card, minChars, maxChars, hist, tries) {
+  function realize(dict, card, minChars, maxChars, hist, tries, markovText, P) {
     var frames = [];
     for (var i = 0; i < dict.frames.length; i++) {
       if (condsPass(dict.frames[i].conds, card)) frames.push(dict.frames[i]);
@@ -1631,7 +1637,7 @@ var SkeletonEngine = (function () {
     if (!frames.length) return '';
     for (var t = 0; t < tries; t++) {
       var frame = weightedPick(frames);
-      var res = renderParts(dict, card, frame.parts, [], 0);
+      var res = renderParts(dict, card, frame.parts, [], 0, markovText, P);
       if (res == null) continue;
       var body = res.replace(/\s+/g, '');
       if (!body) continue;
@@ -1655,14 +1661,16 @@ var SkeletonEngine = (function () {
     for (var t = 0; t < (opts.cardTries || 60); t++) {
       var card = drawCard(dict, hist);
       if (tooSimilar(card, hist, dict.keys)) continue;
-      var body = realize(dict, card, minChars, maxChars, hist, tries);
+      var markovText = opts.markovText;
+      var P = opts.P;
+      var body = realize(dict, card, minChars, maxChars, hist, tries, markovText, P);
       if (!body) continue;
       recordHistory(kind, card, body);
       return { text: dict.prefix + body + dict.suffix, body: body, axes: card.axes, mutex: card.mutex };
     }
     // 履歴との重複判定を緩めて最終の1回だけ作る（空振りで注入ごと消えるのを防ぐ）
     var card2 = drawCard(dict, hist);
-    var body2 = realize(dict, card2, minChars, maxChars, null, tries);
+    var body2 = realize(dict, card2, minChars, maxChars, null, tries, markovText, P);
     if (body2) {
       recordHistory(kind, card2, body2);
       return { text: dict.prefix + body2 + dict.suffix, body: body2, axes: card2.axes, mutex: card2.mutex };
@@ -2080,7 +2088,9 @@ var NovelGen = (function () {
         minChars: 18,
         maxChars: Math.max(20, limit - 10),
         tries: 120,
-        cardTries: 60
+        cardTries: 60,
+        markovText: files.markov,
+        P: P
       });
     } catch (e) { result = ''; }
     if (!result || !result.text) return '';
