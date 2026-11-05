@@ -1756,6 +1756,33 @@ TEMPLATE_EXCLUDE_AA_BY_FILE = {
 }
 
 
+# 詳細キャラ資料を持つキャラの、キャラテンプレ.txt の表に置かれた行名。
+# 資料側の表記とテンプレ側の行名が異なるキャラだけを対応づける。
+# キャラテンプレ.txt はこの対応表の行名で行を引き、AA では照合しない
+# （AA を共有する派生キャラの行まで同じ扱いになるため）。
+TEMPLATE_ROW_NAME_BY_MATERIAL_NAME = {
+    "ペニサス": "ペニサス伊藤",
+    "トソン": "都村トソン",
+    "キュート": "素直キュート",
+    "ロマネスク": "杉浦ロマネスク",
+    "またんき": "斉藤またんき",
+}
+
+# 詳細キャラ資料を持つキャラの、キャラテンプレ.txt 側の行名集合。
+DETAIL_MATERIAL_ROW_NAMES = {
+    TEMPLATE_ROW_NAME_BY_MATERIAL_NAME.get(n, n)
+    for m in CHAR_MATERIALS for n in m["names"]
+}
+
+
+def _is_detail_material_row(row) -> bool:
+    """キャラテンプレ.txt の1行が、詳細キャラ資料を持つキャラの行かどうか。"""
+    if not row:
+        return False
+    core = (row[0] or "").split("（")[0].strip()
+    return bool(core and core in DETAIL_MATERIAL_ROW_NAMES)
+
+
 def _parse_template(text: str):
     header = None
     sep = None
@@ -1803,10 +1830,21 @@ def build_char_template(selected_ids: list[str], hero_text: str, shuryo_mode: in
         return heroes, others
 
     if shuryo_mode == 2:
-        hero_rows, rest = split_hero(rows)
+        # モード2の一覧は、詳細キャラ資料を持つキャラの行を提示数に関わらず
+        # 常に含める。ブーン系SSはキャラクターの集合が作品をまたいで共有されるため、
+        # 詳細資料を読ませないモードでも、その集合のキャラをメインとして扱う。
+        # 固定枠の並びは毎回シャッフルする。テンプレの行順のまま並べると、
+        # 特定の行が毎回一覧の先頭に立ち、そのキャラを主人公にした話へ寄る。
+        # 視点キャラの行だけは一覧の先頭へ置く。
+        fixed_rows = [r for r in rows if _is_detail_material_row(r)]
+        rest_rows = [r for r in rows if not _is_detail_material_row(r)]
+        random.shuffle(fixed_rows)
+        fixed_hero_rows, fixed_others = split_hero(fixed_rows)
+        # 視点キャラは固定枠に入らない場合も一覧から漏らさない。
+        hero_rows, rest = split_hero(rest_rows)
         random.shuffle(rest)
-        slots = pick_count(len(hero_rows) + len(rest)) - len(hero_rows)
-        kept = hero_rows + rest[:max(0, slots)]
+        # 固定枠の後ろに、キャラテンプレ提示数の枠だけランダムな行を加える。
+        kept = fixed_hero_rows + hero_rows + fixed_others + rest[:pick_count(len(rest))]
     else:
         exclude = set()
         exclude_aa = set()
@@ -2064,6 +2102,21 @@ FIRST_PERSON_LINE = "一人称視点の形式で書くこと"
 # build_contents（プロンプト本体の組み立て）— 11資料対応版
 # ============================================================
 
+def first_markov_source(files: dict) -> str:
+    """1本目のマルコフ素材：SS.txt、全キャラ資料、共通.txt を改行で連結する。
+
+    素材は採用キャラ資料の選出結果に依存させない（全資料を対象にする）。
+    2本目のマルコフ素材は マルコフ.txt 単体。
+    """
+    parts = [files.get("ss", "")]
+    for m in CHAR_MATERIALS:
+        if files.get(m["id"]):
+            parts.append(files[m["id"]])
+    if files.get("kyoutsu"):
+        parts.append(files["kyoutsu"])
+    return "\n".join(p for p in parts if p)
+
+
 def build_contents_priority(files: dict, shuryo_mode: int, use_markov: bool,
                             markov_lines_max: int, max_char: int,
                             char_priority: list[dict] | None = None,
@@ -2127,11 +2180,10 @@ def build_contents_priority(files: dict, shuryo_mode: int, use_markov: bool,
         effective_min = min(MARKOV_LINES_HARD_MAX, 1 if shuryo_mode == 3 else MARKOV_LINES_MIN)
         actual_max = min(MARKOV_LINES_HARD_MAX, max(effective_min, markov_lines_max))
         if shuryo_mode == 3:
-            all_parts = [files.get("ss", "")]
-            for m in CHAR_MATERIALS:
-                if files.get(m["id"]):
-                    all_parts.append(files[m["id"]])
-            combined = "\n".join(p for p in all_parts if p)
+            # モード3の1本目のマルコフ素材も、キャラ資料の優先度決定より先に作る。
+            # 素材は SS.txt・全キャラ資料・共通.txt を連結したもので、
+            # 後段で採用するキャラ資料とは独立させる。
+            combined = first_markov_source(files)
             if combined:
                 left = max_char - base_len
                 if left > 0:
@@ -2451,11 +2503,8 @@ def build_contents(chosen: dict, use_markov: bool, hero_mode: int, hero_text: st
         actual_max = max(effective_min, markov_lines_max)
 
         if shuryo_mode in (2, 3):
-            parts = [files_global.get("ss", "")]
-            for m in CHAR_MATERIALS:
-                if files_global.get(m["id"]):
-                    parts.append(files_global[m["id"]])
-            combined = "\n".join(p for p in parts if p)
+            # 1本目のマルコフ素材：SS.txt・全キャラ資料・共通.txt の連結。
+            combined = first_markov_source(files_global)
             if combined:
                 left = max_char - current_len
                 if left > 0:
