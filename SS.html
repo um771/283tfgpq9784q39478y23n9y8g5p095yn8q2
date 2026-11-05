@@ -1618,8 +1618,8 @@ var SkeletonEngine = (function () {
       }
       var pick = weightedPick(cand);
       usedEntries.push(pick);
-      // @MALCOVタグを検出してマルコフ生成文に置換
-      if (pick.text === '@MALCOV' && markovText && P) {
+      // __MALCOV__マーカーを検出してマルコフ生成文に置換
+      if (pick.text === '__MALCOV__' && markovText && P) {
         var malcovSentence = generateMarkovOneLiner(markovText, 4, 50, P, '__serifu');
         out += malcovSentence || pick.text;
       } else {
