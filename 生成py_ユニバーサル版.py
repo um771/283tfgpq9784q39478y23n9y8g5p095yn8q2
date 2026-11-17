@@ -346,6 +346,18 @@ def int_or(v, fallback):
         return fallback
 
 
+def enforce_char_count_width(char_min: int, char_max: int) -> int:
+    """文字数行（文字数は X~Y 文字）の幅の下限を確保する。
+
+    幅（Y−X）は上限Yの1/10以上でなければならない。幅が上限の1/10に満たないときは、
+    上限を (X×10)/9 の切り上げへ置き換えて幅を確保する。置き換えた上限は、設定された
+    文字数上限（CHAR_COUNT_MAX）を超えてよい。
+    """
+    if (char_max - char_min) * 10 >= char_max:
+        return char_max
+    return (char_min * 10 + 8) // 9
+
+
 def norm_aa(s: str) -> str:
     """AA照合用の正規化"""
     if not s:
@@ -2320,7 +2332,7 @@ def build_contents_priority(files: dict, shuryo_mode: int, use_markov: bool,
         seal_base()
 
     char_min = random.randint(CHAR_COUNT_MIN, CHAR_COUNT_MAX)
-    char_max = random.randint(char_min, CHAR_COUNT_MAX)
+    char_max = enforce_char_count_width(char_min, random.randint(char_min, CHAR_COUNT_MAX))
     char_count_text = f"文字数は{char_min}~{char_max}文字"
 
     # キャラ資料の優先度適用
@@ -2626,7 +2638,7 @@ def build_contents(chosen: dict, use_markov: bool, hero_mode: int, hero_text: st
         return None
 
     char_min = random.randint(CHAR_COUNT_MIN, CHAR_COUNT_MAX)
-    char_max = random.randint(char_min, CHAR_COUNT_MAX)
+    char_max = enforce_char_count_width(char_min, random.randint(char_min, CHAR_COUNT_MAX))
     char_count_text = f"文字数は{char_min}~{char_max}文字"
 
     fp_hit = random.random() * 100 < num_or(FIRST_PERSON_RATE, 0)
