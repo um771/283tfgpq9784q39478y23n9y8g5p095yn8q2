@@ -2565,9 +2565,12 @@ var NovelGen = (function () {
       if (!addBase(files.kyoutsu)) return null;
       sealBase();
     }
-    if (!addBase('主要AAのキャラのみを使用し、モブを用意する場合も12-2の選出順序に従う')) return null;
-    sealBase();
+    if (shuryoMode !== 3) {
+      if (!addBase('主要AAのキャラのみを使用し、モブを用意する場合も12-2の選出順序に従う')) return null;
+      sealBase();
+    }
 
+    var markovSlots = [];
     if (useMarkov) {
       var effectiveMin = Math.min(MARKOV_LINES_HARD_MAX, shuryoMode === 3 ? 1 : P.markovLinesMin);
       var actualMax = Math.min(MARKOV_LINES_HARD_MAX, Math.max(effectiveMin, A.markovLinesMax));
@@ -2582,6 +2585,7 @@ var NovelGen = (function () {
             var generated1 = generateMarkovText(combined, MARKOV_ORDER, randint(effectiveMin, actualMax), left, P, '__priority_c1');
             if (generated1) {
               if (!addBase(generated1)) return null;
+              markovSlots.push({ block: curBaseBlock, index: curBaseBlock.length - 1, source: combined, cacheKey: '__priority_c1' });
               if (!addBase('---\n' + DATA_NOTE)) return null;
               sealBase();
             }
@@ -2593,6 +2597,7 @@ var NovelGen = (function () {
             var generated2 = generateMarkovText(files.markov, MARKOV_ORDER, randint(effectiveMin, actualMax), left2, P, 'markov');
             if (generated2) {
               if (!addBase(generated2)) return null;
+              markovSlots.push({ block: curBaseBlock, index: curBaseBlock.length - 1, source: files.markov, cacheKey: 'markov' });
               if (!addBase('---\n' + DATA_NOTE)) return null;
               sealBase();
             }
@@ -2604,6 +2609,7 @@ var NovelGen = (function () {
           var generated3 = generateMarkovText(files.markov, MARKOV_ORDER, randint(effectiveMin, actualMax), left3, P, 'markov');
           if (generated3) {
             if (!addBase(generated3)) return null;
+            markovSlots.push({ block: curBaseBlock, index: curBaseBlock.length - 1, source: files.markov, cacheKey: 'markov' });
             if (!addBase('↑\n' + DATA_NOTE)) return null;
             sealBase();
           }
@@ -2859,6 +2865,15 @@ var NovelGen = (function () {
       bodyBlocks = shuffle(bodyBlocks.slice());
     }
 
+    var preFillLen = 0;
+    bodyBlocks.forEach(function (b) {
+      b.forEach(function (t) { preFillLen += t.length + 2; });
+    });
+    finalTailBlocks.forEach(function (x) { preFillLen += x.length + 2; });
+    if (useMarkov) {
+      fillMarkovBlocksToMaxChar(markovSlots, maxChar, preFillLen, MARKOV_ORDER, P);
+    }
+
     var finalContents = [];
     bodyBlocks.forEach(function (b) {
       b.forEach(function (t) { finalContents.push(t); });
@@ -2878,6 +2893,47 @@ var NovelGen = (function () {
     };
   }
 
+
+  function trimTextToLimit(text, limit) {
+    if (!text || limit <= 0) return '';
+    if (text.length <= limit) return text;
+    var lines = text.split('\n');
+    while (lines.length > 0 && lines.join('\n').length > limit) {
+      lines.pop();
+    }
+    return lines.join('\n');
+  }
+
+  function fillMarkovBlocksToMaxChar(slots, maxChar, currentLen, markovOrder, P) {
+    if (!slots || !slots.length) return currentLen;
+    var slack = maxChar - currentLen;
+    if (slack <= 200) return currentLen;
+
+    for (var i = 0; i < slots.length; i++) {
+      var remainingSlots = slots.length - i;
+      var budget = (remainingSlots === 1)
+        ? slack
+        : Math.floor(slack * (0.3 + Math.random() * 0.4));
+      if (budget <= 100) continue;
+
+      var slot = slots[i];
+      var existing = slot.block[slot.index] || '';
+      var sepLen = existing ? 1 : 0; // '\n'
+      var charBudget = budget - sepLen;
+      if (charBudget <= 50) continue;
+
+      var extra = generateMarkovText(slot.source, markovOrder, 1000000, charBudget, P, slot.cacheKey);
+      extra = trimTextToLimit(extra, charBudget);
+      if (extra) {
+        slot.block[slot.index] = existing ? (existing + '\n' + extra) : extra;
+        var added = extra.length + sepLen;
+        slack -= added;
+        currentLen += added;
+      }
+      if (slack <= 100) break;
+    }
+    return currentLen;
+  }
 
   // ============================================================
   // build_contents（プロンプト本体の組み立て） — py と同ロジック
@@ -2924,8 +2980,9 @@ var NovelGen = (function () {
       return true;
     }
 
-    // モード2のとき、冒頭にSS.txtをそのまま挿入
-    if (shuryoMode === 2 && randint(1, 10000000000) > 2) {
+    // モード2のとき、1/2の確率で冒頭にSS.txtをそのまま挿入（残りの1/2は挿入せず前半マルコフの素材のみ）
+    var insertSS = (shuryoMode === 2 && Math.random() < 0.5);
+    if (insertSS) {
       var ssText = files.ss;
       if (ssText != null) {
         if (!addToContents(ssText)) return null;
@@ -2975,8 +3032,8 @@ var NovelGen = (function () {
       sealBlock();
     }
 
-    // 主要AAキャラ限定制約
-    if (randint(1, 1) === 1) {
+    // 主要AAキャラ限定制約（SS.txtがブロックとして挿入される場合のみ）
+    if (shuryoMode !== 3 && (shuryoMode !== 2 || insertSS) && randint(1, 1) === 1) {
       if (!addToContents('主要AAのキャラのみを使用し、モブを用意する場合も12-2の選出順序に従う')) return null;
       sealBlock();
     }
@@ -2998,6 +3055,7 @@ var NovelGen = (function () {
     var charaTemplate = buildCharTemplate(chosen, heroText, shuryoMode, files, P);
 
     // ---- マルコフテキスト ----
+    var markovSlots = [];
     if (useMarkov) {
       var effectiveMin = Math.min(MARKOV_LINES_HARD_MAX, (shuryoMode === 2 || shuryoMode === 3) ? 1 : P.markovLinesMin);
       var actualMax = Math.min(MARKOV_LINES_HARD_MAX, Math.max(effectiveMin, markovLinesMax));
@@ -3012,6 +3070,7 @@ var NovelGen = (function () {
             var mText1 = generateMarkovText(combinedText1, MARKOV_ORDER, mLines, remaining, P, '__c1');
             if (mText1) {
               if (!addToContents(mText1)) return null;
+              markovSlots.push({ block: curBlock, index: curBlock.length - 1, source: combinedText1, cacheKey: '__c1' });
               if (!addToContents('---\n' + DATA_NOTE)) return null;
               sealBlock();
             }
@@ -3026,6 +3085,7 @@ var NovelGen = (function () {
             var mText2 = generateMarkovText(markovText2, MARKOV_ORDER, mLines2, remaining2, P, 'markov');
             if (mText2) {
               if (!addToContents(mText2)) return null;
+              markovSlots.push({ block: curBlock, index: curBlock.length - 1, source: markovText2, cacheKey: 'markov' });
               if (!addToContents('---\n' + DATA_NOTE)) return null;
               sealBlock();
             }
@@ -3038,6 +3098,7 @@ var NovelGen = (function () {
           var mText3 = generateMarkovText(files.markov, MARKOV_ORDER, mLines3, remaining3, P, 'markov');
           if (mText3) {
             if (!addToContents(mText3)) return null;
+            markovSlots.push({ block: curBlock, index: curBlock.length - 1, source: files.markov, cacheKey: 'markov' });
             if (!addToContents('↑\n' + DATA_NOTE)) return null;
             sealBlock();
           }
@@ -3220,6 +3281,9 @@ var NovelGen = (function () {
     //   「視点提示 → 文字数指定」の2つ（fixedTail）は対象外で、
     //   シャッフル後も常にプロンプトの最後にこの順で固定される。
     sealBlock();
+    if (useMarkov) {
+      currentLen = fillMarkovBlocksToMaxChar(markovSlots, maxChar, currentLen, MARKOV_ORDER, P);
+    }
     var bodyBlocks = blocks;
     if (numOr(P.shuffleBlocksMode, 0) === 1) bodyBlocks = shuffle(blocks.slice());
 

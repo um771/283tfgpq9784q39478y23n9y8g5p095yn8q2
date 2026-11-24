@@ -2129,6 +2129,49 @@ def first_markov_source(files: dict) -> str:
     return "\n".join(p for p in parts if p)
 
 
+def trim_text_to_limit(text: str, limit: int) -> str:
+    if not text or limit <= 0:
+        return ""
+    if len(text) <= limit:
+        return text
+    lines = text.split("\n")
+    while lines and len("\n".join(lines)) > limit:
+        lines.pop()
+    return "\n".join(lines)
+
+
+def fill_markov_blocks_to_max_char(slots: list, max_char: int, current_len: int, markov_order: int) -> int:
+    if not slots:
+        return current_len
+    slack = max_char - current_len
+    if slack <= 200:
+        return current_len
+
+    for i, slot in enumerate(slots):
+        remaining_slots = len(slots) - i
+        budget = slack if remaining_slots == 1 else int(slack * (0.3 + random.random() * 0.4))
+        if budget <= 100:
+            continue
+
+        container, idx, source, cache_key = slot
+        existing = container[idx] or ""
+        sep_len = 1 if existing else 0
+        char_budget = budget - sep_len
+        if char_budget <= 50:
+            continue
+
+        extra = generate_markov_text(source, markov_order, 1000000, char_budget, cache_key)
+        extra = trim_text_to_limit(extra, char_budget)
+        if extra:
+            container[idx] = (existing + "\n" + extra) if existing else extra
+            added = len(extra) + sep_len
+            slack -= added
+            current_len += added
+        if slack <= 100:
+            break
+    return current_len
+
+
 def build_contents_priority(files: dict, shuryo_mode: int, use_markov: bool,
                             markov_lines_max: int, max_char: int,
                             char_priority: list[dict] | None = None,
@@ -2183,11 +2226,13 @@ def build_contents_priority(files: dict, shuryo_mode: int, use_markov: bool,
             return None
         seal_base()
 
-    if not add_base("主要AAのキャラのみを使用し、モブを用意する場合も12-2の選出順序に従う"):
-        return None
-    seal_base()
+    if shuryo_mode != 3:
+        if not add_base("主要AAのキャラのみを使用し、モブを用意する場合も12-2の選出順序に従う"):
+            return None
+        seal_base()
 
     # マルコフ
+    markov_slots = []
     if use_markov:
         effective_min = min(MARKOV_LINES_HARD_MAX, 1 if shuryo_mode == 3 else MARKOV_LINES_MIN)
         actual_max = min(MARKOV_LINES_HARD_MAX, max(effective_min, markov_lines_max))
@@ -2204,6 +2249,7 @@ def build_contents_priority(files: dict, shuryo_mode: int, use_markov: bool,
                     if gen:
                         if not add_base(gen):
                             return None
+                        markov_slots.append((cur_base_block, len(cur_base_block) - 1, combined, "__c1"))
                         if not add_base("---\n" + DATA_NOTE):
                             return None
                         seal_base()
@@ -2215,6 +2261,7 @@ def build_contents_priority(files: dict, shuryo_mode: int, use_markov: bool,
                     if gen2:
                         if not add_base(gen2):
                             return None
+                        markov_slots.append((cur_base_block, len(cur_base_block) - 1, files["markov"], "markov"))
                         if not add_base("---\n" + DATA_NOTE):
                             return None
                         seal_base()
@@ -2226,6 +2273,7 @@ def build_contents_priority(files: dict, shuryo_mode: int, use_markov: bool,
                 if gen:
                     if not add_base(gen):
                         return None
+                    markov_slots.append((cur_base_block, len(cur_base_block) - 1, files.get("markov", ""), "markov"))
                     if not add_base("↑\n" + DATA_NOTE):
                         return None
                     seal_base()
@@ -2429,6 +2477,10 @@ def build_contents_priority(files: dict, shuryo_mode: int, use_markov: bool,
     if SHUFFLE_BLOCKS_MODE == 1:
         random.shuffle(body_blocks)
 
+    pre_fill_len = sum(len(x) + 2 for b in body_blocks for x in b) + sum(len(x) + 2 for x in final_tail)
+    if use_markov:
+        fill_markov_blocks_to_max_char(markov_slots, max_char, pre_fill_len, MARKOV_ORDER)
+
     final_contents = []
     for b in body_blocks:
         final_contents.extend(b)
@@ -2463,7 +2515,8 @@ def build_contents(chosen: dict, use_markov: bool, hero_mode: int, hero_text: st
         current_len += len(text) + 2
         return current_len <= max_char
 
-    if shuryo_mode == 2 and random.randint(1, 10) > 2:
+    insert_ss = (shuryo_mode == 2 and random.random() < 0.5)
+    if insert_ss:
         ss = files_global.get("ss")
         if ss:
             if not add(ss):
@@ -2486,8 +2539,9 @@ def build_contents(chosen: dict, use_markov: bool, hero_mode: int, hero_text: st
             if not add(kyoutsu):
                 return None
 
-    if not add("主要AAのキャラのみを使用し、モブを用意する場合も12-2の選出順序に従う"):
-        return None
+    if shuryo_mode != 3 and (shuryo_mode != 2 or insert_ss):
+        if not add("主要AAのキャラのみを使用し、モブを用意する場合も12-2の選出順序に従う"):
+            return None
 
     if shuryo_mode != 2:
         # モード2では3グループの関係ルールは使わない
@@ -2510,6 +2564,7 @@ def build_contents(chosen: dict, use_markov: bool, hero_mode: int, hero_text: st
         if not add(template):
             return None
 
+    markov_slots = []
     if use_markov:
         effective_min = 1 if shuryo_mode in (2, 3) else MARKOV_LINES_MIN
         actual_max = max(effective_min, markov_lines_max)
@@ -2525,6 +2580,7 @@ def build_contents(chosen: dict, use_markov: bool, hero_mode: int, hero_text: st
                     if gen:
                         if not add(gen):
                             return None
+                        markov_slots.append((contents, len(contents) - 1, combined, "__c1"))
                         if not add("---\n" + DATA_NOTE):
                             return None
             markov = files_global.get("markov")
@@ -2536,6 +2592,7 @@ def build_contents(chosen: dict, use_markov: bool, hero_mode: int, hero_text: st
                     if gen2:
                         if not add(gen2):
                             return None
+                        markov_slots.append((contents, len(contents) - 1, markov, "markov"))
                         if not add("---\n" + DATA_NOTE):
                             return None
         else:
@@ -2546,6 +2603,7 @@ def build_contents(chosen: dict, use_markov: bool, hero_mode: int, hero_text: st
                 if gen:
                     if not add(gen):
                         return None
+                    markov_slots.append((contents, len(contents) - 1, files_global.get("markov", ""), "markov"))
                     if not add("↑\n" + DATA_NOTE):
                         return None
 
@@ -2676,6 +2734,9 @@ def build_contents(chosen: dict, use_markov: bool, hero_mode: int, hero_text: st
                 return None
             if not add(char_count_text):
                 return None
+
+    if use_markov:
+        fill_markov_blocks_to_max_char(markov_slots, max_char, current_len, MARKOV_ORDER)
 
     return contents
 
