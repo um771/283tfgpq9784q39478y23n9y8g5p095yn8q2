@@ -2579,27 +2579,42 @@ var NovelGen = (function () {
         // 素材は SS.txt・全キャラ資料・共通.txt を連結したもので、
         // 後段で採用するキャラ資料とは独立させる。
         var combined = firstMarkovSource(files);
-        if (combined) {
-          var left = maxChar - baseLen;
-          if (left > 0) {
-            var generated1 = generateMarkovText(combined, MARKOV_ORDER, randint(effectiveMin, actualMax), left, P, '__priority_c1');
-            if (generated1) {
-              if (!addBase(generated1)) return null;
-              markovSlots.push({ block: curBaseBlock, index: curBaseBlock.length - 1, source: combined, cacheKey: '__priority_c1' });
+        var useMerged = (numOr(P.mergeMarkovSourcesMode, 1) === 1 && Math.random() < 0.5);
+        if (useMerged && combined && files.markov) {
+          var mergedSrc = buildMergedMarkovSource(combined, files.markov, P);
+          var leftM = maxChar - baseLen;
+          if (leftM > 0 && mergedSrc) {
+            var genM = generateMarkovText(mergedSrc, MARKOV_ORDER, randint(effectiveMin, actualMax), leftM, P, '__priority_merged');
+            if (genM) {
+              if (!addBase(genM)) return null;
+              markovSlots.push({ block: curBaseBlock, index: curBaseBlock.length - 1, source: mergedSrc, cacheKey: '__priority_merged' });
               if (!addBase('---\n' + DATA_NOTE)) return null;
               sealBase();
             }
           }
-        }
-        if (files.markov) {
-          var left2 = maxChar - baseLen;
-          if (left2 > 0) {
-            var generated2 = generateMarkovText(files.markov, MARKOV_ORDER, randint(effectiveMin, actualMax), left2, P, 'markov');
-            if (generated2) {
-              if (!addBase(generated2)) return null;
-              markovSlots.push({ block: curBaseBlock, index: curBaseBlock.length - 1, source: files.markov, cacheKey: 'markov' });
-              if (!addBase('---\n' + DATA_NOTE)) return null;
-              sealBase();
+        } else {
+          if (combined) {
+            var left = maxChar - baseLen;
+            if (left > 0) {
+              var generated1 = generateMarkovText(combined, MARKOV_ORDER, randint(effectiveMin, actualMax), left, P, '__priority_c1');
+              if (generated1) {
+                if (!addBase(generated1)) return null;
+                markovSlots.push({ block: curBaseBlock, index: curBaseBlock.length - 1, source: combined, cacheKey: '__priority_c1' });
+                if (!addBase('---\n' + DATA_NOTE)) return null;
+                sealBase();
+              }
+            }
+          }
+          if (files.markov) {
+            var left2 = maxChar - baseLen;
+            if (left2 > 0) {
+              var generated2 = generateMarkovText(files.markov, MARKOV_ORDER, randint(effectiveMin, actualMax), left2, P, 'markov');
+              if (generated2) {
+                if (!addBase(generated2)) return null;
+                markovSlots.push({ block: curBaseBlock, index: curBaseBlock.length - 1, source: files.markov, cacheKey: 'markov' });
+                if (!addBase('---\n' + DATA_NOTE)) return null;
+                sealBase();
+              }
             }
           }
         }
@@ -2904,6 +2919,23 @@ var NovelGen = (function () {
     return lines.join('\n');
   }
 
+  function buildMergedMarkovSource(sysText, markovText, P) {
+    var a = sysText || '';
+    var b = markovText || '';
+    if (!a) return b;
+    if (!b) return a;
+    if (a.length < b.length) {
+      var diffA = b.length - a.length;
+      var padA = generateMarkovText(a, 4, 1000000, diffA, P, '__pad_sys');
+      if (padA) a = a + '\n' + trimTextToLimit(padA, diffA);
+    } else if (b.length < a.length) {
+      var diffB = a.length - b.length;
+      var padB = generateMarkovText(b, 4, 1000000, diffB, P, '__pad_mkv');
+      if (padB) b = b + '\n' + trimTextToLimit(padB, diffB);
+    }
+    return a + '\n' + b;
+  }
+
   function fillMarkovBlocksToMaxChar(slots, maxChar, currentLen, markovOrder, P) {
     if (!slots || !slots.length) return currentLen;
     var slack = maxChar - currentLen;
@@ -2913,7 +2945,7 @@ var NovelGen = (function () {
       var remainingSlots = slots.length - i;
       var budget = (remainingSlots === 1)
         ? slack
-        : Math.floor(slack * (0.3 + Math.random() * 0.4));
+        : Math.floor(slack * (0.45 + Math.random() * 0.1));
       if (budget <= 100) continue;
 
       var slot = slots[i];
@@ -3063,31 +3095,47 @@ var NovelGen = (function () {
       if (shuryoMode === 2 || shuryoMode === 3) {
         // 1本目のマルコフ素材：SS.txt・全キャラ資料・共通.txt の連結。
         var combinedText1 = firstMarkovSource(files);
-        if (combinedText1) {
-          var mLines = randint(effectiveMin, actualMax);
-          var remaining = maxChar - currentLen;
-          if (remaining > 0) {
-            var mText1 = generateMarkovText(combinedText1, MARKOV_ORDER, mLines, remaining, P, '__c1');
-            if (mText1) {
-              if (!addToContents(mText1)) return null;
-              markovSlots.push({ block: curBlock, index: curBlock.length - 1, source: combinedText1, cacheKey: '__c1' });
+        var useMerged2 = (numOr(P.mergeMarkovSourcesMode, 1) === 1 && Math.random() < 0.5);
+        if (useMerged2 && combinedText1 && files.markov) {
+          var mergedSrc2 = buildMergedMarkovSource(combinedText1, files.markov, P);
+          var mLinesM = randint(effectiveMin, actualMax);
+          var remainingM = maxChar - currentLen;
+          if (remainingM > 0 && mergedSrc2) {
+            var mTextM = generateMarkovText(mergedSrc2, MARKOV_ORDER, mLinesM, remainingM, P, '__merged');
+            if (mTextM) {
+              if (!addToContents(mTextM)) return null;
+              markovSlots.push({ block: curBlock, index: curBlock.length - 1, source: mergedSrc2, cacheKey: '__merged' });
               if (!addToContents('---\n' + DATA_NOTE)) return null;
               sealBlock();
             }
           }
-        }
-        // 2つ目：マルコフ.txt のみでマルコフ
-        var markovText2 = files.markov;
-        if (markovText2) {
-          var mLines2 = randint(effectiveMin, actualMax);
-          var remaining2 = maxChar - currentLen;
-          if (remaining2 > 0) {
-            var mText2 = generateMarkovText(markovText2, MARKOV_ORDER, mLines2, remaining2, P, 'markov');
-            if (mText2) {
-              if (!addToContents(mText2)) return null;
-              markovSlots.push({ block: curBlock, index: curBlock.length - 1, source: markovText2, cacheKey: 'markov' });
-              if (!addToContents('---\n' + DATA_NOTE)) return null;
-              sealBlock();
+        } else {
+          if (combinedText1) {
+            var mLines = randint(effectiveMin, actualMax);
+            var remaining = maxChar - currentLen;
+            if (remaining > 0) {
+              var mText1 = generateMarkovText(combinedText1, MARKOV_ORDER, mLines, remaining, P, '__c1');
+              if (mText1) {
+                if (!addToContents(mText1)) return null;
+                markovSlots.push({ block: curBlock, index: curBlock.length - 1, source: combinedText1, cacheKey: '__c1' });
+                if (!addToContents('---\n' + DATA_NOTE)) return null;
+                sealBlock();
+              }
+            }
+          }
+          // 2つ目：マルコフ.txt のみでマルコフ
+          var markovText2 = files.markov;
+          if (markovText2) {
+            var mLines2 = randint(effectiveMin, actualMax);
+            var remaining2 = maxChar - currentLen;
+            if (remaining2 > 0) {
+              var mText2 = generateMarkovText(markovText2, MARKOV_ORDER, mLines2, remaining2, P, 'markov');
+              if (mText2) {
+                if (!addToContents(mText2)) return null;
+                markovSlots.push({ block: curBlock, index: curBlock.length - 1, source: markovText2, cacheKey: 'markov' });
+                if (!addToContents('---\n' + DATA_NOTE)) return null;
+                sealBlock();
+              }
             }
           }
         }
@@ -4194,6 +4242,7 @@ NovelGen.setNovelData(NOVEL_DATA);
     // 基本
     shuryoOnlyMode: 0,        // 0=ランダム / -1=通常（キャラ優先度） / 2=モード2 / 3=モード3（モード1は欠番）
     shuffleBlocksMode: 0,     // ブロックランダム順 0=OFF（固定順） / 1=ON（視点→文字数は常に最後固定）
+    mergeMarkovSourcesMode: 1, // 複数マルコフ時に1/2で合算1本化 0=OFF / 1=ON
     useMarkovMode: 1,         // 1=ON / 0=OFF
     heroMode: -1,             // -1=ランダム / 0=視点なし / 1=必ず視点
     useLastMarkovLineMode: 1, // 題材断片の提示 1=ON / 0=OFF
@@ -4253,6 +4302,7 @@ NovelGen.setNovelData(NOVEL_DATA);
       options: [['', '0: ランダム（従来通り）'], ['group:nijisousaku', '二次創作の誰か（ランダム）'], ['group:choukasoku', '超加速の誰か（ランダム）'], ['group:lab', 'ラボ組の誰か（ランダム）'], ['group:school', '学校組の誰か（ランダム）'], ['group:host', 'ホスト組の誰か（ランダム）'], ['ブーン', 'ブーン（二次創作）'], ['ドクオ', 'ドクオ（二次創作）'], ['クー', 'クー（二次創作）'], ['シュー', 'シュー（二次創作）'], ['モララー', 'モララー（二次創作）'], ['ギコ', 'ギコ（二次創作）'], ['ショボン', 'ショボン（二次創作）'], ['シャキン', 'シャキン（二次創作）'], ['兄者', '兄者（二次創作）'], ['弟者', '弟者（二次創作）'], ['モナー', 'モナー（超加速）'], ['ロマネスク', 'ロマネスク（超加速）'], ['しぃ', 'しぃ（超加速）'], ['つー', 'つー（超加速）'], ['ミセリ', 'ミセリ（超加速）'], ['トソン', 'トソン（超加速）'], ['フォックス', 'フォックス（ラボ組）'], ['花瓶', '花瓶（ラボ組）'], ['ヒート', 'ヒート（ラボ組）'], ['デレ', 'デレ（学校組）'], ['キュート', 'キュート（学校組）'], ['ペニサス', 'ペニサス（学校組）'], ['またんき', 'またんき（ホスト組）'], ['フサギコ', 'フサギコ（ホスト組）'], ['ぃょぅ', 'ぃょぅ（ホスト組）'], ['ツン', 'ツン'], ['渡辺さん', '渡辺さん'], ['ハイン', 'ハイン'], ['でぃ', 'でぃ']] },
     { key: 'markovOrder', label: 'マルコフ次数（0=ランダム1〜5）', type: 'number', min: 0, max: 5, adv: true },
     { key: 'markovFluctuation', label: 'マルコフ精度の揺らぎ', type: 'select', options: [[1, '1: ON'], [-1, '-1: OFF']], adv: true },
+    { key: 'mergeMarkovSourcesMode', label: '複数マルコフ1/2合算モード', type: 'select', options: [[1, '1: ON（1/2で均等補完して合算）'], [0, '0: OFF（常に2本）']], adv: true },
     { key: 'markovLinesMin', label: 'マルコフ最小行数', type: 'number', min: 1, adv: true },
     { key: 'markovLinesMaxShuryo', label: '資料オンリー時のマルコフ最大行数（上限1000）', type: 'number', min: 1, max: 1000, adv: true },
     { key: 'maxChar', label: '全体上限文字数（MAX_CHAR）', type: 'number', min: 1000, adv: true },

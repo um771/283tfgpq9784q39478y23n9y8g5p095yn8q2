@@ -104,6 +104,7 @@ FIRST_PERSON_RATE = 50
 
 # ブロックランダム順モード（0=OFF / 1=ON）
 SHUFFLE_BLOCKS_MODE = 0
+MERGE_MARKOV_SOURCES_MODE = 1
 
 # 視点キャラ固定（''=ランダム / キャラ名 / group:◯◯）
 FIXED_HERO = ""
@@ -2140,6 +2141,26 @@ def trim_text_to_limit(text: str, limit: int) -> str:
     return "\n".join(lines)
 
 
+def build_merged_markov_source(sys_text: str, markov_text: str) -> str:
+    a = sys_text or ""
+    b = markov_text or ""
+    if not a:
+        return b
+    if not b:
+        return a
+    if len(a) < len(b):
+        diff_a = len(b) - len(a)
+        pad_a = generate_markov_text(a, 4, 1000000, diff_a, "__pad_sys")
+        if pad_a:
+            a = a + "\n" + trim_text_to_limit(pad_a, diff_a)
+    elif len(b) < len(a):
+        diff_b = len(a) - len(b)
+        pad_b = generate_markov_text(b, 4, 1000000, diff_b, "__pad_mkv")
+        if pad_b:
+            b = b + "\n" + trim_text_to_limit(pad_b, diff_b)
+    return a + "\n" + b
+
+
 def fill_markov_blocks_to_max_char(slots: list, max_char: int, current_len: int, markov_order: int) -> int:
     if not slots:
         return current_len
@@ -2149,7 +2170,7 @@ def fill_markov_blocks_to_max_char(slots: list, max_char: int, current_len: int,
 
     for i, slot in enumerate(slots):
         remaining_slots = len(slots) - i
-        budget = slack if remaining_slots == 1 else int(slack * (0.3 + random.random() * 0.4))
+        budget = slack if remaining_slots == 1 else int(slack * (0.45 + random.random() * 0.1))
         if budget <= 100:
             continue
 
@@ -2241,30 +2262,45 @@ def build_contents_priority(files: dict, shuryo_mode: int, use_markov: bool,
             # 素材は SS.txt・全キャラ資料・共通.txt を連結したもので、
             # 後段で採用するキャラ資料とは独立させる。
             combined = first_markov_source(files)
-            if combined:
-                left = max_char - base_len
-                if left > 0:
-                    gen = generate_markov_text(combined, MARKOV_ORDER,
-                                              random.randint(effective_min, actual_max), left, "__c1")
-                    if gen:
-                        if not add_base(gen):
+            use_merged = (MERGE_MARKOV_SOURCES_MODE == 1 and random.random() < 0.5)
+            if use_merged and combined and files.get("markov"):
+                merged_src = build_merged_markov_source(combined, files["markov"])
+                left_m = max_char - base_len
+                if left_m > 0 and merged_src:
+                    gen_m = generate_markov_text(merged_src, MARKOV_ORDER,
+                                                 random.randint(effective_min, actual_max), left_m, "__priority_merged")
+                    if gen_m:
+                        if not add_base(gen_m):
                             return None
-                        markov_slots.append((cur_base_block, len(cur_base_block) - 1, combined, "__c1"))
+                        markov_slots.append((cur_base_block, len(cur_base_block) - 1, merged_src, "__priority_merged"))
                         if not add_base("---\n" + DATA_NOTE):
                             return None
                         seal_base()
-            if files.get("markov"):
-                left2 = max_char - base_len
-                if left2 > 0:
-                    gen2 = generate_markov_text(files["markov"], MARKOV_ORDER,
-                                               random.randint(effective_min, actual_max), left2, "markov")
-                    if gen2:
-                        if not add_base(gen2):
-                            return None
-                        markov_slots.append((cur_base_block, len(cur_base_block) - 1, files["markov"], "markov"))
-                        if not add_base("---\n" + DATA_NOTE):
-                            return None
-                        seal_base()
+            else:
+                if combined:
+                    left = max_char - base_len
+                    if left > 0:
+                        gen = generate_markov_text(combined, MARKOV_ORDER,
+                                                  random.randint(effective_min, actual_max), left, "__c1")
+                        if gen:
+                            if not add_base(gen):
+                                return None
+                            markov_slots.append((cur_base_block, len(cur_base_block) - 1, combined, "__c1"))
+                            if not add_base("---\n" + DATA_NOTE):
+                                return None
+                            seal_base()
+                if files.get("markov"):
+                    left2 = max_char - base_len
+                    if left2 > 0:
+                        gen2 = generate_markov_text(files["markov"], MARKOV_ORDER,
+                                                   random.randint(effective_min, actual_max), left2, "markov")
+                        if gen2:
+                            if not add_base(gen2):
+                                return None
+                            markov_slots.append((cur_base_block, len(cur_base_block) - 1, files["markov"], "markov"))
+                            if not add_base("---\n" + DATA_NOTE):
+                                return None
+                            seal_base()
         else:
             left = max_char - base_len
             if left > 0:
@@ -2572,29 +2608,43 @@ def build_contents(chosen: dict, use_markov: bool, hero_mode: int, hero_text: st
         if shuryo_mode in (2, 3):
             # 1本目のマルコフ素材：SS.txt・全キャラ資料・共通.txt の連結。
             combined = first_markov_source(files_global)
-            if combined:
-                left = max_char - current_len
-                if left > 0:
-                    gen = generate_markov_text(combined, MARKOV_ORDER,
-                                              random.randint(effective_min, actual_max), left, "__c1")
-                    if gen:
-                        if not add(gen):
-                            return None
-                        markov_slots.append((contents, len(contents) - 1, combined, "__c1"))
-                        if not add("---\n" + DATA_NOTE):
-                            return None
             markov = files_global.get("markov")
-            if markov:
-                left = max_char - current_len
-                if left > 0:
-                    gen2 = generate_markov_text(markov, MARKOV_ORDER,
-                                               random.randint(effective_min, actual_max), left, "markov")
-                    if gen2:
-                        if not add(gen2):
+            use_merged2 = (MERGE_MARKOV_SOURCES_MODE == 1 and random.random() < 0.5)
+            if use_merged2 and combined and markov:
+                merged_src2 = build_merged_markov_source(combined, markov)
+                left_m2 = max_char - current_len
+                if left_m2 > 0 and merged_src2:
+                    gen_m2 = generate_markov_text(merged_src2, MARKOV_ORDER,
+                                                  random.randint(effective_min, actual_max), left_m2, "__merged")
+                    if gen_m2:
+                        if not add(gen_m2):
                             return None
-                        markov_slots.append((contents, len(contents) - 1, markov, "markov"))
+                        markov_slots.append((contents, len(contents) - 1, merged_src2, "__merged"))
                         if not add("---\n" + DATA_NOTE):
                             return None
+            else:
+                if combined:
+                    left = max_char - current_len
+                    if left > 0:
+                        gen = generate_markov_text(combined, MARKOV_ORDER,
+                                                  random.randint(effective_min, actual_max), left, "__c1")
+                        if gen:
+                            if not add(gen):
+                                return None
+                            markov_slots.append((contents, len(contents) - 1, combined, "__c1"))
+                            if not add("---\n" + DATA_NOTE):
+                                return None
+                if markov:
+                    left = max_char - current_len
+                    if left > 0:
+                        gen2 = generate_markov_text(markov, MARKOV_ORDER,
+                                                   random.randint(effective_min, actual_max), left, "markov")
+                        if gen2:
+                            if not add(gen2):
+                                return None
+                            markov_slots.append((contents, len(contents) - 1, markov, "markov"))
+                            if not add("---\n" + DATA_NOTE):
+                                return None
         else:
             left = max_char - current_len
             if left > 0:
